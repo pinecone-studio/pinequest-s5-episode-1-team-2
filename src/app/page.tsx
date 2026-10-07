@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Settings2 } from "lucide-react";
+import { ChevronRight, Settings2, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/safe-path";
 
 export default function Home() {
@@ -16,16 +16,19 @@ export default function Home() {
         </header>
 
         <section className="flex flex-1 flex-col justify-center pb-8" aria-labelledby="start-title">
-          <h1 id="start-title" className="mb-5 text-[30px] font-semibold tracking-[-0.04em]">Та хэн бэ?</h1>
-          <div className="divide-y divide-[#e7e7e5] border-y border-[#e7e7e5]">
-            <Link href="/guardian" className="group flex min-h-[64px] items-center gap-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
-              <span className="min-w-0 flex-1 text-[16px] font-medium">Эцэг эх / Асран хамгаалагч</span>
-              <ChevronRight size={18} className="text-[#737373] transition group-hover:translate-x-0.5" />
+          <h1 id="start-title" className="text-[28px] font-semibold tracking-[-0.04em]">Та хэн бэ?</h1>
+          <p className="mt-2 text-[14px] text-[#737373]">Үргэлжлүүлэх горимоо сонгоно уу.</p>
+          <div className="mt-6 grid gap-2">
+            <Link href="/guardian" className="group flex min-h-[76px] items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><ShieldCheck size={19} strokeWidth={1.7} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Эцэг эх / Асран хамгаалагч</span><span className="mt-1 block text-[12px] text-[#737373]">Байршил, аюулгүй байдлыг харах</span></span>
+              <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
             </Link>
 
-            <Link href="/tracker" className="group flex min-h-[64px] items-center gap-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
-              <span className="min-w-0 flex-1 text-[16px] font-medium">Хэрэглэгч</span>
-              <ChevronRight size={18} className="text-[#737373] transition group-hover:translate-x-0.5" />
+            <Link href="/tracker" className="group flex min-h-[76px] items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><UserRound size={19} strokeWidth={1.7} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Хэрэглэгч</span><span className="mt-1 block text-[12px] text-[#737373]">Милотой ярилцах</span></span>
+              <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
         </section>

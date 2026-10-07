@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronRight, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/safe-path";
 
 type Step = "role" | "pin";
@@ -32,12 +33,16 @@ export default function RolePage() {
               Та хэн бэ?
             </h1>
 
-            <div className="mt-10 grid gap-3" role="group" aria-label="Хэрэглэгчийн горим сонгох">
-              <button type="button" onClick={() => setStep("pin")} className="min-h-[52px] w-full rounded-2xl bg-[#111111] px-5 text-[16px] font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
-                Эцэг эх / Асран хамгаалагч
+            <div className="mt-6 grid gap-2" role="group" aria-label="Хэрэглэгчийн горим сонгох">
+              <button type="button" onClick={() => setStep("pin")} className="group flex min-h-[76px] w-full items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 text-left transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><ShieldCheck size={19} strokeWidth={1.7} /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Эцэг эх / Асран хамгаалагч</span><span className="mt-1 block text-[12px] font-normal text-[#737373]">Байршил, аюулгүй байдлыг харах</span></span>
+                <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
               </button>
-              <button type="button" onClick={() => router.push("/tracker")} className="min-h-[52px] w-full rounded-2xl border border-[#e7e7e5] bg-white px-5 text-[16px] font-medium text-[#111111] transition-colors hover:bg-[#f7f7f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
-                Хэрэглэгч
+              <button type="button" onClick={() => router.push("/tracker")} className="group flex min-h-[76px] w-full items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 text-left transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><UserRound size={19} strokeWidth={1.7} /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Хэрэглэгч</span><span className="mt-1 block text-[12px] font-normal text-[#737373]">Милотой ярилцах</span></span>
+                <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </div>
