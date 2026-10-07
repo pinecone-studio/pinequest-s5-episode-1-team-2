@@ -1,27 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { ChevronRight, UserRoundCog } from "lucide-react";
 import { AppShell, BackHeader } from "@/components/safe-path";
+import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import type { AssistantSettings } from "@/types/safety";
-
-const initialSettings: AssistantSettings = {
-  name: "Мило",
-  voice: "Эмэгтэй",
-  avatar: "Мило",
-  tone: "Тайван",
-  speechSpeed: "Удаан",
-  instructionLength: "Богино",
-};
 
 const avatars: AssistantSettings["avatar"][] = ["Мило", "Ари", "Номи", "Туяа"];
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState(initialSettings);
-  const update = <K extends keyof AssistantSettings>(key: K, value: AssistantSettings[K]) => {
-    setSettings((current) => ({ ...current, [key]: value }));
-  };
+  const { settings, update } = useAssistantSettings();
 
   return (
     <AppShell>
@@ -29,6 +17,11 @@ export default function SettingsPage() {
         <BackHeader title="AI туслах" />
 
         <form className="px-5 pt-4" onSubmit={(event) => event.preventDefault()}>
+          <section className="pb-8">
+            <label htmlFor="user-name" className="text-sm font-medium text-[#737373]">Хэрэглэгчийн нэр</label>
+            <input id="user-name" value={settings.userName} onChange={(event) => update("userName", event.target.value)} className="mt-2 min-h-13 w-full border-0 border-b border-[#deded9] bg-white px-0 text-[22px] font-semibold tracking-[-0.02em] outline-none focus:border-[#111111]" />
+          </section>
+
           <section className="pb-8">
             <label htmlFor="assistant-name" className="text-sm font-medium text-[#737373]">Туслахын нэр</label>
             <input id="assistant-name" value={settings.name} onChange={(event) => update("name", event.target.value)} className="mt-2 min-h-13 w-full border-0 border-b border-[#deded9] bg-white px-0 text-[22px] font-semibold tracking-[-0.02em] outline-none focus:border-[#111111]" />
