@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronRight, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/safe-path";
 
 type Step = "role" | "pin";
@@ -24,20 +25,24 @@ export default function RolePage() {
   return (
     <AppShell>
       {step === "role" ? (
-        <main className="flex min-h-dvh flex-col px-6 pb-[calc(28px+env(safe-area-inset-bottom))] pt-[calc(24px+env(safe-area-inset-top))]">
+        <main className="flex min-h-dvh flex-col px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))]">
           <p className="text-[17px] font-semibold tracking-[-0.02em]">SafePath</p>
 
           <div className="flex flex-1 flex-col justify-center py-16">
-            <h1 className="text-center text-[32px] font-semibold leading-[1.14] tracking-[-0.04em]">
-              Та ямар горимоор ашиглах вэ?
+            <h1 className="text-center text-[30px] font-semibold leading-[1.14] tracking-[-0.04em]">
+              Та хэн бэ?
             </h1>
 
-            <div className="mt-12 grid gap-3" role="group" aria-label="Хэрэглэгчийн горим сонгох">
-              <button type="button" onClick={() => setStep("pin")} className="min-h-16 w-full rounded-2xl bg-black px-5 text-[17px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
-                Асран хамгаалагч
+            <div className="mt-6 grid gap-2" role="group" aria-label="Хэрэглэгчийн горим сонгох">
+              <button type="button" onClick={() => setStep("pin")} className="group flex min-h-[76px] w-full items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 text-left transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><ShieldCheck size={19} strokeWidth={1.7} /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Эцэг эх / Асран хамгаалагч</span><span className="mt-1 block text-[12px] font-normal text-[#737373]">Байршил, аюулгүй байдлыг харах</span></span>
+                <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
               </button>
-              <button type="button" onClick={() => router.push("/tracker")} className="min-h-16 w-full rounded-2xl bg-black px-5 text-[17px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
-                Хэрэглэгч
+              <button type="button" onClick={() => router.push("/tracker")} className="group flex min-h-[76px] w-full items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 text-left transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><UserRound size={19} strokeWidth={1.7} /></span>
+                <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Хэрэглэгч</span><span className="mt-1 block text-[12px] font-normal text-[#737373]">Милотой ярилцах</span></span>
+                <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </div>
@@ -47,9 +52,9 @@ export default function RolePage() {
           </Link>
         </main>
       ) : (
-        <main className="flex min-h-dvh flex-col px-6 pb-[calc(28px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
+        <main className="flex min-h-dvh flex-col px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
           <header className="flex min-h-16 items-center">
-            <button type="button" onClick={() => { setStep("role"); setPin(""); }} aria-label="Үүрэг сонгох дэлгэц рүү буцах" className="-ml-3 grid size-11 place-items-center rounded-full hover:bg-[#f6f6f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+            <button type="button" onClick={() => { setStep("role"); setPin(""); }} aria-label="Үүрэг сонгох дэлгэц рүү буцах" className="-ml-3 grid size-11 place-items-center rounded-xl transition-colors hover:bg-[#f7f7f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
               <span className="text-xl" aria-hidden="true">←</span>
             </button>
           </header>
@@ -68,11 +73,11 @@ export default function RolePage() {
               value={pin}
               onChange={(event) => handlePinChange(event.target.value)}
               autoFocus
-              className="mt-8 h-16 w-full rounded-2xl border border-[#deded9] bg-[#f6f6f4] px-5 text-center text-2xl font-semibold tracking-[0.7em] outline-none focus:border-[#111111]"
+              className="mt-8 h-16 w-full rounded-xl border border-[#e7e7e5] bg-[#f7f7f5] px-5 text-center text-2xl font-semibold tracking-[0.7em] outline-none focus:border-[#111111]"
             />
             <p className="mt-3 text-center text-xs text-[#737373]">Туршилтын хувилбар · дурын 4 орон</p>
 
-            <button type="submit" disabled={pin.length !== 4} className="mt-8 min-h-13 rounded-2xl bg-[#111111] px-5 text-[15px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+            <button type="submit" disabled={pin.length !== 4} className="mt-8 min-h-[52px] rounded-2xl bg-[#111111] px-5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
               Үргэлжлүүлэх
             </button>
           </form>

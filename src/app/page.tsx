@@ -1,53 +1,37 @@
 import Link from "next/link";
-import { ChevronRight, MapPin, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import { ChevronRight, Settings2, ShieldCheck, UserRound } from "lucide-react";
 import { AppShell } from "@/components/safe-path";
 
 export default function Home() {
   return (
     <AppShell>
-      <main className="flex min-h-dvh flex-col px-6 pb-[calc(28px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))]">
+      <main className="flex min-h-dvh flex-col px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))]">
         <header className="flex items-center justify-between">
-          <Link href="/" aria-label="SafePath нүүр" className="flex min-h-11 items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173f35]">
-            <span className="grid size-9 place-items-center rounded-xl bg-[#173f35] text-white"><ShieldCheck size={19} strokeWidth={1.8} /></span>
-            <span className="text-[16px] font-semibold tracking-[-0.025em]">SafePath</span>
+          <Link href="/" aria-label="SafePath нүүр" className="flex min-h-11 items-center rounded-xl text-[17px] font-semibold tracking-[-0.025em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+            SafePath
           </Link>
-          <Link href="/settings" aria-label="Тохиргоо" className="grid size-10 place-items-center rounded-full text-[#737b75] transition hover:bg-[#f5f6f4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173f35]">
+          <Link href="/settings" aria-label="Тохиргоо" className="grid size-11 place-items-center rounded-xl text-[#737373] transition hover:bg-[#f7f7f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
             <Settings2 size={18} strokeWidth={1.8} />
           </Link>
         </header>
 
-        <section className="mt-14" aria-labelledby="welcome-title">
-          <p className="text-[13px] font-medium text-[#858b86]">ӨДӨР ТУТМЫН АЮУЛГҮЙ БАЙДАЛ</p>
-          <h1 id="welcome-title" className="mt-3 max-w-[320px] text-[32px] font-semibold leading-[1.12] tracking-[-0.045em]">Хайртай хүмүүсээ аюулгүй байлга.</h1>
-          <p className="mt-3 text-[15px] leading-6 text-[#737973]">Байршил, маршрутаа нэг дороос хянаарай.</p>
-        </section>
-
-        <section className="mt-12" aria-labelledby="start-title">
-          <h2 id="start-title" className="mb-3 text-[14px] font-medium text-[#858b86]">ҮРГЭЛЖЛҮҮЛЭХ</h2>
-          <div className="divide-y divide-[#eeeeeb] border-y border-[#eeeeeb]">
-            <Link href="/guardian" className="group flex min-h-[82px] items-center gap-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173f35]">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f2f5f2] text-[#355347]"><UsersRound size={20} strokeWidth={1.8} /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-medium">Асран хамгаалагч</span>
-                <span className="mt-1 block text-[13px] text-[#858b86]">Байршил, явцыг хянах</span>
-              </span>
-              <ChevronRight size={18} className="text-[#a0a5a0] transition group-hover:translate-x-0.5" />
+        <section className="flex flex-1 flex-col justify-center pb-8" aria-labelledby="start-title">
+          <h1 id="start-title" className="text-[28px] font-semibold tracking-[-0.04em]">Та хэн бэ?</h1>
+          <p className="mt-2 text-[14px] text-[#737373]">Үргэлжлүүлэх горимоо сонгоно уу.</p>
+          <div className="mt-6 grid gap-2">
+            <Link href="/guardian" className="group flex min-h-[76px] items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><ShieldCheck size={19} strokeWidth={1.7} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Эцэг эх / Асран хамгаалагч</span><span className="mt-1 block text-[12px] text-[#737373]">Байршил, аюулгүй байдлыг харах</span></span>
+              <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
             </Link>
 
-            <Link href="/tracker" className="group flex min-h-[82px] items-center gap-4 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173f35]">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f2f5f2] text-[#355347]"><MapPin size={20} strokeWidth={1.8} /></span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-medium">Хэрэглэгч</span>
-                <span className="mt-1 block text-[13px] text-[#858b86]">Өөрийн замаа аюулгүй хянах</span>
-              </span>
-              <ChevronRight size={18} className="text-[#a0a5a0] transition group-hover:translate-x-0.5" />
+            <Link href="/tracker" className="group flex min-h-[76px] items-center gap-3 rounded-2xl bg-[#f7f7f5] px-4 py-3 transition-colors hover:bg-[#f1f1ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#393a36]"><UserRound size={19} strokeWidth={1.7} /></span>
+              <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">Хэрэглэгч</span><span className="mt-1 block text-[12px] text-[#737373]">Милотой ярилцах</span></span>
+              <ChevronRight size={18} className="shrink-0 text-[#737373] transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
         </section>
-
-        <div className="mt-auto pt-7">
-          <p className="text-center text-[12px] text-[#a0a5a0]">Таны аялалд тайван байдал.</p>
-        </div>
       </main>
     </AppShell>
   );
