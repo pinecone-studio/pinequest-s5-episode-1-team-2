@@ -174,9 +174,9 @@ export default function TrackerPage() {
         </header>
 
         <section className="flex flex-1 flex-col items-center pb-5 text-center" aria-label="Милотой ярилцах">
-          <div className="relative mt-2 flex min-h-[min(47vh,390px)] w-full flex-1 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
+          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
             {location ? (
-              <CompanionMap location={location} variant="companion" className="absolute inset-0 size-full rounded-none border-0" />
+              <CompanionMap location={location} variant="companion" />
             ) : (
               <p role="status" className="absolute inset-x-5 bottom-5 text-xs leading-5 text-[#737373]">
                 {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
