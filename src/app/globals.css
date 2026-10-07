@@ -58,6 +58,15 @@ select {
   filter: grayscale(1);
 }
 
+.safepath-map--companion .leaflet-tile-pane {
+  filter: grayscale(1) contrast(.75);
+  opacity: .55;
+}
+
+.safepath-map--companion .leaflet-container {
+  background: #f2f2ef;
+}
+
 .safepath-map .leaflet-tooltip {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -115,6 +124,13 @@ select {
 .companion-avatar--warning { --companion-accent: #b7791f; }
 .companion-avatar--warning .companion-avatar__halo { background: #f4f0e8; border-color: #e8dfce; }
 .companion-avatar--warning .companion-avatar__body { border-color: #e8dfce; }
+.companion-avatar--compact { width: 126px; }
+.companion-avatar--compact .companion-avatar__halo { inset: 0; border-radius: 50%; background: #ecece7; }
+.companion-avatar--compact .companion-avatar__body { width: 78%; aspect-ratio: 1; gap: 15%; border-radius: 50%; }
+.companion-avatar--compact .companion-avatar__eyes { gap: 24px; }
+.companion-avatar--compact .companion-avatar__eyes i { width: 7px; height: 9px; }
+.companion-avatar--compact .companion-avatar__mouth { width: 16px; height: 6px; }
+.companion-avatar--compact.companion-avatar--speaking .companion-avatar__mouth { height: 10px; }
 
 @keyframes companion-talk { from { transform: scaleY(.65); } to { transform: scaleY(1.1); } }
 
