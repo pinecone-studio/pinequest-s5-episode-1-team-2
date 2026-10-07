@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { latLngBounds } from "leaflet";
 import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -18,9 +18,10 @@ type LiveMapProps = {
 export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], familiarRoute = [], variant = "guardian", className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
+  const [tileError, setTileError] = useState(false);
 
   return (
-    <div className={`safepath-map ${companion ? "safepath-map--companion" : ""} relative isolate overflow-hidden rounded-[20px] border border-[#e7e7e5] bg-[#f7f7f5] ${className}`} aria-label={companion ? "Одоогийн байршил орчмын гудамж" : "Байршлын газрын зураг"}>
+    <div className={`safepath-map ${companion ? "safepath-map--companion absolute inset-0" : "relative rounded-[20px] border border-[#e7e7e5]"} isolate overflow-hidden bg-[#f7f7f5] ${className}`} aria-label={companion ? "Одоогийн байршил орчмын гудамж" : "Байршлын газрын зураг"}>
       <MapContainer
         center={center}
         zoom={companion ? 16 : 14}
@@ -37,6 +38,10 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
+          eventHandlers={{
+            tileload: () => setTileError(false),
+            tileerror: () => setTileError(true),
+          }}
         />
         {!companion && safeZones.map((zone, index) => (
           <Circle
@@ -65,6 +70,7 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
       </MapContainer>
 
       <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute right-2 top-2 z-[400] rounded-xl bg-white/90 px-2 py-1 text-[10px] text-[#737373]">© OpenStreetMap</a>
+      {tileError && <p role="status" className="absolute inset-x-3 bottom-3 z-[400] rounded-xl bg-white/95 px-3 py-2 text-center text-xs leading-5 text-[#737373]">Газрын зураг ачаалсангүй. Интернэт холболтоо шалгана уу.</p>}
 
     </div>
   );
