@@ -58,6 +58,15 @@ select {
   filter: grayscale(1);
 }
 
+.safepath-map--companion .leaflet-tile-pane {
+  filter: grayscale(1) contrast(.75);
+  opacity: .55;
+}
+
+.safepath-map--companion .leaflet-container {
+  background: #f2f2ef;
+}
+
 .safepath-map .leaflet-tooltip {
   border: 1px solid var(--border);
   border-radius: 12px;
