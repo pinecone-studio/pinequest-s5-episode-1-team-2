@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
@@ -9,10 +10,15 @@ import { toCompanionProfile } from "@/lib/assistant-settings";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
+const CompanionMap = dynamic(() => import("@/components/live-map"), {
+  ssr: false,
+  loading: () => <p className="absolute inset-x-4 bottom-5 text-xs text-[#737373]">Газрын зураг ачаалж байна…</p>,
+});
+
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
 export default function TrackerPage() {
-  const { location } = useGeolocation();
+  const { location, status: locationStatus, error: locationError } = useGeolocation();
   const { settings } = useAssistantSettings();
   const [assistantMessage, setAssistantMessage] = useState("Байршил тогтоож байна…");
   const [assistantLoading, setAssistantLoading] = useState(false);
@@ -167,10 +173,19 @@ export default function TrackerPage() {
           <Link href="/" className="inline-flex min-h-11 items-center text-[17px] font-semibold tracking-[-0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">SafePath</Link>
         </header>
 
-        <section className="flex flex-1 flex-col items-center justify-center pb-5 text-center" aria-label="Милотой ярилцах">
-          <CompanionMark state={safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING" ? "warning" : speechStatus === "playing" ? "speaking" : "idle"} className="mb-7" />
+        <section className="flex flex-1 flex-col items-center pb-5 text-center" aria-label="Милотой ярилцах">
+          <div className="relative mt-2 flex min-h-[min(47vh,390px)] w-full flex-1 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
+            {location ? (
+              <CompanionMap location={location} variant="companion" className="absolute inset-0 size-full rounded-none border-0" />
+            ) : (
+              <p role="status" className="absolute inset-x-5 bottom-5 text-xs leading-5 text-[#737373]">
+                {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
+              </p>
+            )}
+            <CompanionMark state={safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING" ? "warning" : speechStatus === "playing" ? "speaking" : "idle"} className="companion-avatar--compact relative z-10" />
+          </div>
           <p className="text-[16px] font-medium text-[#737373]">{settings.name || "Мило"}</p>
-          <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[18px] leading-7 tracking-[-0.01em] text-[#292a27]">
+          <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#292a27]">
             {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : "Байршил тогтоож байна…")}
           </p>
           {assistantLoading && <span className="mt-3 text-sm text-[#737373]">Мило бодож байна…</span>}
