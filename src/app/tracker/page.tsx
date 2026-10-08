@@ -52,8 +52,7 @@ export default function TrackerPage() {
     speechController.current?.abort();
     const controller = new AbortController();
     speechController.current = controller;
-    const voiceId = profile.voiceId;
-    const cacheKey = `${voiceId ?? "default"}\u0000${text}`;
+    const cacheKey = `${profile.voice}\u0000${settings.speechSpeed}\u0000${text}`;
     const audio = audioElement.current;
     audio?.pause();
     if (audio) audio.currentTime = 0;
@@ -66,7 +65,7 @@ export default function TrackerPage() {
         const response = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, ...(voiceId ? { voiceId } : {}) }),
+          body: JSON.stringify({ text, voice: profile.voice }),
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Speech generation failed.");
@@ -83,6 +82,7 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       currentAudio.src = audioUrl;
       currentAudio.currentTime = 0;
+      currentAudio.playbackRate = settings.speechSpeed === "Удаан" ? 0.86 : 1;
       await currentAudio.play();
       if (sequence === speechSequence.current) setSpeechStatus("playing");
     } catch {
@@ -92,7 +92,7 @@ export default function TrackerPage() {
     } finally {
       if (sequence === speechSequence.current) speechController.current = null;
     }
-  }, [profile.voiceId]);
+  }, [profile.voice, settings.speechSpeed]);
 
   const requestAssistantMessage = useCallback(async (state: SafetyState) => {
     const sequence = ++requestSequence.current;
@@ -182,7 +182,12 @@ export default function TrackerPage() {
                 {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
               </p>
             )}
-            <CompanionMark state={safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING" ? "warning" : speechStatus === "playing" ? "speaking" : "idle"} className="companion-avatar--compact relative z-10" />
+            <CompanionMark
+              state={safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING" ? "warning" : speechStatus === "playing" ? "speaking" : "idle"}
+              avatar={settings.avatar}
+              name={settings.name || "Мило"}
+              className="companion-avatar--compact relative z-10"
+            />
           </div>
           <p className="text-[16px] font-medium text-[#737373]">{settings.name || "Мило"}</p>
           <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#292a27]">

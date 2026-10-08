@@ -15,6 +15,7 @@ const allowedKeys = new Set([
   "destination",
   "userName",
   "assistantName",
+  "voice",
   "tone",
   "instructionLength",
   "navigationInstruction",
@@ -81,6 +82,7 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     !isOptionalText(value.destination, 120) ||
     !isText(value.userName, 40) ||
     !isText(value.assistantName, 40) ||
+    (value.voice !== "female" && value.voice !== "male") ||
     (value.tone !== "calm" && value.tone !== "friendly") ||
     (value.instructionLength !== "short" && value.instructionLength !== "normal") ||
     !isOptionalText(value.navigationInstruction, 160)
@@ -98,6 +100,7 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     destination: typeof value.destination === "string" ? value.destination.trim() : null,
     userName: value.userName.trim(),
     assistantName: value.assistantName.trim(),
+    voice: value.voice,
     tone: value.tone,
     instructionLength: value.instructionLength,
     ...(typeof value.navigationInstruction === "string"

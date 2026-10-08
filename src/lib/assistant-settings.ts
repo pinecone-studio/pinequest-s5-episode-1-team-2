@@ -31,6 +31,7 @@ export function toCompanionProfile(settings: AssistantSettings): CompanionProfil
   return {
     userName: settings.userName,
     assistantName: settings.name,
+    voice: settings.voice === "Эрэгтэй" ? "male" : "female",
     tone: settings.tone === "Найрсаг" ? "friendly" : "calm",
     instructionLength: settings.instructionLength === "Энгийн" ? "normal" : "short",
   };
@@ -43,5 +44,5 @@ function readText(value: unknown, fallback: string, maxLength: number) {
 }
 
 function isAvatar(value: unknown): value is AssistantSettings["avatar"] {
-  return value === "Мило" || value === "Ари" || value === "Номи" || value === "Туяа";
+  return value === "Мило" || value === "Ари" || value === "Номи" || value === "Туяа" || value === "Мяу" || value === "Бамбар" || value === "Пип" || value === "Рокки";
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import type { SafetyStatus } from "@/types/safety";
+import type { AssistantSettings, SafetyStatus } from "@/types/safety";
 
 export function AppShell({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -71,14 +71,21 @@ export function MockMap({ navigation = false, className = "" }: { navigation?: b
   );
 }
 
-export function CompanionMark({ state = "idle", className = "" }: { state?: "idle" | "listening" | "speaking" | "warning"; className?: string }) {
+export function CompanionMark({
+  state = "idle",
+  avatar = "Мило",
+  name = "Мило",
+  className = "",
+}: {
+  state?: "idle" | "listening" | "speaking" | "warning";
+  avatar?: AssistantSettings["avatar"];
+  name?: string;
+  className?: string;
+}) {
   return (
-    <div className={`companion-avatar companion-avatar--${state} ${className}`} role="img" aria-label={`Мило AI туслах, ${state}`}>
+    <div className={`companion-avatar companion-avatar--${avatar.toLowerCase()} companion-avatar--${state} ${className}`} role="img" aria-label={`${name} AI туслах, ${state}`}>
       <span className="companion-avatar__halo" aria-hidden="true" />
-      <span className="companion-avatar__body" aria-hidden="true">
-        <span className="companion-avatar__eyes"><i /><i /></span>
-        <span className="companion-avatar__mouth" />
-      </span>
+      <span className="companion-avatar__art" aria-hidden="true" />
     </div>
   );
 }
