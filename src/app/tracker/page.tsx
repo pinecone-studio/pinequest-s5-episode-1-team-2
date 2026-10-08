@@ -4,6 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
+import { LocationSharingStatus } from "@/components/location-sharing-status";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
@@ -67,6 +68,9 @@ export default function TrackerPage() {
 
   const [route, setRoute] =
     useState<RouteResult | null>(null);
+
+  const [routeStatus, setRouteStatus] =
+    useState<"loading" | "ready" | "error">("loading");
 
 
   const routeController =
@@ -171,6 +175,8 @@ export default function TrackerPage() {
 
   useEffect(() => {
     if (!currentLocation) {
+      setRoute(null);
+      setRouteStatus("loading");
       return;
     }
 
@@ -179,73 +185,167 @@ export default function TrackerPage() {
     if (
       !demoMode &&
       lastRouteAt.current !== 0 &&
-      now - lastRouteAt.current < 15_000
+      now - lastRouteAt.current < 10_000
     ) {
       return;
     }
 
     lastRouteAt.current = now;
-
     routeController.current?.abort();
 
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
+    routeController.current = controller;
+    setRouteStatus("loading");
 
-    routeController.current =
-      controller;
+    const origin = {
+      lat: currentLocation.latitude,
+      lon: currentLocation.longitude,
+    };
 
-    void fetch("/api/route", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        origin: {
-          lat: currentLocation.latitude,
-          lon: currentLocation.longitude,
+    const destination = {
+      lat: SAFE_ZONES[0].latitude,
+      lon: SAFE_ZONES[0].longitude,
+    };
+
+    const isValidRoute = (value: unknown): value is RouteResult => {
+      if (!value || typeof value !== "object") return false;
+      const result = value as Partial<RouteResult>;
+      return (
+        Array.isArray(result.route) &&
+        result.route.length >= 2 &&
+        result.route.every(
+          (point) =>
+            Array.isArray(point) &&
+            point.length === 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        ) &&
+        typeof result.nextInstruction === "string"
+      );
+    };
+
+    const fetchAppRoute = async (): Promise<RouteResult> => {
+      const response = await fetch("/api/route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          origin,
+          destination,
+        }),
+        signal: controller.signal,
+      });
 
+      if (!response.ok) {
+        throw new Error(`Route API ${response.status}`);
+      }
+
+      const result: unknown = await response.json();
+
+      if (!isValidRoute(result)) {
+        throw new Error("Invalid route response");
+      }
+
+      return result;
+    };
+
+    const fetchFallbackRoute = async (): Promise<RouteResult> => {
+      const coordinates = `${origin.lon},${origin.lat};${destination.lon},${destination.lat}`;
+      const url =
+        `https://router.project-osrm.org/route/v1/driving/${coordinates}` +
+        `?overview=full&geometries=geojson&steps=true`;
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Fallback route ${response.status}`);
+      }
+
+      const data = await response.json();
+      const osrmRoute = data?.routes?.[0];
+      const geometry = osrmRoute?.geometry?.coordinates;
+
+      if (!Array.isArray(geometry) || geometry.length < 2) {
+        throw new Error("Fallback route has no geometry");
+      }
+
+      const points: [number, number][] = geometry
+        .filter(
+          (point: unknown) =>
+            Array.isArray(point) &&
+            point.length >= 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        )
+        .map(
+          (point: [number, number]) =>
+            [point[1], point[0]] as [number, number],
+        );
+
+      if (points.length < 2) {
+        throw new Error("Fallback route geometry is invalid");
+      }
+
+      const step =
+        osrmRoute.legs?.[0]?.steps?.[0];
+      const maneuver = step?.maneuver;
+      const modifier =
+        typeof maneuver?.modifier === "string"
+          ? maneuver.modifier
+          : "";
+
+      const instruction =
+        modifier === "right"
+          ? "Баруун тийш эргээрэй."
+          : modifier === "left"
+            ? "Зүүн тийш эргээрэй."
+            : modifier === "straight"
+              ? "Энэ замаараа урагшаа яваарай."
+              : "Буцах замаараа тайван яваарай.";
+
+      return {
         destination: {
-          lat: SAFE_ZONES[0].latitude,
-          lon: SAFE_ZONES[0].longitude,
+          latitude: destination.lat,
+          longitude: destination.lon,
         },
-      }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            "Route request failed.",
-          );
-        }
+        route: points,
+        distanceMeters:
+          typeof osrmRoute.distance === "number"
+            ? osrmRoute.distance
+            : null,
+        durationSeconds:
+          typeof osrmRoute.duration === "number"
+            ? osrmRoute.duration
+            : null,
+        nextInstruction: instruction,
+      };
+    };
 
-        const result =
-          (await response.json()) as RouteResult;
-
-        if (
-          !Array.isArray(result.route) ||
-          result.route.length < 2 ||
-          typeof result.nextInstruction !==
-            "string"
-        ) {
-          throw new Error(
-            "Invalid route response.",
-          );
-        }
-
-        setRoute(result);
+    void fetchAppRoute()
+      .catch(async (error) => {
+        if (controller.signal.aborted) throw error;
+        console.warn("/api/route failed, using fallback route:", error);
+        return fetchFallbackRoute();
       })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setRoute((current) => current);
-        }
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setRoute(result);
+        setRouteStatus("ready");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        console.error("ROUTE ERROR:", error);
+        setRoute(null);
+        setRouteStatus("error");
       });
   }, [
     currentLocation?.latitude,
     currentLocation?.longitude,
     demoMode,
   ]);
-
 
   useEffect(() => {
     return () => {
@@ -800,6 +900,16 @@ export default function TrackerPage() {
               className="companion-avatar--compact relative z-10"
             />
           </div>
+          {routeStatus === "loading" && (
+            <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
+              Буцах замыг тооцоолж байна…
+            </p>
+          )}
+          {routeStatus === "error" && (
+            <p role="status" className="mt-3 text-sm text-[#fda4af]">
+              Буцах замыг тооцоолж чадсангүй.
+            </p>
+          )}
           <p className="text-[16px] font-semibold text-[#67e8f9]">{settings.name || "Мило"}</p>
           <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#f1f7f8]">
             {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : "Байршил тогтоож байна…")}
@@ -820,7 +930,8 @@ export default function TrackerPage() {
           )}
         </section>
 
-   
+        <LocationSharingStatus />
+
         <div className="pt-2">
           <button
             type="button"

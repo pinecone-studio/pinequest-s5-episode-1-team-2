@@ -27,6 +27,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           name: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
           phone: { bsonType: ["string", "null"] },
           role: { bsonType: ["string", "null"], enum: [...ROLES, null] },
+          locationPaused: { bsonType: "bool" },
           createdAt: { bsonType: "date" },
         },
       },
