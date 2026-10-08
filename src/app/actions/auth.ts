@@ -127,7 +127,7 @@ export async function login(
   }
 
   await createSession(user._id);
-  redirect(homeFor(user.role));
+  redirect("/role");
 }
 
 export async function logout() {
