@@ -3,6 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MapPin } from "lucide-react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
@@ -14,11 +15,7 @@ import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => (
-    <p className="absolute inset-x-4 bottom-5 text-xs text-[#737373]">
-      Газрын зураг ачаалж байна…
-    </p>
-  ),
+  loading: () => <p className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85 px-3 py-2 text-xs text-[#d4e1e5]">Газрын зураг ачаалж байна…</p>,
 });
 
 
@@ -737,11 +734,10 @@ export default function TrackerPage() {
 
   return (
     <AppShell>
-      <main className="flex min-h-dvh flex-col px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
-
-       
-
-        <div className="flex justify-center pb-3">
+      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-gradient-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
+        <div className="relative z-10 flex justify-center pb-3">
           <button
             type="button"
             onClick={() =>
@@ -751,8 +747,8 @@ export default function TrackerPage() {
             }
             className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
               demoMode
-                ? "border-[#111111] bg-[#111111] text-white"
-                : "border-[#d8d8d4]"
+                ? "border-[#67e8f9] bg-[#0e7490] text-white"
+                : "border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5]"
             }`}
           >
             {demoMode
@@ -764,7 +760,7 @@ export default function TrackerPage() {
     
 
         {demoMode && (
-          <div className="mb-4 flex flex-col items-center gap-2">
+          <div className="relative z-10 mb-4 flex flex-col items-center gap-2">
 
             <button
               type="button"
@@ -773,7 +769,7 @@ export default function TrackerPage() {
                   "up",
                 )
               }
-              className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
+              className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
               aria-label="Demo move up"
             >
               ↑
@@ -788,7 +784,7 @@ export default function TrackerPage() {
                     "left",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
                 aria-label="Demo move left"
               >
                 ←
@@ -801,7 +797,7 @@ export default function TrackerPage() {
                     "down",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
                 aria-label="Demo move down"
               >
                 ↓
@@ -814,7 +810,7 @@ export default function TrackerPage() {
                     "right",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
                 aria-label="Demo move right"
               >
                 →
@@ -822,7 +818,7 @@ export default function TrackerPage() {
 
             </div>
 
-            <p className="text-xs text-[#737373]">
+            <p className="text-xs text-[#b7c7cc]">
               1 алхам ≈ 110м ·{" "}
               {demoLocation.latitude.toFixed(
                 6,
@@ -834,7 +830,7 @@ export default function TrackerPage() {
             </p>
 
             {safetyState && (
-              <div className="rounded-full bg-[#f1f1ee] px-4 py-2 text-xs font-medium">
+              <div className="rounded-full border border-[#67e8f9]/20 bg-[#0d2028] px-4 py-2 text-xs font-medium text-[#d4e1e5]">
                 Status:{" "}
                 {safetyState.riskLevel}
               </div>
@@ -842,24 +838,23 @@ export default function TrackerPage() {
           </div>
         )}
 
-        <header className="flex min-h-16 items-center">
+        <header className="relative z-10 flex min-h-16 items-center">
           <Link
             href="/"
-            className="inline-flex min-h-11 items-center text-[17px] font-semibold tracking-[-0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
-          >
-            SafePath
+            className="inline-flex min-h-11 items-center gap-2 text-[17px] font-bold tracking-[-0.02em] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+          ><span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>SafePath
           </Link>
         </header>
 
 
         <section
-          className="flex flex-1 flex-col items-center pb-5 text-center"
+          className="relative z-10 flex flex-1 flex-col items-center pb-5 text-center"
           aria-label="Милотой ярилцах"
         >
 
 
 
-          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
+          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
 
             {currentLocation ? (
               <CompanionMap
@@ -875,15 +870,8 @@ export default function TrackerPage() {
                 variant="companion"
               />
             ) : (
-              <p
-                role="status"
-                className="absolute inset-x-5 bottom-5 text-xs leading-5 text-[#737373]"
-              >
-                {locationStatus ===
-                "loading"
-                  ? "Байршил тогтоож байна…"
-                  : locationError ||
-                    "Байршлын зөвшөөрлөө шалгана уу."}
+              <p role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
+                {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
               </p>
             )}
 
@@ -926,67 +914,14 @@ export default function TrackerPage() {
             {settings.name ||
               "Мило"}
           </p>
-
-
-
-          <p
-            aria-live="polite"
-            aria-busy={
-              assistantLoading
-            }
-            className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#292a27]"
-          >
-            {assistantMessage ||
-              (safetyState
-                ? getSafetyFallback(
-                    safetyState.riskLevel,
-                    profile.userName,
-                  )
-                : "Байршил тогтоож байна…")}
-          </p>
-
-          {/* AI STATUS */}
-
-          {assistantLoading && (
-            <span className="mt-3 text-sm text-[#737373]">
-              Мило бодож байна…
-            </span>
-          )}
-
-          {speechStatus ===
-            "loading" && (
-            <span className="mt-2 text-sm text-[#737373]">
-              Дуу бэлдэж байна…
-            </span>
-          )}
-
-          {speechStatus ===
-            "playing" && (
-            <span className="mt-2 text-sm text-[#737373]">
-              Мило ярьж байна…
-            </span>
-          )}
-
-          {speechError && (
-            <span
-              role="status"
-              className="mt-2 text-sm text-[#737373]"
-            >
-              {speechError}
-            </span>
-          )}
-
+          {assistantLoading && <span className="mt-3 text-sm text-[#b7c7cc]">Мило бодож байна…</span>}
+          {speechStatus === "loading" && <span className="mt-2 text-sm text-[#b7c7cc]">Дуу бэлдэж байна…</span>}
+          {speechStatus === "playing" && <span className="mt-2 text-sm text-[#67e8f9]">Мило ярьж байна…</span>}
+          {speechError && <span role="status" className="mt-2 text-sm text-[#fda4af]">{speechError}</span>}
 
           {navigationInstruction && (
-            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl bg-[#f1f1ee] px-5 py-4 text-left">
-
-              <span
-                className="text-3xl"
-                aria-hidden="true"
-              >
-                ➜
-              </span>
-
+            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl border border-[#67e8f9]/20 bg-[#0d2028]/90 px-5 py-4 text-left text-white shadow-[0_12px_28px_rgba(0,0,0,.18)]">
+              <span className="text-3xl text-[#67e8f9]" aria-hidden="true">➜</span>
               <div className="min-w-0">
 
                 <p className="font-semibold">
@@ -1024,7 +959,7 @@ export default function TrackerPage() {
               )
             }
             aria-label="Милогийн зөвлөгөөг сонсох"
-            className="w-full min-h-[54px] rounded-2xl bg-[#111111] px-4 text-[15px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
+            className="w-full min-h-[56px] rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
           >
             {assistantLoading
               ? "Мило бодож байна…"
@@ -1038,26 +973,8 @@ export default function TrackerPage() {
           </button>
         </div>
 
-       
-
-        <a
-          href="tel:+97600000000"
-          className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
-        >
-          Тусламж хэрэгтэй
-        </a>
-
-      
-
-        <Link
-          href="/tracker/code"
-          className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
-        >
-          Холбох код
-        </Link>
-
-
-
+        <a href="tel:+97600000000" className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
+        <Link href="/tracker/code" className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Холбох код</Link>
         <audio
           ref={audioElement}
           className="sr-only"

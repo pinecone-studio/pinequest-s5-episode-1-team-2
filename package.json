@@ -14,6 +14,7 @@
     "android:run": "cap run android"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor/android": "7",
     "@capacitor/core": "7",
     "@capacitor/geolocation": "7",
