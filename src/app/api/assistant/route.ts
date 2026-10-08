@@ -21,6 +21,7 @@ const allowedKeys = new Set([
   "tone",
   "instructionLength",
   "navigationInstruction",
+  "nearbyLandmarks",
 ]);
 const requiredKeys = [...allowedKeys].filter((key) => key !== "navigationInstruction");
 
@@ -93,7 +94,8 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     (value.voice !== "female" && value.voice !== "male") ||
     (value.tone !== "calm" && value.tone !== "friendly") ||
     (value.instructionLength !== "short" && value.instructionLength !== "normal") ||
-    !isOptionalText(value.navigationInstruction, 160)
+    !isOptionalText(value.navigationInstruction, 160) ||
+    !isNearbyLandmarks(value.nearbyLandmarks)
   ) {
     return null;
   }
@@ -111,9 +113,9 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     voice: value.voice,
     tone: value.tone,
     instructionLength: value.instructionLength,
-    ...(typeof value.navigationInstruction === "string"
-      ? { navigationInstruction: value.navigationInstruction.trim() }
-      : {}),
+    ...(Array.isArray(value.nearbyLandmarks)
+  ? { nearbyLandmarks: value.nearbyLandmarks }
+  : {}),
   };
 }
 
@@ -165,4 +167,29 @@ function isDistance(value: unknown): value is number {
 
 function isOptionalDistance(value: unknown): value is number | null {
   return value === null || isDistance(value);
+}
+function isNearbyLandmarks(
+  value: unknown,
+): boolean {
+  if (value == null) return true;
+
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  if (value.length > 10) {
+    return false;
+  }
+
+  return value.every((item) => {
+    if (!isRecord(item)) {
+      return false;
+    }
+
+    return (
+      isText(item.name, 100) &&
+      isText(item.type, 40) &&
+      isDistance(item.distance)
+    );
+  });
 }

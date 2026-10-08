@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
 type Landmark = {
-  id: number;
   name: string;
   type: string;
   latitude: number;
@@ -17,9 +16,7 @@ export async function GET(request: NextRequest) {
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return NextResponse.json(
-      {
-        error: "lat болон lng шаардлагатай.",
-      },
+      { error: "Байршил шаардлагатай." },
       { status: 400 },
     );
   }
@@ -38,7 +35,6 @@ export async function GET(request: NextRequest) {
       node["amenity"="restaurant"](around:${radius},${lat},${lng});
       node["leisure"="park"](around:${radius},${lat},${lng});
     );
-
     out center;
   `;
 
@@ -48,7 +44,8 @@ export async function GET(request: NextRequest) {
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Type":
+            "application/x-www-form-urlencoded",
         },
         body: new URLSearchParams({
           data: query,
@@ -58,55 +55,87 @@ export async function GET(request: NextRequest) {
     );
 
     if (!response.ok) {
-      throw new Error(`Overpass API error: ${response.status}`);
+      throw new Error("Landmark request failed");
     }
 
     const data = await response.json();
 
-    const landmarks: Landmark[] = data.elements.map((element: any) => {
-      const latitude = element.lat ?? element.center?.lat;
-      const longitude = element.lon ?? element.center?.lon;
+    const landmarks: Landmark[] = data.elements
+      .map((element: any) => {
+        const latitude =
+          element.lat ?? element.center?.lat;
 
-      const type = getLandmarkType(element.tags);
+        const longitude =
+          element.lon ?? element.center?.lon;
 
-      return {
-        id: element.id,
-        name: getLandmarkName(element.tags, type),
-        type,
-        latitude,
-        longitude,
-        distance: Math.round(
-          calculateDistance(lat, lng, latitude, longitude),
-        ),
-      };
-    });
+        if (
+          typeof latitude !== "number" ||
+          typeof longitude !== "number"
+        ) {
+          return null;
+        }
 
-    landmarks.sort((a, b) => a.distance - b.distance);
+        const type =
+          getLandmarkType(element.tags);
+
+        return {
+          name: getLandmarkName(
+            element.tags,
+            type,
+          ),
+          type,
+          latitude,
+          longitude,
+          distance: Math.round(
+            calculateDistance(
+              lat,
+              lng,
+              latitude,
+              longitude,
+            ),
+          ),
+        };
+      })
+      .filter(Boolean)
+      .sort(
+        (a: Landmark, b: Landmark) =>
+          a.distance - b.distance,
+      )
+      .slice(0, 10);
 
     return NextResponse.json({
-      latitude: lat,
-      longitude: lng,
-      radius,
-      landmarks: landmarks.slice(0, 20),
+      landmarks,
     });
   } catch (error) {
-    console.error("LANDMARK API ERROR:", error);
+    console.error(
+      "LANDMARK ERROR:",
+      error,
+    );
 
     return NextResponse.json(
       {
-        error: "Ойролцоох landmark авахад алдаа гарлаа.",
+        error:
+          "Ойролцоох зүйлсийг таних боломжгүй байна.",
       },
       { status: 500 },
     );
   }
 }
 
-function getLandmarkType(tags: any = {}) {
-  if (tags.highway === "traffic_signals") {
+function getLandmarkType(
+  tags: any = {},
+) {
+  if (
+    tags.highway ===
+    "traffic_signals"
+  ) {
     return "traffic_light";
   }
 
-  if (tags.highway === "bus_stop") {
+  if (
+    tags.highway ===
+    "bus_stop"
+  ) {
     return "bus_stop";
   }
 
@@ -126,35 +155,54 @@ function getLandmarkType(tags: any = {}) {
     return "shop";
   }
 
-  if (tags.amenity === "restaurant") {
+  if (
+    tags.amenity ===
+    "restaurant"
+  ) {
     return "restaurant";
   }
 
-  if (tags.leisure === "park") {
+  if (
+    tags.leisure === "park"
+  ) {
     return "park";
   }
 
   return "landmark";
 }
 
-function getLandmarkName(tags: any = {}, type: string) {
+function getLandmarkName(
+  tags: any = {},
+  type: string,
+) {
   if (tags.name) {
     return tags.name;
   }
 
-  const defaultNames: Record<string, string> = {
-    traffic_light: "Гэрлэн дохио",
-    bus_stop: "Автобусны буудал",
-    school: "Сургууль",
-    hospital: "Эмнэлэг",
-    pharmacy: "Эмийн сан",
-    shop: "Дэлгүүр",
-    restaurant: "Ресторан",
-    park: "Парк",
-    landmark: "Ойролцоох газар",
+  const names: Record<
+    string,
+    string
+  > = {
+    traffic_light:
+      "гэрлэн дохио",
+    bus_stop:
+      "автобусны буудал",
+    school: "сургууль",
+    hospital: "эмнэлэг",
+    pharmacy:
+      "эмийн сан",
+    shop: "дэлгүүр",
+    restaurant:
+      "ресторан",
+    park: "парк",
+    landmark:
+      "ойролцоох газар",
   };
 
-  return defaultNames[type] ?? "Ойролцоох газар";
+  return (
+    names[type] ??
+    "ойролцоох газар"
+  );
 }
 
 function calculateDistance(
@@ -163,22 +211,32 @@ function calculateDistance(
   lat2: number,
   lng2: number,
 ) {
-  const earthRadius = 6371000;
+  const R = 6371000;
 
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
+  const dLat =
+    ((lat2 - lat1) * Math.PI) /
+    180;
+
+  const dLng =
+    ((lng2 - lng1) * Math.PI) /
+    180;
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
+    Math.cos(
+      (lat1 * Math.PI) / 180,
+    ) *
+      Math.cos(
+        (lat2 * Math.PI) / 180,
+      ) *
       Math.sin(dLng / 2) ** 2;
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return earthRadius * c;
-}
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
+  return (
+    R *
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a),
+    )
+  );
 }

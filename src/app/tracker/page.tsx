@@ -22,6 +22,7 @@ const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ),
 });
 
+
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
 type RouteResult = {
@@ -44,9 +45,7 @@ export default function TrackerPage() {
 
   const { settings } = useAssistantSettings();
 
-  /* =========================================================
-     DEMO MODE
-     ========================================================= */
+  
 
   const [demoMode, setDemoMode] = useState(false);
 
@@ -57,9 +56,7 @@ export default function TrackerPage() {
     timestamp: Date.now(),
   });
 
-  /* =========================================================
-     NORMAL STATE
-     ========================================================= */
+
 
   const [assistantMessage, setAssistantMessage] = useState(
     "Байршил тогтоож байна…",
@@ -75,9 +72,6 @@ export default function TrackerPage() {
   const [route, setRoute] =
     useState<RouteResult | null>(null);
 
-  /* =========================================================
-     REFS
-     ========================================================= */
 
   const routeController =
     useRef<AbortController | null>(null);
@@ -106,9 +100,6 @@ export default function TrackerPage() {
   const audioElement =
     useRef<HTMLAudioElement | null>(null);
 
-  /* =========================================================
-     PROFILE
-     ========================================================= */
 
   const profile = useMemo(
     () => toCompanionProfile(settings),
@@ -118,20 +109,13 @@ export default function TrackerPage() {
   const navigationInstruction =
     route?.nextInstruction;
 
-  /*
-   * IMPORTANT:
-   *
-   * Demo Mode ON  -> use demoLocation
-   * Demo Mode OFF -> use real GPS
-   */
+
+ 
   const currentLocation =
     demoMode
       ? demoLocation
       : location;
 
-  /* =========================================================
-     DEMO LOCATION MOVEMENT
-     ========================================================= */
 
   const moveDemoLocation = useCallback(
     (
@@ -142,17 +126,7 @@ export default function TrackerPage() {
         | "right",
     ) => {
       setDemoLocation((current) => {
-        /*
-         * 0.001 latitude/longitude is roughly 110 meters.
-         *
-         * Therefore:
-         *
-         * ↑ = ~110m
-         * ↓ = ~110m
-         * ← = ~110m
-         * → = ~110m
-         */
-
+      
         const step = 0.001;
 
         let latitude = current.latitude;
@@ -185,10 +159,6 @@ export default function TrackerPage() {
     [],
   );
 
-  /* =========================================================
-     SAFETY STATE
-     ========================================================= */
-
   const routeDeviation = false;
 
   const safetyState = useMemo(
@@ -202,9 +172,6 @@ export default function TrackerPage() {
     [currentLocation, routeDeviation],
   );
 
-  /* =========================================================
-     ROUTE REQUEST
-     ========================================================= */
 
   useEffect(() => {
     if (!currentLocation) {
@@ -212,17 +179,6 @@ export default function TrackerPage() {
     }
 
     const now = Date.now();
-
-    /*
-     * REAL GPS:
-     * wait 15 seconds between route requests.
-     *
-     * DEMO MODE:
-     * do NOT wait.
-     *
-     * This means every arrow press immediately
-     * recalculates the route.
-     */
 
     if (
       !demoMode &&
@@ -294,19 +250,12 @@ export default function TrackerPage() {
     demoMode,
   ]);
 
-  /* =========================================================
-     CLEANUP ROUTE
-     ========================================================= */
 
   useEffect(() => {
     return () => {
       routeController.current?.abort();
     };
   }, []);
-
-  /* =========================================================
-     TEXT TO SPEECH
-     ========================================================= */
 
   const speakMessage = useCallback(
     async (message: string) => {
@@ -471,9 +420,6 @@ export default function TrackerPage() {
     ],
   );
 
-  /* =========================================================
-     AI ASSISTANT
-     ========================================================= */
 
   const requestAssistantMessage =
     useCallback(
@@ -545,6 +491,8 @@ export default function TrackerPage() {
 
           destination:
             SAFE_ZONES[0].name,
+
+          nearbyLandmarks: [],
 
           ...(navigationInstruction
             ? {
@@ -639,10 +587,6 @@ export default function TrackerPage() {
       ],
     );
 
-  /* =========================================================
-     AUTOMATIC AI TRIGGER
-     ========================================================= */
-
   const automaticRequestKey =
     safetyState
       ? [
@@ -677,9 +621,6 @@ export default function TrackerPage() {
     safetyState,
   ]);
 
-  /* =========================================================
-     CLEANUP
-     ========================================================= */
 
   useEffect(() => {
     return () => {
@@ -697,17 +638,12 @@ export default function TrackerPage() {
     };
   }, []);
 
-  /* =========================================================
-     UI
-     ========================================================= */
 
   return (
     <AppShell>
       <main className="flex min-h-dvh flex-col px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
 
-        {/* =================================================
-            DEMO MODE BUTTON
-            ================================================= */}
+       
 
         <div className="flex justify-center pb-3">
           <button
@@ -729,9 +665,7 @@ export default function TrackerPage() {
           </button>
         </div>
 
-        {/* =================================================
-            DEMO CONTROLS
-            ================================================= */}
+    
 
         {demoMode && (
           <div className="mb-4 flex flex-col items-center gap-2">
@@ -812,10 +746,6 @@ export default function TrackerPage() {
           </div>
         )}
 
-        {/* =================================================
-            HEADER
-            ================================================= */}
-
         <header className="flex min-h-16 items-center">
           <Link
             href="/"
@@ -825,16 +755,13 @@ export default function TrackerPage() {
           </Link>
         </header>
 
-        {/* =================================================
-            MAIN
-            ================================================= */}
 
         <section
           className="flex flex-1 flex-col items-center pb-5 text-center"
           aria-label="Милотой ярилцах"
         >
 
-          {/* MAP */}
+
 
           <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
 
@@ -887,14 +814,14 @@ export default function TrackerPage() {
             />
           </div>
 
-          {/* COMPANION NAME */}
+
 
           <p className="text-[16px] font-medium text-[#737373]">
             {settings.name ||
               "Мило"}
           </p>
 
-          {/* AI MESSAGE */}
+
 
           <p
             aria-live="polite"
@@ -943,7 +870,6 @@ export default function TrackerPage() {
             </span>
           )}
 
-          {/* NAVIGATION */}
 
           {navigationInstruction && (
             <div className="mt-7 flex w-full items-center gap-4 rounded-2xl bg-[#f1f1ee] px-5 py-4 text-left">
@@ -978,10 +904,7 @@ export default function TrackerPage() {
           )}
         </section>
 
-        {/* =================================================
-            SPEAK BUTTON
-            ================================================= */}
-
+   
         <div className="pt-2">
           <button
             type="button"
@@ -1011,15 +934,7 @@ export default function TrackerPage() {
           </button>
         </div>
 
-        {/* =================================================
-            LOCATION SHARING
-            ================================================= */}
-
-        <LocationSharingStatus />
-
-        {/* =================================================
-            HELP
-            ================================================= */}
+       
 
         <a
           href="tel:+97600000000"
@@ -1028,9 +943,7 @@ export default function TrackerPage() {
           Тусламж хэрэгтэй
         </a>
 
-        {/* =================================================
-            CONNECTION CODE
-            ================================================= */}
+      
 
         <Link
           href="/tracker/code"
@@ -1039,9 +952,7 @@ export default function TrackerPage() {
           Холбох код
         </Link>
 
-        {/* =================================================
-            AUDIO
-            ================================================= */}
+
 
         <audio
           ref={audioElement}
@@ -1069,9 +980,6 @@ export default function TrackerPage() {
   );
 }
 
-/* =========================================================
-   DISTANCE FORMAT
-   ========================================================= */
 
 function formatDistance(
   meters: number,
