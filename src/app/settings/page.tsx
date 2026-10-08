@@ -6,7 +6,7 @@ import { AppShell, BackHeader } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import type { AssistantSettings } from "@/types/safety";
 
-const avatars: AssistantSettings["avatar"][] = ["Мило", "Ари", "Номи", "Туяа"];
+const avatars: AssistantSettings["avatar"][] = ["Мило", "Ари", "Номи", "Туяа", "Мяу", "Бамбар", "Пип", "Рокки"];
 
 export default function SettingsPage() {
   const { settings, update } = useAssistantSettings();
@@ -28,12 +28,12 @@ export default function SettingsPage() {
           </section>
 
           <SettingsSection title="Дүр">
-            <div className="flex items-start justify-between gap-3" role="group" aria-label="Туслахын дүр">
-              {avatars.map((avatar, index) => {
+            <div className="grid grid-cols-4 gap-2" role="group" aria-label="Туслахын дүр">
+              {avatars.map((avatar) => {
                 const selected = settings.avatar === avatar;
                 return (
-                  <button key={avatar} type="button" aria-pressed={selected} onClick={() => update("avatar", avatar)} className="group min-h-16 min-w-14 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
-                    <span className={`mx-auto grid size-14 place-items-center rounded-full border text-sm font-medium transition ${selected ? "border-[#111111] bg-[#111111] text-white" : "border-[#e7e7e5] bg-[#f7f7f5] text-[#737373]"}`} aria-hidden="true">{["M", "A", "N", "T"][index]}</span>
+                  <button key={avatar} type="button" aria-pressed={selected} onClick={() => update("avatar", avatar)} className="group min-w-0 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+                    <span className={`companion-picker__art companion-picker__art--${avatar.toLowerCase()} ${selected ? "ring-2 ring-[#111111] ring-offset-2" : ""}`} aria-hidden="true" />
                     <span className={`mt-2 block text-xs ${selected ? "font-semibold text-[#111111]" : "text-[#737373]"}`}>{avatar}</span>
                   </button>
                 );

@@ -12,21 +12,24 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  if (!isRecord(body) || Object.keys(body).some((key) => key !== "text" && key !== "voiceId")) {
+  if (!isRecord(body) || Object.keys(body).some((key) => key !== "text" && key !== "voice")) {
     return Response.json({ error: "Invalid speech request." }, { status: 400 });
   }
 
   const text = typeof body.text === "string" ? body.text.trim() : "";
-  const voiceId = body.voiceId;
+  const voice = body.voice;
   if (
     !text ||
     text.length > maxTextLength ||
-    (voiceId !== undefined && (typeof voiceId !== "string" || !/^[A-Za-z0-9_-]{1,100}$/.test(voiceId)))
+    (voice !== undefined && voice !== "female" && voice !== "male")
   ) {
     return Response.json({ error: "Invalid speech request." }, { status: 400 });
   }
 
-  if (!process.env.ELEVENLABS_API_KEY || (!voiceId && !process.env.ELEVENLABS_VOICE_ID)) {
+  const voiceId = voice === "male"
+    ? process.env.ELEVENLABS_MALE_VOICE_ID || process.env.ELEVENLABS_VOICE_ID
+    : process.env.ELEVENLABS_FEMALE_VOICE_ID || process.env.ELEVENLABS_VOICE_ID;
+  if (!process.env.ELEVENLABS_API_KEY || !voiceId) {
     return Response.json({ error: "Speech is not configured." }, { status: 503 });
   }
 

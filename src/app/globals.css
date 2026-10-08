@@ -81,13 +81,12 @@ select {
 }
 
 .companion-avatar {
-  --companion-accent: #9a9a92;
   position: relative;
   display: grid;
   width: min(68vw, 260px);
   aspect-ratio: 1;
   place-items: center;
-  color: #292a27;
+  overflow: hidden;
 }
 
 .companion-avatar__halo {
@@ -95,44 +94,49 @@ select {
   inset: 5%;
   border: 1px solid #e7e7e5;
   border-radius: 42% 58% 51% 49% / 49% 43% 57% 51%;
-  background: #f2f1ed;
-  transition: transform 300ms ease, background-color 300ms ease;
+  background: #f7f7f5;
+  transition: transform 300ms ease, background-color 300ms ease, border-color 300ms ease;
 }
 
-.companion-avatar__body {
-  position: relative;
-  display: flex;
-  width: 72%;
-  aspect-ratio: 1 / 1.08;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18%;
-  border: 1px solid #deded9;
-  border-radius: 48% 48% 44% 44%;
-  background: #fff;
-  box-shadow: 0 18px 48px #1111110d;
-  transition: transform 300ms ease, border-color 300ms ease;
+.companion-avatar__art {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image: url("/companions/storybook-companions.png");
+  background-repeat: no-repeat;
+  background-size: 200% 200%;
+  filter: drop-shadow(0 12px 18px #11111118);
+  transition: transform 300ms ease, filter 300ms ease;
 }
 
-.companion-avatar__eyes { display: flex; gap: 34px; }
-.companion-avatar__eyes i { width: 9px; height: 12px; border-radius: 50%; background: currentColor; }
-.companion-avatar__mouth { width: 20px; height: 8px; border-bottom: 1.5px solid currentColor; border-radius: 0 0 50% 50%; }
+.companion-avatar--мило .companion-avatar__art, .companion-picker__art--мило { background-position: left top; }
+.companion-avatar--ари .companion-avatar__art, .companion-picker__art--ари { background-position: right top; }
+.companion-avatar--номи .companion-avatar__art, .companion-picker__art--номи { background-position: left bottom; }
+.companion-avatar--туяа .companion-avatar__art, .companion-picker__art--туяа { background-position: right bottom; }
 .companion-avatar--listening .companion-avatar__halo { transform: scale(1.04); background: #eeeee9; }
-.companion-avatar--listening .companion-avatar__body { transform: translateY(-3px) scale(1.02); }
-.companion-avatar--speaking .companion-avatar__mouth { height: 13px; border: 1.5px solid currentColor; border-radius: 50%; animation: companion-talk 650ms ease-in-out infinite alternate; }
-.companion-avatar--warning { --companion-accent: #b7791f; }
+.companion-avatar--listening .companion-avatar__art { transform: translateY(-3px) scale(1.02); }
+.companion-avatar--speaking .companion-avatar__art { animation: companion-talk 650ms ease-in-out infinite alternate; }
 .companion-avatar--warning .companion-avatar__halo { background: #f4f0e8; border-color: #e8dfce; }
-.companion-avatar--warning .companion-avatar__body { border-color: #e8dfce; }
-.companion-avatar--compact { width: 126px; }
-.companion-avatar--compact .companion-avatar__halo { inset: 0; border-radius: 50%; background: #ecece7; }
-.companion-avatar--compact .companion-avatar__body { width: 78%; aspect-ratio: 1; gap: 15%; border-radius: 50%; }
-.companion-avatar--compact .companion-avatar__eyes { gap: 24px; }
-.companion-avatar--compact .companion-avatar__eyes i { width: 7px; height: 9px; }
-.companion-avatar--compact .companion-avatar__mouth { width: 16px; height: 6px; }
-.companion-avatar--compact.companion-avatar--speaking .companion-avatar__mouth { height: 10px; }
+.companion-avatar--ари .companion-avatar__halo { background: #f1eef6; border-color: #e2ddea; }
+.companion-avatar--номи .companion-avatar__halo { border-radius: 58% 42% 46% 54% / 43% 57% 43% 57%; background: #eaf3f1; border-color: #d8e7e2; }
+.companion-avatar--туяа .companion-avatar__halo { border-radius: 50%; background: #f7eee7; border-color: #ebddd1; }
+.companion-avatar--мяу .companion-avatar__art, .companion-picker__art.companion-picker__art--мяу { background-image: url("/companions/storybook-companions-extra.png"); background-position: left top; }
+.companion-avatar--бамбар .companion-avatar__art, .companion-picker__art.companion-picker__art--бамбар { background-image: url("/companions/storybook-companions-extra.png"); background-position: right top; }
+.companion-avatar--пип .companion-avatar__art, .companion-picker__art.companion-picker__art--пип { background-image: url("/companions/storybook-companions-extra.png"); background-position: left bottom; }
+.companion-avatar--рокки .companion-avatar__art, .companion-picker__art.companion-picker__art--рокки { background-image: url("/companions/storybook-companions-extra.png"); background-position: right bottom; }
+.companion-avatar--мяу .companion-avatar__halo { background: #fff3eb; border-color: #f0ded0; }
+.companion-avatar--бамбар .companion-avatar__halo { background: #f8eee9; border-color: #ebd9d1; }
+.companion-avatar--пип .companion-avatar__halo { background: #eef2fb; border-color: #dbe3f3; }
+.companion-avatar--рокки .companion-avatar__halo { background: #f1efed; border-color: #e2dedb; }
+.companion-avatar--compact { width: 126px; border-radius: 50%; }
+.companion-avatar--compact .companion-avatar__halo { inset: 0; border-radius: 50%; }
+.companion-avatar--compact .companion-avatar__art { border-radius: 50%; transform: scale(.98); }
+.companion-avatar--compact.companion-avatar--listening .companion-avatar__art { transform: translateY(-3px) scale(1); }
+.companion-avatar--compact.companion-avatar--speaking .companion-avatar__art { animation: companion-talk 650ms ease-in-out infinite alternate; }
+.companion-picker__art { display: block; width: 56px; height: 56px; border-radius: 50%; background-color: #f7f7f5; background-image: url("/companions/storybook-companions.png"); background-repeat: no-repeat; background-size: 200% 200%; filter: drop-shadow(0 4px 6px #11111118); transition: box-shadow 200ms ease, transform 200ms ease; }
+.group:hover .companion-picker__art { transform: scale(1.05); }
 
-@keyframes companion-talk { from { transform: scaleY(.65); } to { transform: scaleY(1.1); } }
+@keyframes companion-talk { from { transform: translateY(0) scale(.98); } to { transform: translateY(-4px) scale(1.03); } }
 
 @media (prefers-reduced-motion: reduce) {
   .companion-avatar *, .companion-avatar { animation: none !important; transition: none !important; }

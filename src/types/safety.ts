@@ -37,7 +37,7 @@ export type AssistantSettings = {
   userName: string;
   name: string;
   voice: "Эмэгтэй" | "Эрэгтэй";
-  avatar: "Мило" | "Ари" | "Номи" | "Туяа";
+  avatar: "Мило" | "Ари" | "Номи" | "Туяа" | "Мяу" | "Бамбар" | "Пип" | "Рокки";
   tone: "Тайван" | "Найрсаг";
   speechSpeed: "Удаан" | "Энгийн";
   instructionLength: "Богино" | "Энгийн";
@@ -46,7 +46,7 @@ export type AssistantSettings = {
 export type CompanionProfile = {
   userName: string;
   assistantName: string;
-  voiceId?: string;
+  voice: "female" | "male";
   tone: "calm" | "friendly";
   instructionLength: "short" | "normal";
 };
