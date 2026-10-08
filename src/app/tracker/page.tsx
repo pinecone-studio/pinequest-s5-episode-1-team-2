@@ -11,7 +11,7 @@ import { toCompanionProfile } from "@/lib/assistant-settings";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
-import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
+import type { NearbyLandmark, SafetyAssistantRequest, SafetyState } from "@/types/safety";
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
@@ -75,12 +75,21 @@ export default function TrackerPage() {
   const [routeStatus, setRouteStatus] =
     useState<"loading" | "ready" | "error">("loading");
 
+  const [nearbyLandmarks, setNearbyLandmarks] =
+    useState<NearbyLandmark[]>([]);
+
 
   const routeController =
     useRef<AbortController | null>(null);
 
   const lastRouteAt =
     useRef(0);
+
+  const landmarkController =
+    useRef<AbortController | null>(null);
+
+  const lastLandmarkQuery =
+    useRef<{ latitude: number; longitude: number; at: number } | null>(null);
 
   const lastAutomaticRequest =
     useRef<string | null>(null);
@@ -353,8 +362,63 @@ export default function TrackerPage() {
   useEffect(() => {
     return () => {
       routeController.current?.abort();
+      landmarkController.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentLocation) {
+      setNearbyLandmarks([]);
+      return;
+    }
+
+    const previous = lastLandmarkQuery.current;
+    const movedEnough = !previous || Math.hypot(
+      currentLocation.latitude - previous.latitude,
+      currentLocation.longitude - previous.longitude,
+    ) > 0.001;
+
+    if (!movedEnough && previous && Date.now() - previous.at < 60_000) {
+      return;
+    }
+
+    lastLandmarkQuery.current = {
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude,
+      at: Date.now(),
+    };
+    landmarkController.current?.abort();
+    const controller = new AbortController();
+    landmarkController.current = controller;
+
+    void fetch(`/api/landmarks?lat=${currentLocation.latitude}&lng=${currentLocation.longitude}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Landmark request failed.");
+        return response.json() as Promise<unknown>;
+      })
+      .then((value) => {
+        if (controller.signal.aborted || !value || typeof value !== "object") return;
+        const landmarks = "landmarks" in value ? value.landmarks : null;
+        if (!Array.isArray(landmarks)) return;
+
+        setNearbyLandmarks(
+          landmarks
+            .filter((landmark): landmark is NearbyLandmark =>
+              Boolean(landmark) &&
+              typeof landmark === "object" &&
+              "name" in landmark && typeof landmark.name === "string" &&
+              "type" in landmark && typeof landmark.type === "string" &&
+              "distance" in landmark && typeof landmark.distance === "number",
+            )
+            .slice(0, 5),
+        );
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) console.warn("LANDMARK ERROR:", error);
+      });
+  }, [currentLocation?.latitude, currentLocation?.longitude]);
 
   const speakMessage = useCallback(
     async (message: string) => {
@@ -534,11 +598,16 @@ export default function TrackerPage() {
         requestController.current =
           controller;
 
-        const fallbackMessage =
-          getSafetyFallback(
-            state.riskLevel,
-            profile.userName,
-          );
+        const landmark = nearbyLandmarks[0];
+        const landmarkHint = landmark
+          ? ` Ойрхон ${landmark.name} байна.`
+          : "";
+        const fallbackMessage = navigationInstruction
+          ? `${profile.userName}, ${navigationInstruction}${landmarkHint}`
+          : getSafetyFallback(
+              state.riskLevel,
+              profile.userName,
+            );
 
         speechSequence.current += 1;
 
@@ -596,6 +665,8 @@ export default function TrackerPage() {
                 navigationInstruction,
               }
             : {}),
+
+          nearbyLandmarks,
         };
 
         try {
@@ -679,6 +750,7 @@ export default function TrackerPage() {
       },
       [
         navigationInstruction,
+        nearbyLandmarks,
         profile,
         speakMessage,
       ],
@@ -690,6 +762,7 @@ export default function TrackerPage() {
           safetyState.riskLevel,
           safetyState.routeDeviation,
           navigationInstruction ?? "",
+          nearbyLandmarks.map((landmark) => `${landmark.name}:${landmark.distance}`).join(","),
           demoMode
             ? `${demoLocation.latitude}:${demoLocation.longitude}`
             : "",

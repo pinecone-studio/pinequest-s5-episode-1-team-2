@@ -8,6 +8,11 @@ type Landmark = {
   distance: number;
 };
 
+const OVERPASS_URLS = [
+  "https://overpass.private.coffee/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
+];
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -28,39 +33,52 @@ export async function GET(request: NextRequest) {
     (
       node["highway"="traffic_signals"](around:${radius},${lat},${lng});
       node["highway"="bus_stop"](around:${radius},${lat},${lng});
-      node["amenity"="school"](around:${radius},${lat},${lng});
-      node["amenity"="hospital"](around:${radius},${lat},${lng});
-      node["amenity"="pharmacy"](around:${radius},${lat},${lng});
-      node["shop"](around:${radius},${lat},${lng});
-      node["amenity"="restaurant"](around:${radius},${lat},${lng});
-      node["leisure"="park"](around:${radius},${lat},${lng});
+      nwr["amenity"="school"](around:${radius},${lat},${lng});
+      nwr["amenity"="hospital"](around:${radius},${lat},${lng});
+      nwr["amenity"="pharmacy"](around:${radius},${lat},${lng});
+      nwr["shop"](around:${radius},${lat},${lng});
+      nwr["amenity"="restaurant"](around:${radius},${lat},${lng});
+      nwr["leisure"="park"](around:${radius},${lat},${lng});
     );
     out center;
   `;
 
   try {
-    const response = await fetch(
-      "https://overpass-api.de/api/interpreter",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          data: query,
-        }),
-        cache: "no-store",
-      },
-    );
+    let elements: unknown[] | null = null;
 
-    if (!response.ok) {
-      throw new Error("Landmark request failed");
+    for (const url of OVERPASS_URLS) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/x-www-form-urlencoded",
+            "User-Agent": "SafePath/1.0",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({
+            data: query,
+          }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(4_000),
+        });
+
+        const data: unknown = response.ok ? await response.json() : null;
+        if (isOverpassResponse(data)) {
+          elements = data.elements;
+          break;
+        }
+      } catch {
+        // Try the next OSM provider below.
+      }
     }
 
-    const data = await response.json();
+    if (!elements) {
+      const landmark = await getReverseLandmark(lat, lng);
+      return NextResponse.json({ landmarks: landmark ? [landmark] : [] });
+    }
 
-    const landmarks: Landmark[] = data.elements
+    const landmarks: Landmark[] = elements
       .map((element: any) => {
         const latitude =
           element.lat ?? element.center?.lat;
@@ -79,10 +97,7 @@ export async function GET(request: NextRequest) {
           getLandmarkType(element.tags);
 
         return {
-          name: getLandmarkName(
-            element.tags,
-            type,
-          ),
+          name: getLandmarkName(type),
           type,
           latitude,
           longitude,
@@ -96,7 +111,7 @@ export async function GET(request: NextRequest) {
           ),
         };
       })
-      .filter(Boolean)
+      .filter((landmark): landmark is Landmark => landmark !== null)
       .sort(
         (a: Landmark, b: Landmark) =>
           a.distance - b.distance,
@@ -119,6 +134,44 @@ export async function GET(request: NextRequest) {
       },
       { status: 500 },
     );
+  }
+}
+
+function isOverpassResponse(value: unknown): value is { elements: unknown[] } {
+  if (!value || typeof value !== "object" || !("elements" in value)) return false;
+  return Array.isArray(value.elements);
+}
+
+async function getReverseLandmark(lat: number, lng: number): Promise<Landmark | null> {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`,
+      {
+        headers: {
+          "User-Agent": "SafePath/1.0",
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(4_000),
+      },
+    );
+    const data: unknown = response.ok ? await response.json() : null;
+    if (!data || typeof data !== "object") return null;
+
+    const type = "type" in data && typeof data.type === "string" ? data.type : "landmark";
+    const latitude = "lat" in data ? Number(data.lat) : NaN;
+    const longitude = "lon" in data ? Number(data.lon) : NaN;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    return {
+      name: getLandmarkName(type),
+      type,
+      latitude,
+      longitude,
+      distance: Math.round(calculateDistance(lat, lng, latitude, longitude)),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -171,14 +224,7 @@ function getLandmarkType(
   return "landmark";
 }
 
-function getLandmarkName(
-  tags: any = {},
-  type: string,
-) {
-  if (tags.name) {
-    return tags.name;
-  }
-
+function getLandmarkName(type: string) {
   const names: Record<
     string,
     string
@@ -195,6 +241,10 @@ function getLandmarkName(
     restaurant:
       "ресторан",
     park: "парк",
+    office: "ойрхон барилга",
+    insurance: "ойрхон барилга",
+    commercial: "ойрхон барилга",
+    building: "ойрхон барилга",
     landmark:
       "ойролцоох газар",
   };

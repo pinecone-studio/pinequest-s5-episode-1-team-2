@@ -51,6 +51,12 @@ export type CompanionProfile = {
   instructionLength: "short" | "normal";
 };
 
+export type NearbyLandmark = {
+  name: string;
+  type: string;
+  distance: number;
+};
+
 export type SafetyAssistantRequest = CompanionProfile & {
   riskLevel: SafetyStatus;
   riskScore: number;
@@ -61,4 +67,5 @@ export type SafetyAssistantRequest = CompanionProfile & {
   distanceFromSafeZone: number;
   destination: string | null;
   navigationInstruction?: string;
+  nearbyLandmarks?: NearbyLandmark[];
 };

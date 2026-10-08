@@ -92,14 +92,22 @@ function pickNextManeuver(maneuvers: ValhallaManeuver[]) {
 
 function buildMongolianInstruction(maneuver: ValhallaManeuver, distanceMeters: number | null) {
   const instruction = maneuver.instruction?.toLowerCase() ?? "";
-  const distance = distanceMeters && distanceMeters >= 10 ? `${distanceMeters} метрийн дараа ` : "";
+  const distance = describeDistance(distanceMeters);
 
-  if (/\b(left|slight left)\b/.test(instruction)) return `${distance}зүүн тийш эргэ.`;
-  if (/\b(right|slight right)\b/.test(instruction)) return `${distance}баруун тийш эргэ.`;
-  if (/\bu[- ]?turn\b/.test(instruction)) return `${distance}буцаж эргэ.`;
-  if (/\broundabout\b/.test(instruction)) return `${distance}тойргоор эргээд гэрийн зүг яв.`;
+  if (/\b(left|slight left)\b/.test(instruction)) return `${distance}зүүн тийш эргээрэй.`;
+  if (/\b(right|slight right)\b/.test(instruction)) return `${distance}баруун тийш эргээрэй.`;
+  if (/\bu[- ]?turn\b/.test(instruction)) return `${distance}болгоомжтой буцаж эргээрэй.`;
+  if (/\broundabout\b/.test(instruction)) return `${distance}тойргоор эргээд гэрийн зүг яваарай.`;
   if (/\barrive\b|\bdestination\b/.test(instruction)) return "Та гэртээ ойртож байна.";
-  return `${distance}чигээрээ яв.`;
+  return `${distance}чигээрээ яваарай.`;
+}
+
+function describeDistance(distanceMeters: number | null) {
+  if (!distanceMeters || distanceMeters < 50) return "Эндээс жаахан яваад ";
+  if (distanceMeters < 120) return "Жаахан цааш яваад ";
+  if (distanceMeters < 250) return "Хэсэгхэн урагшаа яваад ";
+  if (distanceMeters < 500) return "Энэ замаараа нэлээн яваад ";
+  return "Энэ замаараа хэсэг явсны дараа ";
 }
 
 function decodePolyline6(encoded: string): [number, number][] {

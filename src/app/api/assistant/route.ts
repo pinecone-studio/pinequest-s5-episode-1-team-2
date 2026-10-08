@@ -113,6 +113,9 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     voice: value.voice,
     tone: value.tone,
     instructionLength: value.instructionLength,
+    ...(typeof value.navigationInstruction === "string"
+      ? { navigationInstruction: value.navigationInstruction.trim() }
+      : {}),
     ...(Array.isArray(value.nearbyLandmarks)
   ? { nearbyLandmarks: value.nearbyLandmarks }
   : {}),
