@@ -17,6 +17,8 @@ const name = z
   .min(1, { error: "Нэрээ оруулна уу." })
   .max(NAME_MAX_LENGTH, { error: `Нэр хамгийн ихдээ ${NAME_MAX_LENGTH} тэмдэгт байна.` });
 
+const role = z.enum(ROLES, { error: "Үүргээ сонгоно уу." });
+
 const email = z
   .string({ error: "Имэйл хаягаа оруулна уу." })
   .trim()
@@ -37,6 +39,7 @@ export const SignupFormSchema = z
     name,
     email,
     password: newPassword,
+    role,
     confirmPassword: z.string({ error: "Нууц үгээ дахин оруулна уу." }),
   })
   .refine((value) => value.password === value.confirmPassword, {
@@ -52,7 +55,7 @@ export const LoginFormSchema = z.object({
 });
 
 export const SetRoleFormSchema = z.object({
-  role: z.enum(ROLES, { error: "Үүргээ сонгоно уу." }),
+  role,
 });
 
 export const PairingCodeFormSchema = z.object({

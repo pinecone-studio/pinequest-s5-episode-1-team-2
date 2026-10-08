@@ -19,27 +19,28 @@ function text(formData: FormData, key: string) {
 }
 
 export async function signup(_state: FormState, formData: FormData): Promise<FormState> {
-  const values = { name: text(formData, "name"), email: text(formData, "email") };
+  const values = { name: text(formData, "name"), email: text(formData, "email"), role: text(formData, "role") };
   const parsed = SignupFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
   if (!parsed.success) return { errors: z.flattenError(parsed.error).fieldErrors, values };
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role } = parsed.data;
   const { users } = await getCollections();
   const id = crypto.randomUUID();
   try {
-    await users.insertOne({ _id: id, email, passwordHash: await hashPassword(password), name, phone: null, role: null, createdAt: new Date() });
+    await users.insertOne({ _id: id, email, passwordHash: await hashPassword(password), name, phone: null, role, createdAt: new Date() });
   } catch (error) {
     if (isDuplicateKey(error)) return { errors: { email: ["Энэ имэйл бүртгэлтэй байна."] }, values };
     throw error;
   }
 
   await createSession(id);
-  redirect(homeFor(null));
+  redirect(homeFor(role));
 }
 
 export async function login(_state: FormState, formData: FormData): Promise<FormState> {
