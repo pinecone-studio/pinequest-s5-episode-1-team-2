@@ -19,8 +19,6 @@ export type UserRecord = {
   phone: string | null;
   /** null until the user picks one after their first login. */
   role: Role | null;
-  /** The child paused location sharing. Missing means not paused, so older accounts need no update. */
-  locationPaused?: boolean;
   createdAt: Date;
 };
 

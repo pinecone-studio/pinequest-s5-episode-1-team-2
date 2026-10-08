@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
-import { LocationSharingStatus } from "@/components/location-sharing-status";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { toCompanionProfile } from "@/lib/assistant-settings";
