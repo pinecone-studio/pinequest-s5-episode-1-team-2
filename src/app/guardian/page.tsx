@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { calculateSafetyState } from "@/lib/risk-engine";
@@ -187,7 +187,7 @@ export default function GuardianPage() {
             <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#2e7d4f]" />Одоогийн зам</span>
             <Link href="/guardian/zones" className="ml-auto inline-flex min-h-8 items-center font-medium text-[#111111] underline underline-offset-4">Бүс засах</Link>
           </div>
-
+        </div>
         <section className="px-5 pt-4" aria-label="Одоогийн мэдээлэл">
           <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-[#e7e7e5] py-3">
             <Info label="Одоогийн байршил" value={safetyState ? (safetyState.isInsideSafeZone ? safetyState.nearestSafeZone.name : "Бүсээс гадуур") : "Тодорхойгүй"} />
@@ -424,8 +424,4 @@ function formatAge(ms: number) {
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} минутын өмнө`;
   return `${Math.round(minutes / 60)} цагийн өмнө`;
-}
-
-function formatDistance(meters: number) {
-  return meters < 1000 ? `${Math.round(meters)} м` : `${(meters / 1000).toFixed(1)} км`;
 }
