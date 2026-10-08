@@ -1,0 +1,23 @@
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/safe-path";
+import { SignupForm } from "@/components/auth/forms";
+import { getCurrentUser } from "@/lib/auth/dal";
+import { homeFor } from "@/lib/auth/routes";
+
+export default async function SignupPage() {
+  const user = await getCurrentUser();
+  if (user) redirect(homeFor(user.role));
+
+  return (
+    <AppShell>
+      <main className="flex min-h-dvh flex-col px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))]">
+        <p className="text-[17px] font-semibold tracking-[-0.02em]">SafePath</p>
+        <div className="flex flex-1 flex-col justify-center py-10">
+          <h1 className="text-[30px] font-semibold leading-[1.14] tracking-[-0.04em]">Бүртгүүлэх</h1>
+          <p className="mb-8 mt-2 text-[15px] text-[#737373]">Шинэ бүртгэл үүсгэнэ үү.</p>
+          <SignupForm />
+        </div>
+      </main>
+    </AppShell>
+  );
+}

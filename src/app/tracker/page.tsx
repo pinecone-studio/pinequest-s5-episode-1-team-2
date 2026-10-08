@@ -214,6 +214,7 @@ export default function TrackerPage() {
         </div>
 
         <a href="tel:+97600000000" className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">Тусламж хэрэгтэй</a>
+        <Link href="/tracker/code" className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">Холбох код</Link>
         <audio
           ref={audioElement}
           className="sr-only"
