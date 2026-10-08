@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { postLocation, watchReadings, type Reading } from "@/lib/location-source";
 import type { SharingState } from "@/types/location";
 
 export type SharingStatus = "waiting" | "sharing" | "no-guardian" | "no-location" | "error" | "stopped";
@@ -8,18 +9,15 @@ export type SharingStatus = "waiting" | "sharing" | "no-guardian" | "no-location
 /** At most one report this often, however fast new readings arrive. */
 const MIN_GAP_MS = 10_000;
 
-async function send(position: GeolocationPosition, signal: AbortSignal): Promise<{ status: SharingStatus; state?: SharingState }> {
-  const { latitude, longitude, accuracy } = position.coords;
+async function send(reading: Reading, signal: AbortSignal): Promise<{ status: SharingStatus; state?: SharingState }> {
   try {
-    const response = await fetch("/api/location", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ latitude, longitude, accuracy, ageMs: Math.max(0, Date.now() - position.timestamp) }),
+    const { status, data } = await postLocation(
+      { latitude: reading.latitude, longitude: reading.longitude, accuracy: reading.accuracy, ageMs: Math.max(0, Date.now() - reading.timestamp) },
       signal,
-    });
-    if (response.status === 401 || response.status === 403) return { status: "stopped" };
-    if (!response.ok) return { status: "error" };
-    const result = (await response.json()) as Partial<SharingState & { shared: boolean }>;
+    );
+    if (status === 401 || status === 403) return { status: "stopped" };
+    if (status < 200 || status >= 300) return { status: "error" };
+    const result = (data ?? {}) as Partial<SharingState & { shared: boolean }>;
     const state = { paused: result.paused === true, watchers: typeof result.watchers === "number" ? result.watchers : 0 };
     return { status: result.shared === true ? "sharing" : "no-guardian", state };
   } catch {
@@ -29,9 +27,10 @@ async function send(position: GeolocationPosition, signal: AbortSignal): Promise
 
 /**
  * While the child's page is open and sharing is not paused, sends each new GPS reading (at most one
- * every 10 s) so linked guardians can see it. It first asks the server whether sharing is paused, so a
- * paused phone never sends a position. It watches the real GPS itself, so a demo-mode position is never
- * sent, and each report says how old its reading is, so a position that stopped updating never looks current.
+ * every 10 s) so linked guardians can see it; in the Android app this continues in the background.
+ * It first asks the server whether sharing is paused, so a paused phone never sends a position. It
+ * reads the real GPS itself, so a demo-mode position is never sent, and each report says how old its
+ * reading is, so a position that stopped updating never looks current.
  */
 export function useLocationSharing() {
   const [status, setStatus] = useState<SharingStatus>("waiting");
@@ -67,13 +66,9 @@ export function useLocationSharing() {
 
   useEffect(() => {
     if (paused !== false) return;
-    if (!("geolocation" in navigator)) {
-      queueMicrotask(() => setStatus("no-location"));
-      return;
-    }
 
     const controller = new AbortController();
-    let latest: GeolocationPosition | null = null;
+    let latest: Reading | null = null;
     let sentTimestamp = 0;
     let lastSendAt = 0;
     let sending = false;
@@ -81,7 +76,10 @@ export function useLocationSharing() {
 
     function schedule() {
       if (timer !== undefined || sending || !latest || latest.timestamp === sentTimestamp) return;
-      timer = window.setTimeout(flush, Math.max(0, lastSendAt + MIN_GAP_MS - Date.now()));
+      const wait = lastSendAt + MIN_GAP_MS - Date.now();
+      // Send straight away when allowed: in the background, Android may hold timers back.
+      if (wait <= 0) void flush();
+      else timer = window.setTimeout(flush, wait);
     }
 
     async function flush() {
@@ -96,27 +94,26 @@ export function useLocationSharing() {
       if (controller.signal.aborted) return;
       setStatus(result.status);
       if (result.state) setSharing(result.state); // a pause made on another device stops this watch
-      if (result.status === "stopped") return navigator.geolocation.clearWatch(watchId);
+      if (result.status === "stopped") return stopWatching();
       if (result.status === "error") sentTimestamp = 0; // try this reading again after the gap
       schedule(); // a newer reading may have arrived while sending
     }
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        latest = position;
+    const stopWatching = watchReadings(
+      (reading) => {
+        latest = reading;
         schedule();
       },
       (error) => {
         // A dropout after a good reading is fine: the last reading keeps its true age.
-        if (!latest || error.code === error.PERMISSION_DENIED) setStatus("no-location");
+        if (!latest || error === "denied") setStatus("no-location");
       },
-      { enableHighAccuracy: true, maximumAge: 5_000 },
     );
 
     return () => {
       controller.abort();
       window.clearTimeout(timer);
-      navigator.geolocation.clearWatch(watchId);
+      stopWatching();
     };
   }, [paused]);
 

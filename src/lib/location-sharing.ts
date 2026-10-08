@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { zonesByChild } from "@/lib/child-zones";
 import { getCollections } from "@/lib/db/mongo";
 import type { ChildLocation, SharingState } from "@/types/location";
 
@@ -53,11 +54,11 @@ export async function setSharingPaused(childId: string, paused: boolean): Promis
   return getSharingState(childId);
 }
 
-/** After a link is removed: a child nobody is linked to any more keeps no stored position. */
-export async function forgetLocationIfUnwatched(childId: string) {
-  const { guardianLinks, locations } = await getCollections();
+/** After a link is removed: a child nobody is linked to any more keeps no stored position or safe zones. */
+export async function forgetUnwatchedChild(childId: string) {
+  const { guardianLinks, locations, safeZones } = await getCollections();
   const watched = await guardianLinks.countDocuments({ childId }, { limit: 1 });
-  if (!watched) await locations.deleteOne({ _id: childId });
+  if (!watched) await Promise.all([locations.deleteOne({ _id: childId }), safeZones.deleteMany({ childId })]);
 }
 
 /** The children linked to this guardian, oldest link first, each with their latest position if they are sharing. */
@@ -65,9 +66,10 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
   const { guardianLinks, users, locations } = await getCollections();
   const links = await guardianLinks.find({ guardianId }).sort({ createdAt: 1 }).toArray();
   const childIds = links.map((link) => link.childId);
-  const [children, positions] = await Promise.all([
+  const [children, positions, zones] = await Promise.all([
     users.find({ _id: { $in: childIds } }, { projection: { name: 1, locationPaused: 1 } }).toArray(),
     locations.find({ _id: { $in: childIds } }).toArray(),
+    zonesByChild(childIds),
   ]);
   const byId = new Map(children.map((child) => [child._id, child]));
   const latest = new Map(positions.map((position) => [position._id, position]));
@@ -80,6 +82,7 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
     return {
       childId,
       name: child?.name ?? "—",
+      zones: zones.get(childId) ?? [],
       paused,
       position: position
         ? { latitude: position.latitude, longitude: position.longitude, accuracy: position.accuracy, updatedAt: position.updatedAt.toISOString() }

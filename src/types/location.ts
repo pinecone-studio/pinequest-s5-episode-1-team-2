@@ -1,3 +1,5 @@
+import type { SafeZone } from "@/types/safety";
+
 /** A document in `locations`: the latest position a child shared. `_id` is the child's user id, so there is one per child. */
 export type LocationRecord = {
   _id: string;
@@ -12,10 +14,24 @@ export type LocationRecord = {
   updatedAt: Date;
 };
 
+/** A document in `safeZones`: a place a guardian marked as safe for one child. Any guardian linked to the child can manage it. */
+export type SafeZoneRecord = {
+  _id: string;
+  childId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  createdBy: string;
+  createdAt: Date;
+};
+
 /** What a guardian's page receives for each linked child. */
 export type ChildLocation = {
   childId: string;
   name: string;
+  /** The child's safe zones, oldest first. Empty until a guardian adds one. */
+  zones: SafeZone[];
   /** The child paused sharing on purpose. The position is then always null. */
   paused: boolean;
   /** null while the child is not sharing: paused, page closed, no reading yet, or nothing for a day. */

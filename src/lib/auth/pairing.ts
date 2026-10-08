@@ -1,7 +1,7 @@
 import { randomInt } from "node:crypto";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import { PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MINUTES } from "@/lib/auth/schemas";
-import { forgetLocationIfUnwatched } from "@/lib/location-sharing";
+import { forgetUnwatchedChild } from "@/lib/location-sharing";
 
 function randomCode() {
   return Array.from({ length: PAIRING_CODE_LENGTH }, () => PAIRING_CODE_ALPHABET[randomInt(PAIRING_CODE_ALPHABET.length)]).join("");
@@ -54,6 +54,6 @@ export async function removeLink(linkId: string, userId: string) {
   const { guardianLinks } = await getCollections();
   const removed = await guardianLinks.findOneAndDelete({ _id: linkId, $or: [{ guardianId: userId }, { childId: userId }] });
   if (!removed) return false;
-  await forgetLocationIfUnwatched(removed.childId);
+  await forgetUnwatchedChild(removed.childId);
   return true;
 }

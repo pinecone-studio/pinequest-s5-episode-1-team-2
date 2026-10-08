@@ -11,6 +11,11 @@ const config: CapacitorConfig = {
     cleartext: false,
     allowNavigation: ["safepath-indol.vercel.app", "safepath.app", "*.safepath.app"],
   },
+  android: {
+    // Required by the background-geolocation plugin: otherwise location updates stop after
+    // about 5 minutes in the background.
+    useLegacyBridge: true,
+  },
 };
 
 export default config;
