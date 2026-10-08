@@ -62,5 +62,3 @@ export type SafetyAssistantRequest = CompanionProfile & {
   destination: string | null;
   navigationInstruction?: string;
 };
-
-
