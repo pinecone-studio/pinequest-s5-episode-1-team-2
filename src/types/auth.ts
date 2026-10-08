@@ -3,9 +3,13 @@ export const ROLES = ["guardian", "child"] as const;
 /** "child" is the person who talks to Milo (the "Хэрэглэгч" card on /role). */
 export type Role = (typeof ROLES)[number];
 
-/** A `users` row. Server-only: it holds the password hash, so never send it to the browser. */
+/**
+ * A document in `users`. Server-only: it holds the password hash, so never send it
+ * to the browser. Convert it with `toUser` first.
+ */
 export type UserRecord = {
-  id: string;
+  /** crypto.randomUUID(), not an ObjectId, so ids are plain strings everywhere. */
+  _id: string;
   /** Unique and lowercased. */
   email: string;
   passwordHash: string;
@@ -19,19 +23,24 @@ export type UserRecord = {
 };
 
 /** What the browser may see. */
-export type User = Omit<UserRecord, "passwordHash">;
-
-/** A guardian can read a child's data only while this row exists. Revoking deletes it. */
-export type GuardianLink = {
+export type User = Pick<UserRecord, "email" | "name" | "phone" | "role" | "createdAt"> & {
   id: string;
+};
+
+/** A document in `guardianLinks`. A guardian can read a child's data only while it exists. Revoking deletes it. */
+export type GuardianLink = {
+  _id: string;
   guardianId: string;
   childId: string;
   createdAt: Date;
 };
 
-/** Shown on the child's phone and typed on the guardian's. Redeeming deletes it, so it works once. */
+/**
+ * A document in `pairingCodes`. Shown on the child's phone and typed on the guardian's.
+ * Redeeming deletes it, so it works once. `_id` is the child's user id, so a child has only one code.
+ */
 export type PairingCode = {
+  _id: string;
   code: string;
-  childId: string;
   expiresAt: Date;
 };
