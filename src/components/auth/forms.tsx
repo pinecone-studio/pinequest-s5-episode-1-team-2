@@ -48,7 +48,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
   return (
     <form action={action} className="grid gap-4">
-      <Field id="email" label="Имэйл" type="email" autoComplete="email" defaultValue={state?.values?.email} errors={state?.errors?.email} />
+      <Field id="email" label="Имэйл" type="email" autoComplete="email" defaultValue={state?.values?.email} errors={state?.errors?.email}/>
       <Field id="password" label="Нууц үг" type="password" autoComplete="current-password" errors={state?.errors?.password} />
       {state?.message && <p role="alert" className="text-sm text-[#c64242]">{state.message}</p>}
       <SubmitButton pending={pending}>Нэвтрэх</SubmitButton>
