@@ -31,9 +31,9 @@ const statusText: Record<SafetyStatus, string> = {
 };
 
 const statusColor: Record<SafetyStatus, string> = {
-  SAFE: "text-[#2e7d4f]",
-  WARNING: "text-[#b7791f]",
-  HIGH_RISK: "text-[#c64242]",
+  SAFE: "text-[#6ee7a8]",
+  WARNING: "text-[#fbbf24]",
+  HIGH_RISK: "text-[#fb7185]",
 };
 
 export function StatusIndicator({ status }: { status: SafetyStatus }) {
