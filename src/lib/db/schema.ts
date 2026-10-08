@@ -70,6 +70,24 @@ export const SCHEMA: Record<string, CollectionSchema> = {
     // Old counters are removed in the background; the rate limiter also checks resetAt itself.
     indexes: [{ key: { resetAt: 1 }, name: "resetAt_ttl", expireAfterSeconds: 0 }],
   },
+  locations: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["latitude", "longitude", "accuracy", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          accuracy: { bsonType: "number", minimum: 0 },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    // A position nobody refreshed for a day is deleted, so a child's whereabouts are not kept forever.
+    indexes: [{ key: { updatedAt: 1 }, name: "updatedAt_ttl", expireAfterSeconds: 24 * 60 * 60 }],
+  },
   pairingCodes: {
     validator: {
       $jsonSchema: {

@@ -40,6 +40,7 @@ export async function signup(
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
@@ -50,7 +51,7 @@ export async function signup(
     };
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role } = parsed.data;
   const { users } = await getCollections();
   const id = crypto.randomUUID();
 
@@ -78,7 +79,7 @@ export async function signup(
   }
 
   await createSession(id);
-  redirect(homeFor(null));
+  redirect(homeFor(role));
 }
 
 export async function login(

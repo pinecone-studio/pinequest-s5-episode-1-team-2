@@ -1,5 +1,6 @@
 import { MongoClient, type Db } from "mongodb";
 import type { GuardianLink, PairingCode, RateLimit, UserRecord } from "@/types/auth";
+import type { LocationRecord } from "@/types/location";
 
 // Kept on globalThis so dev hot reloads reuse one connection instead of opening a new one each time.
 const globalForMongo = globalThis as typeof globalThis & { mongoClient?: Promise<MongoClient> };
@@ -30,6 +31,7 @@ export async function getCollections() {
     guardianLinks: db.collection<GuardianLink>("guardianLinks"),
     pairingCodes: db.collection<PairingCode>("pairingCodes"),
     rateLimits: db.collection<RateLimit>("rateLimits"),
+    locations: db.collection<LocationRecord>("locations"),
   };
 }
 
