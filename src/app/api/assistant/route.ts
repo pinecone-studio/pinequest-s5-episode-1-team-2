@@ -1,4 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
+import { getSessionUserId } from "@/lib/auth/dal";
+import { allowAttempt } from "@/lib/auth/rate-limit";
 import { createSafetyPrompt, SAFETY_ASSISTANT_SYSTEM_PROMPT } from "@/lib/ai/safety-prompt";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import type { SafetyAssistantRequest, SafetyStatus } from "@/types/safety";
@@ -23,6 +25,12 @@ const allowedKeys = new Set([
 const requiredKeys = [...allowedKeys].filter((key) => key !== "navigationInstruction");
 
 export async function POST(request: Request) {
+  const userId = await getSessionUserId();
+  if (!userId) return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await allowAttempt(`api:${userId}`, 60, 60_000))) {
+    return Response.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
