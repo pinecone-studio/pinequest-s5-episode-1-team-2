@@ -6,9 +6,8 @@ import { useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { calculateSafetyState } from "@/lib/risk-engine";
-import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { ChildLocation } from "@/types/location";
-import type { SafetyLocation } from "@/types/safety";
+import type { SafeZone, SafetyLocation } from "@/types/safety";
 
 const LiveMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
@@ -132,15 +131,17 @@ export default function GuardianPage() {
     [position],
   );
   const ageMs = location && checkedAt ? Math.max(0, checkedAt - location.lastUpdated) : null;
-  const safetyState = useMemo(() => location ? calculateSafetyState({ location }) : null, [location]);
+  // The same array until the zones really change: each poll returns new objects, and the map re-fits whenever the array changes.
+  const zonesKey = JSON.stringify(child?.zones ?? []);
+  const zones = useMemo(() => JSON.parse(zonesKey) as SafeZone[], [zonesKey]);
+  // Risk is measured against the zones the guardians set for this child; without any there is nothing to measure.
+  const safetyState = useMemo(
+    () => (location && zones.length ? calculateSafetyState({ location, safeZones: zones }) : null),
+    [location, zones],
+  );
   const currentRoute: [number, number][] = location && safetyState
     ? [[location.latitude, location.longitude], [safetyState.nearestSafeZone.latitude, safetyState.nearestSafeZone.longitude]]
     : [];
-  const familiarRoute: [number, number][] = [
-    [SAFE_ZONES[0].latitude, SAFE_ZONES[0].longitude],
-    [47.9212, 106.9176],
-    [SAFE_ZONES[1].latitude, SAFE_ZONES[1].longitude],
-  ];
 
   return (
     <AppShell>
@@ -150,7 +151,7 @@ export default function GuardianPage() {
             <Link href="/" className="text-[17px] font-semibold tracking-[-0.025em]">SafePath</Link>
             <p className="mt-0.5 truncate text-sm text-[#737373]">{child?.name ?? "—"}</p>
           </div>
-          <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
+          {safetyState && <StatusIndicator status={safetyState.riskLevel} />}
         </header>
 
         <div id="location" className="px-4 pt-1">
@@ -169,23 +170,28 @@ export default function GuardianPage() {
             </div>
           )}
           <div className="h-[48vh] min-h-[340px] max-h-[520px] overflow-hidden rounded-[22px] border border-[#e7e7e5] bg-[#f1f1ee]">
-            {location ? <LiveMap location={location} safeZones={SAFE_ZONES} currentRoute={currentRoute} familiarRoute={familiarRoute} className="h-full rounded-none border-0" /> : (
+            {location ? <LiveMap location={location} safeZones={zones} currentRoute={currentRoute} className="h-full rounded-none border-0" /> : (
               <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-[#737373]"><MapMessage childList={children} selected={child} failed={failed} /></div>
             )}
           </div>
           {ageMs !== null && ageMs > STALE_MS && (
             <p role="status" className="mt-2 px-1 text-[12px] leading-5 text-[#b7791f]">Сүүлд {formatAge(ageMs)} шинэчлэгдсэн. Хүүхдийн утсан дээр SafePath нээлттэй эсэхийг шалгана уу.</p>
           )}
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 px-1 text-[11px] text-[#737373]" aria-label="Газрын зургийн тэмдэглэгээ">
+          {child && zones.length === 0 && (
+            <p role="status" className="mt-2 px-1 text-[12px] leading-5 text-[#b7791f]">
+              Аюулгүй бүс тохируулаагүй тул эрсдэлийг тооцохгүй байна. <Link href="/guardian/zones" className="font-medium text-[#111111] underline underline-offset-4">Бүс нэмэх</Link>
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] text-[#737373]" aria-label="Газрын зургийн тэмдэглэгээ">
             <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#111111]" />Одоогийн байршил</span>
             <span className="inline-flex items-center gap-1.5"><i className="size-2 rounded-full bg-[#2e7d4f]" />Одоогийн зам</span>
-            <span className="inline-flex items-center gap-1.5"><i className="h-0 w-4 border-t border-dashed border-[#737373]" />Танил зам</span>
+            <Link href="/guardian/zones" className="ml-auto inline-flex min-h-8 items-center font-medium text-[#111111] underline underline-offset-4">Бүс засах</Link>
           </div>
 
         <section className="px-5 pt-4" aria-label="Одоогийн мэдээлэл">
           <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-[#e7e7e5] py-3">
-            <Info label="Одоогийн байршил" value={safetyState?.nearestSafeZone.name ?? "Тодорхойгүй"} />
-            <Info label="Сургууль" value={safetyState?.isInsideSafeZone && safetyState.nearestSafeZone.id === "school" ? "Ирсэн" : "Хуваарьт газар"} />
+            <Info label="Одоогийн байршил" value={safetyState ? (safetyState.isInsideSafeZone ? safetyState.nearestSafeZone.name : "Бүсээс гадуур") : "Тодорхойгүй"} />
+            <Info label="Ойрын бүс" value={safetyState ? (safetyState.isInsideSafeZone ? "Дотор" : `${safetyState.nearestSafeZone.name} · ${formatDistance(safetyState.distanceToNearestZoneMeters)}`) : "—"} />
             <Info label="Сүүлийн шинэчлэл" value={ageMs !== null ? formatAge(ageMs) : "Хүлээгдэж байна"} />
             <Info label="Эрсдэл" value={safetyState ? `${safetyState.riskScore} / 100` : "— / 100"} />
           </dl>
