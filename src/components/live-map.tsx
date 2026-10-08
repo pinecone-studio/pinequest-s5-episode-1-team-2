@@ -10,12 +10,13 @@ type LiveMapProps = {
   location: SafetyLocation;
   safeZones?: SafeZone[];
   currentRoute?: [number, number][];
+  destination?: Pick<SafetyLocation, "latitude" | "longitude">;
   familiarRoute?: [number, number][];
   variant?: "guardian" | "companion";
   className?: string;
 };
 
-export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], familiarRoute = [], variant = "guardian", className = "" }: LiveMapProps) {
+export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -60,7 +61,12 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
           </Circle>
         ))}
         {!companion && familiarRoute.length > 1 && <Polyline positions={familiarRoute} pathOptions={{ color: "#77776f", weight: 3, opacity: 0.45, dashArray: "5 7" }} />}
-        {!companion && currentRoute.length > 1 && <Polyline positions={currentRoute} pathOptions={{ color: "#2e7d4f", weight: 4, opacity: 0.8 }} />}
+        {currentRoute.length > 1 && <Polyline positions={currentRoute} pathOptions={{ color: "#2e7d4f", weight: companion ? 5 : 4, opacity: 0.85 }} />}
+        {destination && <CircleMarker
+          center={[destination.latitude, destination.longitude]}
+          radius={8}
+          pathOptions={{ color: "#ffffff", fillColor: "#2e7d4f", fillOpacity: 1, weight: 3 }}
+        />}
         {!companion && <CircleMarker
           center={center}
           radius={9}

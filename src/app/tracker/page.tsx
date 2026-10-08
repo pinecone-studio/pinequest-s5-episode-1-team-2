@@ -9,6 +9,7 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { toCompanionProfile } from "@/lib/assistant-settings";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { calculateSafetyState } from "@/lib/risk-engine";
+import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
@@ -17,6 +18,14 @@ const CompanionMap = dynamic(() => import("@/components/live-map"), {
 
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
+type RouteResult = {
+  destination: { latitude: number; longitude: number };
+  route: [number, number][];
+  distanceMeters: number | null;
+  durationSeconds: number | null;
+  nextInstruction: string;
+};
+
 export default function TrackerPage() {
   const { location, status: locationStatus, error: locationError } = useGeolocation();
   const { settings } = useAssistantSettings();
@@ -24,6 +33,9 @@ export default function TrackerPage() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [speechStatus, setSpeechStatus] = useState<SpeechStatus>("idle");
   const [speechError, setSpeechError] = useState("");
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const routeController = useRef<AbortController | null>(null);
+  const lastRouteAt = useRef(0);
   const lastAutomaticRequest = useRef<string | null>(null);
   const requestSequence = useRef(0);
   const requestController = useRef<AbortController | null>(null);
@@ -32,13 +44,50 @@ export default function TrackerPage() {
   const speechCache = useRef(new Map<string, string>());
   const audioElement = useRef<HTMLAudioElement | null>(null);
   const profile = useMemo(() => toCompanionProfile(settings), [settings]);
-  const navigationInstruction: string | undefined = undefined;
+  const navigationInstruction = route?.nextInstruction;
   const currentLocation = location;
   const routeDeviation = false;
   const safetyState = useMemo(
     () => currentLocation ? calculateSafetyState({ location: currentLocation, routeDeviation }) : null,
     [currentLocation, routeDeviation],
   );
+
+  useEffect(() => {
+    if (!location) return;
+    const now = Date.now();
+    if (lastRouteAt.current !== 0 && now - lastRouteAt.current < 15_000) return;
+    lastRouteAt.current = now;
+
+    routeController.current?.abort();
+    const controller = new AbortController();
+    routeController.current = controller;
+
+    void fetch("/api/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        origin: { lat: location.latitude, lon: location.longitude },
+        destination: { lat: SAFE_ZONES[0].latitude, lon: SAFE_ZONES[0].longitude },
+      }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Route request failed.");
+        const result = (await response.json()) as RouteResult;
+        if (!Array.isArray(result.route) || result.route.length < 2 || typeof result.nextInstruction !== "string") {
+          throw new Error("Invalid route response.");
+        }
+        setRoute(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRoute((current) => current);
+      });
+
+  }, [location?.latitude, location?.longitude]);
+
+  useEffect(() => () => {
+    routeController.current?.abort();
+  }, []);
 
   const speakMessage = useCallback(async (message: string) => {
     const text = message.trim();
@@ -118,7 +167,7 @@ export default function TrackerPage() {
       routeDeviationMeters: state.routeDeviation ? null : 0,
       nearestSafeZone: state.nearestSafeZone.name,
       distanceFromSafeZone: state.distanceToNearestZoneMeters,
-      destination: null,
+      destination: SAFE_ZONES[0].name,
       ...(navigationInstruction ? { navigationInstruction } : {}),
     };
 
@@ -176,7 +225,12 @@ export default function TrackerPage() {
         <section className="flex flex-1 flex-col items-center pb-5 text-center" aria-label="Милотой ярилцах">
           <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
             {location ? (
-              <CompanionMap location={location} variant="companion" />
+              <CompanionMap
+                location={location}
+                destination={SAFE_ZONES[0]}
+                currentRoute={route?.route ?? []}
+                variant="companion"
+              />
             ) : (
               <p role="status" className="absolute inset-x-5 bottom-5 text-xs leading-5 text-[#737373]">
                 {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
@@ -198,7 +252,15 @@ export default function TrackerPage() {
           {speechStatus === "playing" && <span className="mt-2 text-sm text-[#737373]">Мило ярьж байна…</span>}
           {speechError && <span role="status" className="mt-2 text-sm text-[#737373]">{speechError}</span>}
 
-          {navigationInstruction && <div className="mt-7 flex items-center gap-4 rounded-2xl bg-[#f1f1ee] px-5 py-4 text-left"><span className="text-3xl" aria-hidden="true">↑</span><div><p className="font-semibold">Урагшаа яв</p><p className="mt-0.5 text-sm text-[#737373]">80 м</p></div></div>}
+          {navigationInstruction && (
+            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl bg-[#f1f1ee] px-5 py-4 text-left">
+              <span className="text-3xl" aria-hidden="true">➜</span>
+              <div className="min-w-0">
+                <p className="font-semibold">{navigationInstruction}</p>
+                {route?.distanceMeters != null && <p className="mt-1 text-sm text-[#737373]">Гэр хүртэл ойролцоогоор {formatDistance(route.distanceMeters)}</p>}
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="pt-2">
@@ -229,4 +291,9 @@ export default function TrackerPage() {
       </main>
     </AppShell>
   );
+}
+
+function formatDistance(meters: number) {
+  if (meters < 1000) return `${Math.max(10, Math.round(meters))} м`;
+  return `${(meters / 1000).toFixed(1)} км`;
 }

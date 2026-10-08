@@ -50,9 +50,17 @@ export async function POST(request: Request) {
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
-    return Response.json({ error: "Speech generation failed." }, { status: 502 });
-  }
+} catch (error) {
+  console.error("TTS ERROR:", error);
+
+  return Response.json(
+    {
+      error: "Speech generation failed.",
+      details: error instanceof Error ? error.message : String(error),
+    },
+    { status: 502 }
+  );
+}
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
