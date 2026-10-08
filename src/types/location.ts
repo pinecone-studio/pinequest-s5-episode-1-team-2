@@ -5,6 +5,9 @@ export type LocationRecord = {
   longitude: number;
   /** Metres, as reported by the phone. */
   accuracy: number;
-  /** When the server received it, so a wrong phone clock cannot make an old position look fresh. */
+  /**
+   * When the phone measured this position, in server time (server clock minus the reading's age),
+   * so neither a wrong phone clock nor a re-sent old reading can make it look fresh.
+   */
   updatedAt: Date;
 };
