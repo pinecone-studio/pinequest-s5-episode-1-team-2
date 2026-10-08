@@ -61,7 +61,7 @@ export async function signup(
       passwordHash: await hashPassword(password),
       name,
       phone: null,
-      role,
+      role: null,
       createdAt: new Date(),
     });
   } catch (error) {
