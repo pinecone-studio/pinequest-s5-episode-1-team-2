@@ -11,3 +11,19 @@ export type LocationRecord = {
    */
   updatedAt: Date;
 };
+
+/** What a guardian's page receives for each linked child. */
+export type ChildLocation = {
+  childId: string;
+  name: string;
+  /** The child paused sharing on purpose. The position is then always null. */
+  paused: boolean;
+  /** null while the child is not sharing: paused, page closed, no reading yet, or nothing for a day. */
+  position: { latitude: number; longitude: number; accuracy: number; updatedAt: string } | null;
+};
+
+/** The child's own view of their sharing: whether it is paused and how many guardians can see them. */
+export type SharingState = {
+  paused: boolean;
+  watchers: number;
+};
