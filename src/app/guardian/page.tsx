@@ -2,17 +2,17 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import {useEffect, useMemo, useState} from "react";
-import {AppShell, PhoneIcon, StatusIndicator} from "@/components/safe-path";
-import {useAssistantSettings} from "@/hooks/use-assistant-settings";
-import {useGeolocation} from "@/hooks/use-geolocation";
-import {calculateSafetyState} from "@/lib/risk-engine";
-import {SAFE_ZONES} from "@/lib/safe-zones";
+import { useEffect, useMemo, useState } from "react";
+import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
+import { useAssistantSettings } from "@/hooks/use-assistant-settings";
+import { useGeolocation } from "@/hooks/use-geolocation";
+import { calculateSafetyState } from "@/lib/risk-engine";
+import { SAFE_ZONES } from "@/lib/safe-zones";
 
 const LiveMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
   loading: () => (
-    <div className="grid h-full min-h-[320px] place-items-center text-sm text-[var(--sp-muted)]">
+    <div className="grid h-full min-h-80 place-items-center text-sm text-(--sp-muted)">
       Газрын зураг ачаалж байна…
     </div>
   ),
@@ -64,13 +64,13 @@ const TONE = {
     label: "Өндөр эрсдэл",
     text: "text-[var(--sp-risk)]",
     bg: "bg-[var(--sp-risk-bg)]",
-    bar: "bg-[var(--sp-risk)]",
+    bar: "bg-(--sp-risk)",
   },
 } as const;
 
 function distanceMeters(
-  a: {latitude: number; longitude: number},
-  b: {latitude: number; longitude: number}
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
 ) {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -109,41 +109,41 @@ function useNow(intervalMs = 10_000) {
   }, [intervalMs]);
   return now;
 }
-type TimelineEvent = {time: string; label: string; done: boolean};
+type TimelineEvent = { time: string; label: string; done: boolean };
 
 const timeline: TimelineEvent[] = [
-  {time: "08:05", label: "Гэрээс гарсан", done: true},
-  {time: "08:24", label: "Сургуульд ирсэн", done: true},
-  {time: "16:10", label: "Сургуулиас гарсан", done: true},
-  {time: "16:40", label: "Гэртээ ирэх ёстой", done: false},
+  { time: "08:05", label: "Гэрээс гарсан", done: true },
+  { time: "08:24", label: "Сургуульд ирсэн", done: true },
+  { time: "16:10", label: "Сургуулиас гарсан", done: true },
+  { time: "16:40", label: "Гэртээ ирэх ёстой", done: false },
 ];
 
 export default function GuardianPage() {
-  const {location, status: locationStatus, error} = useGeolocation();
-  const {settings} = useAssistantSettings();
+  const { location, status: locationStatus, error } = useGeolocation();
+  const { settings } = useAssistantSettings();
   const now = useNow();
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
 
   const childName = settings.userName || "Тэмүүлэн";
-  const phone = (settings as {emergencyPhone?: string}).emergencyPhone ?? "";
+  const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
 
   const loc = location as
-    | (typeof location & {timestamp?: number; accuracy?: number})
+    | (typeof location & { timestamp?: number; accuracy?: number })
     | null;
 
   const [prevLocation, setPrevLocation] = useState(location);
   const [lastUpdate, setLastUpdate] = useState<number | null>(
-    loc ? loc.timestamp ?? now : null
+    loc ? (loc.timestamp ?? now) : null,
   );
   if (location !== prevLocation) {
     setPrevLocation(location);
-    setLastUpdate(loc ? loc.timestamp ?? now : null);
+    setLastUpdate(loc ? (loc.timestamp ?? now) : null);
   }
 
   const safetyState = useMemo(
-    () => (location ? calculateSafetyState({location}) : null),
-    [location]
+    () => (location ? calculateSafetyState({ location }) : null),
+    [location],
   );
 
   const tone = toneOf(safetyState?.riskLevel);
@@ -154,18 +154,18 @@ export default function GuardianPage() {
   const headline = !safetyState
     ? "Байршлыг тогтоож байна"
     : tone === "risk"
-    ? "Маршрутаас хазайсан байна"
-    : inside
-    ? "Аюулгүй бүсэд байна"
-    : "Аюулгүй бүсээс гадуур";
+      ? "Маршрутаас хазайсан байна"
+      : inside
+        ? "Аюулгүй бүсэд байна"
+        : "Аюулгүй бүсээс гадуур";
 
   const subline = !zone
-    ? error ?? "Түр хүлээнэ үү"
+    ? (error ?? "Түр хүлээнэ үү")
     : inside
-    ? zone.name
-    : `Хамгийн ойр: ${zone.name} · ${
-        distance !== null ? formatDistance(distance) : "—"
-      }`;
+      ? zone.name
+      : `Хамгийн ойр: ${zone.name} · ${
+          distance !== null ? formatDistance(distance) : "—"
+        }`;
 
   const currentRoute: [number, number][] =
     location && zone
@@ -185,22 +185,22 @@ export default function GuardianPage() {
     <AppShell>
       <div
         style={TOKENS}
-        className="min-h-dvh bg-[linear-gradient(180deg,var(--sp-bg-top)_0%,var(--sp-bg-bottom)_45%,var(--sp-bg-bottom)_100%)] text-[var(--sp-ink)]"
+        className="min-h-dvh bg-[linear-gradient(180deg,var(--sp-bg-top)_0%,var(--sp-bg-bottom)_45%,var(--sp-bg-bottom)_100%)] text-(--sp-ink)"
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-[430px] bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
+          className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
         />
         <main className="relative min-h-dvh pb-[calc(150px+env(safe-area-inset-bottom))]">
-          <header className="flex min-h-[64px] items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
+          <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0">
               <Link
                 href="/"
-                className="text-[17px] font-semibold tracking-[-0.025em]"
+                className="text-[17px] font-semibold tracking-tight"
               >
                 SafePath
               </Link>
-              <p className="mt-0.5 truncate text-sm text-[var(--sp-muted)]">
+              <p className="mt-0.5 truncate text-sm text-(--sp-muted)">
                 {childName}
               </p>
             </div>
@@ -222,13 +222,13 @@ export default function GuardianPage() {
                 {headline}
               </p>
             </div>
-            <p className="mt-1 pl-[18px] text-sm text-[var(--sp-muted)]">
+            <p className="mt-1 pl-4.5 text-sm text-(--sp-muted)">
               {subline} · {formatRelative(lastUpdate, now)}
             </p>
           </section>
 
           <div id="location" className="px-4">
-            <div className="relative h-[46vh] min-h-[320px] max-h-[500px] overflow-hidden rounded-[22px] border border-[var(--sp-line)] bg-[var(--sp-surface)]">
+            <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
               {location ? (
                 <>
                   <LiveMap
@@ -241,7 +241,7 @@ export default function GuardianPage() {
                   />
 
                   {typeof loc?.accuracy === "number" && (
-                    <span className="absolute left-3 top-3 z-[400] rounded-full border border-[var(--sp-line)] bg-black/75 px-2.5 py-1 text-[11px] text-[var(--sp-muted)] shadow-sm backdrop-blur">
+                    <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
                       ±{Math.round(loc.accuracy)} м
                     </span>
                   )}
@@ -250,7 +250,7 @@ export default function GuardianPage() {
                     type="button"
                     onClick={() => setMapKey((k) => k + 1)}
                     aria-label="Одоогийн байршил руу буцах"
-                    className="absolute right-3 top-3 z-[400] grid size-10 place-items-center rounded-full border border-[var(--sp-line)] bg-black/80 text-[var(--sp-primary)] shadow-sm"
+                    className="absolute right-3 top-3 z-400 grid size-10 place-items-center rounded-full border border-(--sp-line) bg-black/80 text-(--sp-primary) shadow-sm"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -266,21 +266,18 @@ export default function GuardianPage() {
 
                   <div
                     aria-label="Газрын зургийн тэмдэглэгээ"
-                    className="absolute bottom-3 left-3 z-[400] flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-[var(--sp-line)] bg-black/75 px-3 py-2 text-[11px] text-[var(--sp-muted)] shadow-sm backdrop-blur"
+                    className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
                   >
                     <Legend dot="bg-[var(--sp-primary)]" label="Байршил" />
-                    <Legend
-                      dot="bg-[var(--sp-secondary)]"
-                      label="Одоогийн зам"
-                    />
+                    <Legend dot="bg-(--sp-secondary)" label="Одоогийн зам" />
                     <span className="inline-flex items-center gap-1.5">
-                      <i className="h-0 w-4 border-t border-dashed border-[var(--sp-muted)]" />
+                      <i className="h-0 w-4 border-t border-dashed border-(--sp-muted)" />
                       Танил зам
                     </span>
                   </div>
                 </>
               ) : (
-                <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-[var(--sp-muted)]">
+                <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-(--sp-muted)">
                   {locationStatus === "loading"
                     ? "Одоогийн байршлыг тогтоож байна…"
                     : error || "Байршил хараахан олдсонгүй"}
@@ -290,17 +287,17 @@ export default function GuardianPage() {
           </div>
 
           <section className="px-5 pt-4" aria-label="Одоогийн мэдээлэл">
-            <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-[var(--sp-line)] py-3">
+            <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-(--sp-line) py-3">
               <Info
                 label="Байршил"
                 value={
                   !zone
                     ? "Тодорхойгүй"
                     : inside
-                    ? zone.name
-                    : `${zone.name}-с ${
-                        distance !== null ? formatDistance(distance) : "—"
-                      }`
+                      ? zone.name
+                      : `${zone.name}-с ${
+                          distance !== null ? formatDistance(distance) : "—"
+                        }`
                 }
               />
               <Info
@@ -308,7 +305,7 @@ export default function GuardianPage() {
                 value={formatRelative(lastUpdate, now)}
               />
               <div className="col-span-2 min-w-0">
-                <dt className="text-[12px] text-[var(--sp-muted)]">Эрсдэл</dt>
+                <dt className="text-[12px] text-(--sp-muted)">Эрсдэл</dt>
                 <dd className="mt-1 flex items-center gap-3">
                   <span
                     className={`text-[14px] font-medium ${TONE[tone].text}`}
@@ -316,7 +313,7 @@ export default function GuardianPage() {
                     {safetyState ? TONE[tone].label : "—"}
                   </span>
                   <span
-                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--sp-line)]"
+                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-(--sp-line)"
                     role="meter"
                     aria-valuemin={0}
                     aria-valuemax={100}
@@ -325,7 +322,7 @@ export default function GuardianPage() {
                   >
                     <span
                       className={`block h-full rounded-full transition-all ${TONE[tone].bar}`}
-                      style={{width: `${safetyState?.riskScore ?? 0}%`}}
+                      style={{ width: `${safetyState?.riskScore ?? 0}%` }}
                     />
                   </span>
                 </dd>
@@ -335,25 +332,25 @@ export default function GuardianPage() {
 
           <section id="events" className="px-5 pt-5">
             <h2 className="text-[16px] font-semibold">Өнөөдрийн үйл явдал</h2>
-            <ol className="relative mt-3 ml-1 border-l border-[var(--sp-line)]">
+            <ol className="relative mt-3 ml-1 border-l border-(--sp-line)">
               {timeline.map((event) => (
                 <li
                   key={event.time + event.label}
                   className="relative pb-4 pl-5 last:pb-0"
                 >
                   <span
-                    className={`absolute -left-[5px] top-1.5 size-2.5 rounded-full ${
+                    className={`absolute -left-1.25 top-1.5 size-2.5 rounded-full ${
                       event.done
-                        ? "bg-[var(--sp-secondary)]"
-                        : "border border-[var(--sp-muted)] bg-black"
+                        ? "bg-(--sp-secondary)"
+                        : "border border-(--sp-muted) bg-black"
                     }`}
                   />
                   <div
                     className={`flex items-baseline gap-3 ${
-                      event.done ? "" : "text-[var(--sp-muted)]"
+                      event.done ? "" : "text-(--sp-muted)"
                     }`}
                   >
-                    <time className="w-11 shrink-0 text-xs tabular-nums text-[var(--sp-muted)]">
+                    <time className="w-11 shrink-0 text-xs tabular-nums text-(--sp-muted)">
                       {event.time}
                     </time>
                     <p className="text-[14px] leading-5">{event.label}</p>
@@ -370,11 +367,11 @@ export default function GuardianPage() {
           alert={tone === "risk"}
         />
 
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[430px] border-t border-[var(--sp-line)] bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
+        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
           <div className="grid grid-cols-2 gap-2">
             <a
               href={`tel:${phone || "+97600000000"}`}
-              className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,var(--sp-primary-deep)_0%,var(--sp-primary)_100%)] text-[15px] font-semibold text-green-300 shadow-[0_0_24px_-6px_rgba(79,143,168,0.75)] transition-transform active:scale-[0.97]"
+              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,var(--sp-primary-deep)_0%,var(--sp-primary)_100%)] text-[15px] font-semibold text-green-300 shadow-[0_0_24px_-6px_rgba(79,143,168,0.75)] transition-transform active:scale-[0.97]"
             >
               <PhoneIcon />
               Залгах
@@ -382,7 +379,7 @@ export default function GuardianPage() {
             <a
               href="#location"
               onClick={() => setActiveTab("map")}
-              className="inline-flex min-h-[50px] items-center justify-center rounded-2xl border border-[rgba(79,143,168,0.35)] bg-[var(--sp-primary-soft)] text-[15px] font-medium text-[var(--sp-primary)] backdrop-blur transition-transform active:scale-[0.97]"
+              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[rgba(79,143,168,0.35)] bg-(--sp-primary-soft) text-[15px] font-medium text-(--sp-primary) backdrop-blur transition-transform active:scale-[0.97]"
             >
               Байршил
             </a>
@@ -439,7 +436,7 @@ function TabBar({
   return (
     <nav
       aria-label="Асран хамгаалагчийн цэс"
-      className="fixed inset-x-0 bottom-[calc(74px+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-[430px] border-t border-[rgba(79,143,168,0.15)] bg-black/85 backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-[calc(74px+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-107.5 border-t border-[rgba(79,143,168,0.15)] bg-black/85 backdrop-blur-xl"
     >
       <ul className="grid grid-cols-4">
         {TABS.map((tab) => {
@@ -450,25 +447,25 @@ function TabBar({
                 href={tab.href}
                 onClick={() => onSelect(tab.id)}
                 aria-current={isActive ? "page" : undefined}
-                className="group flex h-[60px] flex-col items-center justify-center gap-1 select-none [-webkit-tap-highlight-color:transparent]"
+                className="group flex h-15 flex-col items-center justify-center gap-1 select-none [-webkit-tap-highlight-color:transparent]"
               >
                 <span
                   className={`relative grid h-8 w-14 place-items-center rounded-full transition-all duration-200 group-active:scale-90 ${
                     isActive
-                      ? "bg-[var(--sp-primary-soft)] text-[var(--sp-primary)]"
-                      : "text-[var(--sp-muted)]"
+                      ? "bg-(--sp-primary-soft) text-(--sp-primary)"
+                      : "text-(--sp-muted)"
                   }`}
                 >
                   {tab.icon(isActive)}
                   {tab.id === "alerts" && alert && (
-                    <span className="absolute right-3 top-1 size-2 rounded-full bg-[var(--sp-risk)] ring-2 ring-black" />
+                    <span className="absolute right-3 top-1 size-2 rounded-full bg-(--sp-risk) ring-2 ring-black" />
                   )}
                 </span>
                 <span
                   className={`text-[11px] leading-none transition-colors ${
                     isActive
-                      ? "font-semibold text-[var(--sp-primary)]"
-                      : "text-[var(--sp-muted)]"
+                      ? "font-semibold text-(--sp-primary)"
+                      : "text-(--sp-muted)"
                   }`}
                 >
                   {tab.label}
@@ -492,7 +489,7 @@ function IconBase({
   return (
     <svg
       viewBox="0 0 24 24"
-      className="size-[22px]"
+      className="size-5.5"
       fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth={filled ? 0 : 1.8}
@@ -505,7 +502,7 @@ function IconBase({
   );
 }
 
-function PeopleIcon({filled}: {filled: boolean}) {
+function PeopleIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
       <circle cx="9" cy="8" r="3.5" />
@@ -516,7 +513,7 @@ function PeopleIcon({filled}: {filled: boolean}) {
   );
 }
 
-function MapIcon({filled}: {filled: boolean}) {
+function MapIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
       <path d="M12 21.5s-7-6.1-7-11.7a7 7 0 0 1 14 0c0 5.6-7 11.7-7 11.7z" />
@@ -529,7 +526,7 @@ function MapIcon({filled}: {filled: boolean}) {
   );
 }
 
-function BellIcon({filled}: {filled: boolean}) {
+function BellIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
       <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
@@ -543,7 +540,7 @@ function BellIcon({filled}: {filled: boolean}) {
   );
 }
 
-function GearIcon({filled}: {filled: boolean}) {
+function GearIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
       <path d="M10.3 2.8h3.4l.5 2.5 1.7.9 2.4-.9 1.7 2.9-1.9 1.7v2l1.9 1.7-1.7 2.9-2.4-.9-1.7.9-.5 2.5h-3.4l-.5-2.5-1.7-.9-2.4.9-1.7-2.9 1.9-1.7v-2L3.9 8.2l1.7-2.9 2.4.9 1.7-.9z" />
@@ -556,7 +553,7 @@ function GearIcon({filled}: {filled: boolean}) {
   );
 }
 
-function Legend({dot, label}: {dot: string; label: string}) {
+function Legend({ dot, label }: { dot: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <i className={`size-2 rounded-full ${dot}`} />
@@ -565,10 +562,10 @@ function Legend({dot, label}: {dot: string; label: string}) {
   );
 }
 
-function Info({label, value}: {label: string; value: string}) {
+function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[12px] text-[var(--sp-muted)]">{label}</dt>
+      <dt className="text-[12px] text-(--sp-muted)">{label}</dt>
       <dd className="mt-0.5 truncate text-[14px] font-medium">{value}</dd>
     </div>
   );
