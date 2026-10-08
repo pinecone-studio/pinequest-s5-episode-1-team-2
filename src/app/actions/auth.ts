@@ -34,8 +34,8 @@ export async function signup(
   const values = {
     name: text(formData, "name"),
     email: text(formData, "email"),
+    role: text(formData, "role"),
   };
-
   const parsed = SignupFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
@@ -62,7 +62,7 @@ export async function signup(
       passwordHash: await hashPassword(password),
       name,
       phone: null,
-      role: null,
+      role,
       createdAt: new Date(),
     });
   } catch (error) {
