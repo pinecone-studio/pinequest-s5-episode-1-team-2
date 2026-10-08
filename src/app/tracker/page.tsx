@@ -3,8 +3,8 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
+import { LocationSharingStatus } from "@/components/location-sharing-status";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { toCompanionProfile } from "@/lib/assistant-settings";
@@ -15,7 +15,11 @@ import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => <p className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85 px-3 py-2 text-xs text-[#d4e1e5]">Газрын зураг ачаалж байна…</p>,
+  loading: () => (
+    <p className="absolute inset-x-4 bottom-5 text-xs text-[#737373]">
+      Газрын зураг ачаалж байна…
+    </p>
+  ),
 });
 
 
@@ -45,12 +49,12 @@ export default function TrackerPage() {
 
   const [demoMode, setDemoMode] = useState(false);
 
-  const [demoLocation, setDemoLocation] = useState({
-    latitude: SAFE_ZONES[0].latitude,
-    longitude: SAFE_ZONES[0].longitude,
+  const [demoLocation, setDemoLocation] = useState(() => ({
+    latitude: SAFE_ZONES[0].latitude + 0.0045,
+    longitude: SAFE_ZONES[0].longitude + 0.0045,
     accuracy: 5,
-    timestamp: Date.now(),
-  });
+    lastUpdated: Date.now(),
+  }));
 
 
 
@@ -67,6 +71,9 @@ export default function TrackerPage() {
 
   const [route, setRoute] =
     useState<RouteResult | null>(null);
+
+  const [routeStatus, setRouteStatus] =
+    useState<"loading" | "ready" | "error">("loading");
 
 
   const routeController =
@@ -148,7 +155,7 @@ export default function TrackerPage() {
           ...current,
           latitude,
           longitude,
-          timestamp: Date.now(),
+          lastUpdated: Date.now(),
         };
       });
     },
@@ -171,6 +178,8 @@ export default function TrackerPage() {
 
   useEffect(() => {
     if (!currentLocation) {
+      setRoute(null);
+      setRouteStatus("loading");
       return;
     }
 
@@ -179,73 +188,167 @@ export default function TrackerPage() {
     if (
       !demoMode &&
       lastRouteAt.current !== 0 &&
-      now - lastRouteAt.current < 15_000
+      now - lastRouteAt.current < 10_000
     ) {
       return;
     }
 
     lastRouteAt.current = now;
-
     routeController.current?.abort();
 
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
+    routeController.current = controller;
+    setRouteStatus("loading");
 
-    routeController.current =
-      controller;
+    const origin = {
+      lat: currentLocation.latitude,
+      lon: currentLocation.longitude,
+    };
 
-    void fetch("/api/route", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        origin: {
-          lat: currentLocation.latitude,
-          lon: currentLocation.longitude,
+    const destination = {
+      lat: SAFE_ZONES[0].latitude,
+      lon: SAFE_ZONES[0].longitude,
+    };
+
+    const isValidRoute = (value: unknown): value is RouteResult => {
+      if (!value || typeof value !== "object") return false;
+      const result = value as Partial<RouteResult>;
+      return (
+        Array.isArray(result.route) &&
+        result.route.length >= 2 &&
+        result.route.every(
+          (point) =>
+            Array.isArray(point) &&
+            point.length === 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        ) &&
+        typeof result.nextInstruction === "string"
+      );
+    };
+
+    const fetchAppRoute = async (): Promise<RouteResult> => {
+      const response = await fetch("/api/route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          origin,
+          destination,
+        }),
+        signal: controller.signal,
+      });
 
+      if (!response.ok) {
+        throw new Error(`Route API ${response.status}`);
+      }
+
+      const result: unknown = await response.json();
+
+      if (!isValidRoute(result)) {
+        throw new Error("Invalid route response");
+      }
+
+      return result;
+    };
+
+    const fetchFallbackRoute = async (): Promise<RouteResult> => {
+      const coordinates = `${origin.lon},${origin.lat};${destination.lon},${destination.lat}`;
+      const url =
+        `https://router.project-osrm.org/route/v1/driving/${coordinates}` +
+        `?overview=full&geometries=geojson&steps=true`;
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Fallback route ${response.status}`);
+      }
+
+      const data = await response.json();
+      const osrmRoute = data?.routes?.[0];
+      const geometry = osrmRoute?.geometry?.coordinates;
+
+      if (!Array.isArray(geometry) || geometry.length < 2) {
+        throw new Error("Fallback route has no geometry");
+      }
+
+      const points: [number, number][] = geometry
+        .filter(
+          (point: unknown) =>
+            Array.isArray(point) &&
+            point.length >= 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1]),
+        )
+        .map(
+          (point: [number, number]) =>
+            [point[1], point[0]] as [number, number],
+        );
+
+      if (points.length < 2) {
+        throw new Error("Fallback route geometry is invalid");
+      }
+
+      const step =
+        osrmRoute.legs?.[0]?.steps?.[0];
+      const maneuver = step?.maneuver;
+      const modifier =
+        typeof maneuver?.modifier === "string"
+          ? maneuver.modifier
+          : "";
+
+      const instruction =
+        modifier === "right"
+          ? "Баруун тийш эргээрэй."
+          : modifier === "left"
+            ? "Зүүн тийш эргээрэй."
+            : modifier === "straight"
+              ? "Энэ замаараа урагшаа яваарай."
+              : "Буцах замаараа тайван яваарай.";
+
+      return {
         destination: {
-          lat: SAFE_ZONES[0].latitude,
-          lon: SAFE_ZONES[0].longitude,
+          latitude: destination.lat,
+          longitude: destination.lon,
         },
-      }),
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            "Route request failed.",
-          );
-        }
+        route: points,
+        distanceMeters:
+          typeof osrmRoute.distance === "number"
+            ? osrmRoute.distance
+            : null,
+        durationSeconds:
+          typeof osrmRoute.duration === "number"
+            ? osrmRoute.duration
+            : null,
+        nextInstruction: instruction,
+      };
+    };
 
-        const result =
-          (await response.json()) as RouteResult;
-
-        if (
-          !Array.isArray(result.route) ||
-          result.route.length < 2 ||
-          typeof result.nextInstruction !==
-            "string"
-        ) {
-          throw new Error(
-            "Invalid route response.",
-          );
-        }
-
-        setRoute(result);
+    void fetchAppRoute()
+      .catch(async (error) => {
+        if (controller.signal.aborted) throw error;
+        console.warn("/api/route failed, using fallback route:", error);
+        return fetchFallbackRoute();
       })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setRoute((current) => current);
-        }
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setRoute(result);
+        setRouteStatus("ready");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        console.error("ROUTE ERROR:", error);
+        setRoute(null);
+        setRouteStatus("error");
       });
   }, [
     currentLocation?.latitude,
     currentLocation?.longitude,
     demoMode,
   ]);
-
 
   useEffect(() => {
     return () => {
@@ -488,8 +591,6 @@ export default function TrackerPage() {
           destination:
             SAFE_ZONES[0].name,
 
-          nearbyLandmarks: [],
-
           ...(navigationInstruction
             ? {
                 navigationInstruction,
@@ -637,10 +738,11 @@ export default function TrackerPage() {
 
   return (
     <AppShell>
-      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-gradient-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
-        <div className="relative z-10 flex justify-center pb-3">
+      <main className="flex min-h-dvh flex-col px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
+
+       
+
+        <div className="flex justify-center pb-3">
           <button
             type="button"
             onClick={() =>
@@ -650,8 +752,8 @@ export default function TrackerPage() {
             }
             className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
               demoMode
-                ? "border-[#67e8f9] bg-[#0e7490] text-white"
-                : "border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5]"
+                ? "border-[#111111] bg-[#111111] text-white"
+                : "border-[#d8d8d4]"
             }`}
           >
             {demoMode
@@ -663,7 +765,7 @@ export default function TrackerPage() {
     
 
         {demoMode && (
-          <div className="relative z-10 mb-4 flex flex-col items-center gap-2">
+          <div className="mb-4 flex flex-col items-center gap-2">
 
             <button
               type="button"
@@ -672,7 +774,7 @@ export default function TrackerPage() {
                   "up",
                 )
               }
-              className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
+              className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
               aria-label="Demo move up"
             >
               ↑
@@ -687,7 +789,7 @@ export default function TrackerPage() {
                     "left",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
                 aria-label="Demo move left"
               >
                 ←
@@ -700,7 +802,7 @@ export default function TrackerPage() {
                     "down",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
                 aria-label="Demo move down"
               >
                 ↓
@@ -713,7 +815,7 @@ export default function TrackerPage() {
                     "right",
                   )
                 }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
+                className="h-12 w-12 rounded-xl border border-[#d8d8d4] text-xl active:scale-95"
                 aria-label="Demo move right"
               >
                 →
@@ -721,7 +823,7 @@ export default function TrackerPage() {
 
             </div>
 
-            <p className="text-xs text-[#b7c7cc]">
+            <p className="text-xs text-[#737373]">
               1 алхам ≈ 110м ·{" "}
               {demoLocation.latitude.toFixed(
                 6,
@@ -733,7 +835,7 @@ export default function TrackerPage() {
             </p>
 
             {safetyState && (
-              <div className="rounded-full border border-[#67e8f9]/20 bg-[#0d2028] px-4 py-2 text-xs font-medium text-[#d4e1e5]">
+              <div className="rounded-full bg-[#f1f1ee] px-4 py-2 text-xs font-medium">
                 Status:{" "}
                 {safetyState.riskLevel}
               </div>
@@ -741,23 +843,24 @@ export default function TrackerPage() {
           </div>
         )}
 
-        <header className="relative z-10 flex min-h-16 items-center">
+        <header className="flex min-h-16 items-center">
           <Link
             href="/"
-            className="inline-flex min-h-11 items-center gap-2 text-[17px] font-bold tracking-[-0.02em] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
-          ><span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>SafePath
+            className="inline-flex min-h-11 items-center text-[17px] font-semibold tracking-[-0.02em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
+          >
+            SafePath
           </Link>
         </header>
 
 
         <section
-          className="relative z-10 flex flex-1 flex-col items-center pb-5 text-center"
+          className="flex flex-1 flex-col items-center pb-5 text-center"
           aria-label="Милотой ярилцах"
         >
 
 
 
-          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
+          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#e7e7e5] bg-[#f2f2ef]">
 
             {currentLocation ? (
               <CompanionMap
@@ -773,8 +876,15 @@ export default function TrackerPage() {
                 variant="companion"
               />
             ) : (
-              <p role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
-                {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
+              <p
+                role="status"
+                className="absolute inset-x-5 bottom-5 text-xs leading-5 text-[#737373]"
+              >
+                {locationStatus ===
+                "loading"
+                  ? "Байршил тогтоож байна…"
+                  : locationError ||
+                    "Байршлын зөвшөөрлөө шалгана уу."}
               </p>
             )}
 
@@ -800,21 +910,100 @@ export default function TrackerPage() {
               className="companion-avatar--compact relative z-10"
             />
           </div>
-          <p className="text-[16px] font-semibold text-[#67e8f9]">{settings.name || "Мило"}</p>
-          <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#f1f7f8]">
-            {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : "Байршил тогтоож байна…")}
+
+          {routeStatus === "loading" && (
+            <p className="mt-3 text-sm text-[#737373]">
+              Буцах замыг тооцоолж байна…
+            </p>
+          )}
+
+          {routeStatus === "error" && (
+            <p className="mt-3 text-sm text-[#737373]">
+              Буцах замыг тооцоолж чадсангүй.
+            </p>
+          )}
+
+          <p className="text-[16px] font-medium text-[#737373]">
+            {settings.name ||
+              "Мило"}
           </p>
-          {assistantLoading && <span className="mt-3 text-sm text-[#b7c7cc]">Мило бодож байна…</span>}
-          {speechStatus === "loading" && <span className="mt-2 text-sm text-[#b7c7cc]">Дуу бэлдэж байна…</span>}
-          {speechStatus === "playing" && <span className="mt-2 text-sm text-[#67e8f9]">Мило ярьж байна…</span>}
-          {speechError && <span role="status" className="mt-2 text-sm text-[#fda4af]">{speechError}</span>}
+
+
+
+          <p
+            aria-live="polite"
+            aria-busy={
+              assistantLoading
+            }
+            className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#292a27]"
+          >
+            {assistantMessage ||
+              (safetyState
+                ? getSafetyFallback(
+                    safetyState.riskLevel,
+                    profile.userName,
+                  )
+                : "Байршил тогтоож байна…")}
+          </p>
+
+          {/* AI STATUS */}
+
+          {assistantLoading && (
+            <span className="mt-3 text-sm text-[#737373]">
+              Мило бодож байна…
+            </span>
+          )}
+
+          {speechStatus ===
+            "loading" && (
+            <span className="mt-2 text-sm text-[#737373]">
+              Дуу бэлдэж байна…
+            </span>
+          )}
+
+          {speechStatus ===
+            "playing" && (
+            <span className="mt-2 text-sm text-[#737373]">
+              Мило ярьж байна…
+            </span>
+          )}
+
+          {speechError && (
+            <span
+              role="status"
+              className="mt-2 text-sm text-[#737373]"
+            >
+              {speechError}
+            </span>
+          )}
+
 
           {navigationInstruction && (
-            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl border border-[#67e8f9]/20 bg-[#0d2028]/90 px-5 py-4 text-left text-white shadow-[0_12px_28px_rgba(0,0,0,.18)]">
-              <span className="text-3xl text-[#67e8f9]" aria-hidden="true">➜</span>
+            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl bg-[#f1f1ee] px-5 py-4 text-left">
+
+              <span
+                className="text-3xl"
+                aria-hidden="true"
+              >
+                ➜
+              </span>
+
               <div className="min-w-0">
-                <p className="font-semibold">{navigationInstruction}</p>
-                {route?.distanceMeters != null && <p className="mt-1 text-sm text-[#b7c7cc]">Гэр хүртэл ойролцоогоор {formatDistance(route.distanceMeters)}</p>}
+
+                <p className="font-semibold">
+                  {
+                    navigationInstruction
+                  }
+                </p>
+
+                <p className="mt-1 text-sm text-[#737373]">
+                  {routeStatus === "ready"
+                    ? "Буцах замыг харуулж байна."
+                    : routeStatus === "loading"
+                      ? "Буцах замыг тооцоолж байна…"
+                      : "Буцах замыг одоогоор тооцоолж чадсангүй."}
+                </p>
+
               </div>
             </div>
           )}
@@ -836,7 +1025,7 @@ export default function TrackerPage() {
               )
             }
             aria-label="Милогийн зөвлөгөөг сонсох"
-            className="w-full min-h-[56px] rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            className="w-full min-h-[54px] rounded-2xl bg-[#111111] px-4 text-[15px] font-medium text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
           >
             {assistantLoading
               ? "Мило бодож байна…"
@@ -850,8 +1039,36 @@ export default function TrackerPage() {
           </button>
         </div>
 
-        <a href="tel:+97600000000" className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
-        <Link href="/tracker/code" className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Холбох код</Link>
+        {/* =================================================
+            LOCATION SHARING
+            ================================================= */}
+
+        <LocationSharingStatus />
+
+        {/* =================================================
+            HELP
+            ================================================= */}
+
+        <LocationSharingStatus />
+
+        <a
+          href="tel:+97600000000"
+          className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
+        >
+          Тусламж хэрэгтэй
+        </a>
+
+      
+
+        <Link
+          href="/tracker/code"
+          className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#737373] underline decoration-[#c8c8c4] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
+        >
+          Холбох код
+        </Link>
+
+
+
         <audio
           ref={audioElement}
           className="sr-only"
@@ -876,20 +1093,4 @@ export default function TrackerPage() {
       </main>
     </AppShell>
   );
-}
-
-
-function formatDistance(
-  meters: number,
-) {
-  if (meters < 1000) {
-    return `${Math.max(
-      10,
-      Math.round(meters),
-    )} м`;
-  }
-
-  return `${(
-    meters / 1000
-  ).toFixed(1)} км`;
 }
