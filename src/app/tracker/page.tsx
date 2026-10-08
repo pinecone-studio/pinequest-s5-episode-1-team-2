@@ -49,7 +49,7 @@ export default function TrackerPage() {
     latitude: SAFE_ZONES[0].latitude,
     longitude: SAFE_ZONES[0].longitude,
     accuracy: 5,
-    timestamp: Date.now(),
+    lastUpdated: Date.now(),
   });
 
 
@@ -148,7 +148,7 @@ export default function TrackerPage() {
           ...current,
           latitude,
           longitude,
-          timestamp: Date.now(),
+          lastUpdated: Date.now(),
         };
       });
     },
@@ -637,7 +637,7 @@ export default function TrackerPage() {
 
   return (
     <AppShell>
-      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-gradient-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
+      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
         <div className="relative z-10 flex justify-center pb-3">
@@ -836,7 +836,7 @@ export default function TrackerPage() {
               )
             }
             aria-label="Милогийн зөвлөгөөг сонсох"
-            className="w-full min-h-[56px] rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            className="w-full min-h-14 rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
           >
             {assistantLoading
               ? "Мило бодож байна…"
