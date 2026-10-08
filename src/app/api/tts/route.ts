@@ -1,3 +1,5 @@
+import { getSessionUserId } from "@/lib/auth/dal";
+import { allowAttempt } from "@/lib/auth/rate-limit";
 import { generateMongolianSpeech } from "@/lib/voice/elevenlabs";
 
 export const runtime = "nodejs";
@@ -5,6 +7,12 @@ export const runtime = "nodejs";
 const maxTextLength = 280;
 
 export async function POST(request: Request) {
+  const userId = await getSessionUserId();
+  if (!userId) return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await allowAttempt(`api:${userId}`, 60, 60_000))) {
+    return Response.json({ error: "Too many requests." }, { status: 429 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();

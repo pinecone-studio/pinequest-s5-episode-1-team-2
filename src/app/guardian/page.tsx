@@ -82,7 +82,7 @@ export default function GuardianPage() {
         </section>
 
         <nav aria-label="Асран хамгаалагчийн цэс" className="fixed inset-x-0 bottom-[78px] z-10 mx-auto flex w-full max-w-[430px] justify-around border-t border-[#e7e7e5] bg-white/95 px-2 py-2 backdrop-blur">
-          {[["Хүмүүс", "/guardian"], ["Газрын зураг", "#location"], ["Мэдэгдэл", "#events"], ["Тохиргоо", "/settings"]].map(([label, href]) => <Link key={label} href={href} className={`rounded-lg px-2 py-2 text-xs ${label === "Газрын зураг" ? "font-semibold text-[#111111]" : "text-[#737373]"}`}>{label}</Link>)}
+          {[["Хүмүүс", "/guardian/link"], ["Газрын зураг", "#location"], ["Мэдэгдэл", "#events"], ["Тохиргоо", "/settings"]].map(([label, href]) => <Link key={label} href={href} className={`rounded-lg px-2 py-2 text-xs ${label === "Газрын зураг" ? "font-semibold text-[#111111]" : "text-[#737373]"}`}>{label}</Link>)}
         </nav>
       </main>
       <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-[430px] border-t border-[#e7e7e5] bg-white px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">

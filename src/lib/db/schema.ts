@@ -54,6 +54,22 @@ export const SCHEMA: Record<string, CollectionSchema> = {
       { key: { childId: 1 }, name: "childId" },
     ],
   },
+  rateLimits: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["count", "resetAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          count: { bsonType: "number" },
+          resetAt: { bsonType: "date" },
+        },
+      },
+    },
+    // Old counters are removed in the background; the rate limiter also checks resetAt itself.
+    indexes: [{ key: { resetAt: 1 }, name: "resetAt_ttl", expireAfterSeconds: 0 }],
+  },
   pairingCodes: {
     validator: {
       $jsonSchema: {

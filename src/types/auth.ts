@@ -44,3 +44,28 @@ export type PairingCode = {
   code: string;
   expiresAt: Date;
 };
+
+/** The only thing stored in the login cookie. The role is read from the database instead. */
+export type SessionPayload = {
+  userId: string;
+};
+
+/** A document in `rateLimits`: how many attempts a key made since the window opened. */
+export type RateLimit = {
+  _id: string;
+  count: number;
+  resetAt: Date;
+};
+
+/** What a form action returns to its form (via useActionState). Never contains passwords. */
+export type FormState =
+  | {
+      errors?: Record<string, string[]>;
+      message?: string;
+      /** Text fields to put back in the form after an error. */
+      values?: Record<string, string>;
+      code?: string;
+      expiresAt?: string;
+      success?: string;
+    }
+  | undefined;

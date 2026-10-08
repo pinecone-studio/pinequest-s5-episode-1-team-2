@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, UserRoundCog } from "lucide-react";
+import { ChevronRight, LogOut, UserRoundCog } from "lucide-react";
+import { logout } from "@/app/actions/auth";
 import { AppShell, BackHeader } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import type { AssistantSettings } from "@/types/safety";
@@ -73,6 +74,13 @@ export default function SettingsPage() {
               <ChevronRight className="size-5 text-[#737373]" strokeWidth={1.8} aria-hidden="true" />
             </Link>
           </section>
+        </form>
+
+        <form action={logout} className="px-5">
+          <button type="submit" className="flex min-h-14 w-full items-center gap-3 border-t border-[#e7e7e5] text-left text-[15px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+            <LogOut className="size-5 text-[#737373]" strokeWidth={1.8} aria-hidden="true" />
+            <span className="flex-1">Гарах</span>
+          </button>
         </form>
       </main>
     </AppShell>
