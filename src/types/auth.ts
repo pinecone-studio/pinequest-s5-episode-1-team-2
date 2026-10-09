@@ -47,9 +47,11 @@ export type PairingCode = {
   expiresAt: Date;
 };
 
-/** The only thing stored in the login cookie. The role is read from the database instead. */
+/** What the login cookie holds. The role lives here, not in the database, so each device has its own. */
 export type SessionPayload = {
   userId: string;
+  /** Chosen per device at /role, so one account can be guardian on one phone and child on another. */
+  role: Role | null;
 };
 
 /** A document in `rateLimits`: how many attempts a key made since the window opened. */

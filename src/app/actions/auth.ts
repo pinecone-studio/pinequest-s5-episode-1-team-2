@@ -7,6 +7,7 @@ import { getSessionUserId, requireRole } from "@/lib/auth/dal";
 import {
   createPairingCode,
   redeemPairingCode,
+  linkToSelf,
   removeLink,
 } from "@/lib/auth/pairing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
@@ -135,96 +136,35 @@ export async function logout() {
   redirect("/login");
 }
 
+/**
+ * Picks the role for this device only. One account can be the guardian on one phone and the
+ * child on another, so the role goes in the session cookie rather than on the user.
+ * Choosing child links the account to itself, so its guardian phone sees the child phone with no code.
+ */
 export async function setRole(formData: FormData) {
   const userId = await getSessionUserId();
 
   if (!userId) {
-    console.log("SET ROLE: no session -> /login");
     redirect("/login");
   }
-
-  console.log("=================================");
-  console.log("=== SET ROLE DEBUG: START ===");
-  console.log("userId:", userId);
-  console.log("requested role:", formData.get("role"));
 
   const parsed = SetRoleFormSchema.safeParse({
     role: formData.get("role"),
   });
 
   if (!parsed.success) {
-    console.log("SET ROLE: INVALID ROLE");
-    console.log("received value:", formData.get("role"));
-    console.log("=================================");
     redirect("/role");
   }
 
-  console.log("validated role:", parsed.data.role);
+  const { role } = parsed.data;
 
-  const { users } = await getCollections();
-
-  // Before update
-  const beforeUser = await users.findOne(
-    { _id: userId },
-    {
-      projection: {
-        _id: 1,
-        email: 1,
-        role: 1,
-      },
-    },
-  );
-
-  console.log("USER BEFORE UPDATE:", beforeUser);
-
-  // Update role
-  const result = await users.updateOne(
-    { _id: userId },
-    {
-      $set: {
-        role: parsed.data.role,
-      },
-    },
-  );
-
-  console.log("UPDATE RESULT:", {
-    matchedCount: result.matchedCount,
-    modifiedCount: result.modifiedCount,
-  });
-
-  if (result.matchedCount === 0) {
-    console.log("SET ROLE: USER NOT FOUND -> /login");
-    console.log("=================================");
-    redirect("/login");
+  if (role === "child") {
+    await linkToSelf(userId);
   }
 
-  // After update
-  const updatedUser = await users.findOne(
-    { _id: userId },
-    {
-      projection: {
-        _id: 1,
-        email: 1,
-        role: 1,
-      },
-    },
-  );
+  await createSession(userId, role);
 
-  console.log("USER AFTER UPDATE:", updatedUser);
-
-  const redirectPath = homeFor(parsed.data.role);
-
-  console.log("REQUESTED ROLE:", parsed.data.role);
-  console.log("DATABASE ROLE:", updatedUser?.role);
-  console.log("REDIRECT PATH:", redirectPath);
-  console.log("=== SET ROLE DEBUG: END ===");
-  console.log("=================================");
-
-  revalidatePath("/role");
-  revalidatePath("/tracker");
-  revalidatePath("/guardian");
-
-  redirect(redirectPath);
+  redirect(homeFor(role));
 }
 
 /** Child: show a code for a guardian to type in. */
