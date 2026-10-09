@@ -8,14 +8,12 @@ import {
   createPairingCode,
   redeemPairingCode,
   removeLink,
-  updateLinkedChildRole,
 } from "@/lib/auth/pairing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { allowAttempt } from "@/lib/auth/rate-limit";
 import { homeFor } from "@/lib/auth/routes";
 import {
   LoginFormSchema,
-  LinkedChildRoleFormSchema,
   PairingCodeFormSchema,
   SetRoleFormSchema,
   SignupFormSchema,
@@ -169,33 +167,6 @@ export async function setRole(formData: FormData) {
   await createSession(userId, role);
 
   redirect(homeFor(role), "replace");
-}
-
-/** Guardian: correct the role on a linked child's account. */
-export async function changeLinkedChildRole(formData: FormData) {
-  const guardian = await requireRole("guardian");
-  const parsed = LinkedChildRoleFormSchema.safeParse({
-    childId: formData.get("childId"),
-    role: formData.get("role"),
-  });
-
-  if (!parsed.success) {
-    redirect("/guardian/link");
-  }
-
-  const updated = await updateLinkedChildRole(
-    guardian.id,
-    parsed.data.childId,
-    parsed.data.role,
-  );
-
-  if (!updated) {
-    redirect("/guardian/link");
-  }
-
-  revalidatePath("/guardian/link");
-  revalidatePath("/guardian");
-  redirect("/guardian/link", "replace");
 }
 
 /** Child: show a code for a guardian to type in. */

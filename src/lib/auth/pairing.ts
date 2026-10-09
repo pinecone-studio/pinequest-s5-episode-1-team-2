@@ -2,7 +2,6 @@ import { randomInt } from "node:crypto";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import { PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MINUTES } from "@/lib/auth/schemas";
 import { forgetUnwatchedChild } from "@/lib/location-sharing";
-import type { Role } from "@/types/auth";
 
 function randomCode() {
   return Array.from({ length: PAIRING_CODE_LENGTH }, () => PAIRING_CODE_ALPHABET[randomInt(PAIRING_CODE_ALPHABET.length)]).join("");
@@ -47,7 +46,7 @@ export async function linkToSelf(userId: string) {
   }
 }
 
-export type LinkedPerson = { linkId: string; userId: string; name: string; role: Role | null };
+export type LinkedPerson = { linkId: string; name: string };
 
 /** The children a guardian watches (side "guardian") or the guardians watching a child (side "child"). */
 export async function listLinkedPeople(userId: string, side: "guardian" | "child"): Promise<LinkedPerson[]> {
@@ -55,36 +54,9 @@ export async function listLinkedPeople(userId: string, side: "guardian" | "child
   const mine = side === "guardian" ? "guardianId" : "childId";
   const theirs = side === "guardian" ? "childId" : "guardianId";
   const links = await guardianLinks.find({ [mine]: userId }).sort({ createdAt: 1 }).toArray();
-  const people = await users.find(
-    { _id: { $in: links.map((link) => link[theirs]) } },
-    { projection: { name: 1, role: 1 } },
-  ).toArray();
-  const peopleById = new Map(people.map((person) => [person._id, person]));
-  return links.map((link) => {
-    const person = peopleById.get(link[theirs]);
-    return {
-      linkId: link._id,
-      userId: link[theirs],
-      name: person?.name ?? "—",
-      role: person?.role ?? null,
-    };
-  });
-}
-
-/** Updates a child's account role only when the guardian currently has an active link to them. */
-export async function updateLinkedChildRole(
-  guardianId: string,
-  childId: string,
-  role: Role,
-) {
-  if (guardianId === childId) return false;
-
-  const { guardianLinks, users } = await getCollections();
-  const link = await guardianLinks.findOne({ guardianId, childId });
-  if (!link) return false;
-
-  const result = await users.updateOne({ _id: childId }, { $set: { role } });
-  return result.matchedCount > 0;
+  const people = await users.find({ _id: { $in: links.map((link) => link[theirs]) } }, { projection: { name: 1 } }).toArray();
+  const names = new Map(people.map((person) => [person._id, person.name]));
+  return links.map((link) => ({ linkId: link._id, name: names.get(link[theirs]) ?? "—" }));
 }
 
 /** Either side may end a link. Returns whether something was removed. */
