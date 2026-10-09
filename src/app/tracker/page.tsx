@@ -50,7 +50,7 @@ export default function TrackerPage() {
     latitude: SAFE_ZONES[0].latitude,
     longitude: SAFE_ZONES[0].longitude,
     accuracy: 5,
-    lastUpdated: Date.now(),
+    lastUpdated: 0,
   });
 
 
