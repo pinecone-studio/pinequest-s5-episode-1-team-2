@@ -58,6 +58,11 @@ export const SetRoleFormSchema = z.object({
   role,
 });
 
+export const LinkedChildRoleFormSchema = z.object({
+  childId: z.string().trim().min(1, { error: "Хүүхдийн бүртгэл олдсонгүй." }),
+  role,
+});
+
 export const PairingCodeFormSchema = z.object({
   code: z
     .string({ error: "Кодоо оруулна уу." })

@@ -17,7 +17,7 @@ export type UserRecord = {
   name: string;
   /** For the call buttons, which hard-code tel:+97600000000 today. Include the country code. */
   phone: string | null;
-  /** null until the user picks one after their first login. */
+  /** The role for this account; null only for accounts created before role persistence. */
   role: Role | null;
   /** The child paused location sharing. Missing means not paused, so older accounts need no update. */
   locationPaused?: boolean;
@@ -47,10 +47,10 @@ export type PairingCode = {
   expiresAt: Date;
 };
 
-/** What the login cookie holds. The role lives here, not in the database, so each device has its own. */
+/** What the login cookie holds. `role` is retained as a fallback for older sessions. */
 export type SessionPayload = {
   userId: string;
-  /** Chosen per device at /role, so one account can be guardian on one phone and child on another. */
+  /** Snapshot of the account role when this session was created. */
   role: Role | null;
 };
 

@@ -7,14 +7,15 @@ import { getSessionUserId, requireRole } from "@/lib/auth/dal";
 import {
   createPairingCode,
   redeemPairingCode,
-  linkToSelf,
   removeLink,
+  updateLinkedChildRole,
 } from "@/lib/auth/pairing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { allowAttempt } from "@/lib/auth/rate-limit";
 import { homeFor } from "@/lib/auth/routes";
 import {
   LoginFormSchema,
+  LinkedChildRoleFormSchema,
   PairingCodeFormSchema,
   SetRoleFormSchema,
   SignupFormSchema,
@@ -63,7 +64,7 @@ export async function signup(
       passwordHash: await hashPassword(password),
       name,
       phone: null,
-      role: null,
+      role,
       createdAt: new Date(),
     });
   } catch (error) {
@@ -79,8 +80,8 @@ export async function signup(
     throw error;
   }
 
-  await createSession(id);
-  redirect(homeFor(role));
+  await createSession(id, role);
+  redirect(homeFor(role), "replace");
 }
 
 export async function login(
@@ -127,8 +128,9 @@ export async function login(
     };
   }
 
-  await createSession(user._id);
-  redirect("/role");
+  const role = user.role ?? null;
+  await createSession(user._id, role);
+  redirect(homeFor(role), "replace");
 }
 
 export async function logout() {
@@ -136,11 +138,7 @@ export async function logout() {
   redirect("/login");
 }
 
-/**
- * Picks the role for this device only. One account can be the guardian on one phone and the
- * child on another, so the role goes in the session cookie rather than on the user.
- * Choosing child links the account to itself, so its guardian phone sees the child phone with no code.
- */
+/** Persists a role for a legacy account that has not chosen one yet. */
 export async function setRole(formData: FormData) {
   const userId = await getSessionUserId();
 
@@ -157,14 +155,47 @@ export async function setRole(formData: FormData) {
   }
 
   const { role } = parsed.data;
+  const { users } = await getCollections();
+  const updated = await users.updateOne(
+    { _id: userId, role: null },
+    { $set: { role } },
+  );
 
-  if (role === "child") {
-    await linkToSelf(userId);
+  if (updated.matchedCount === 0) {
+    const existing = await users.findOne({ _id: userId }, { projection: { role: 1 } });
+    redirect(homeFor(existing?.role ?? null), "replace");
   }
 
   await createSession(userId, role);
 
-  redirect(homeFor(role));
+  redirect(homeFor(role), "replace");
+}
+
+/** Guardian: correct the role on a linked child's account. */
+export async function changeLinkedChildRole(formData: FormData) {
+  const guardian = await requireRole("guardian");
+  const parsed = LinkedChildRoleFormSchema.safeParse({
+    childId: formData.get("childId"),
+    role: formData.get("role"),
+  });
+
+  if (!parsed.success) {
+    redirect("/guardian/link");
+  }
+
+  const updated = await updateLinkedChildRole(
+    guardian.id,
+    parsed.data.childId,
+    parsed.data.role,
+  );
+
+  if (!updated) {
+    redirect("/guardian/link");
+  }
+
+  revalidatePath("/guardian/link");
+  revalidatePath("/guardian");
+  redirect("/guardian/link", "replace");
 }
 
 /** Child: show a code for a guardian to type in. */

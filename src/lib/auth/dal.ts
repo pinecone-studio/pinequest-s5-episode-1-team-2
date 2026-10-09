@@ -24,10 +24,11 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
 
   const record = await users.findOne({ _id: userId });
 
-  // The role belongs to this device's session, not to the account.
   const session = await getSession();
 
-  return record ? { ...toUser(record), role: session?.role ?? null } : null;
+  return record
+    ? { ...toUser(record), role: record.role ?? session?.role ?? null }
+    : null;
 });
 
 export async function requireUser() {

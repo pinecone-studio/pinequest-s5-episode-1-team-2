@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/safe-path";
 import { LoginForm } from "@/components/auth/forms";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { homeFor } from "@/lib/auth/routes";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
-  if (user) redirect("/role");
+  if (user) redirect(homeFor(user.role));
 
   return (
     <AppShell>
