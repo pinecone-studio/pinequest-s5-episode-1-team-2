@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { jwtVerify, SignJWT } from "jose";
-import type { SessionPayload } from "@/types/auth";
+import { ROLES } from "@/types/auth";
+import type { Role, SessionPayload } from "@/types/auth";
 
 export const SESSION_COOKIE = "session";
 const SESSION_DAYS = 7;
@@ -11,8 +12,8 @@ function secretKey() {
   return new TextEncoder().encode(secret);
 }
 
-export function signSession(userId: string) {
-  return new SignJWT({ userId } satisfies SessionPayload)
+export function signSession(userId: string, role: Role | null = null) {
+  return new SignJWT({ userId, role } satisfies SessionPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DAYS}d`)
@@ -24,15 +25,17 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    return typeof payload.userId === "string" ? { userId: payload.userId } : null;
+    if (typeof payload.userId !== "string") return null;
+    const role = ROLES.find((value) => value === payload.role) ?? null;
+    return { userId: payload.userId, role };
   } catch {
     return null;
   }
 }
 
-export async function createSession(userId: string) {
+export async function createSession(userId: string, role: Role | null = null) {
   const expires = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-  (await cookies()).set(SESSION_COOKIE, await signSession(userId), {
+  (await cookies()).set(SESSION_COOKIE, await signSession(userId, role), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

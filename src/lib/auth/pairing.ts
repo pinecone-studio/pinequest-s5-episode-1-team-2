@@ -36,6 +36,16 @@ export async function redeemPairingCode(code: string, guardianId: string) {
   return found._id;
 }
 
+/** Links an account to itself, so the guardian phone and child phone of one account see each other. */
+export async function linkToSelf(userId: string) {
+  const { guardianLinks } = await getCollections();
+  try {
+    await guardianLinks.insertOne({ _id: crypto.randomUUID(), guardianId: userId, childId: userId, createdAt: new Date() });
+  } catch (error) {
+    if (!isDuplicateKey(error)) throw error; // already linked
+  }
+}
+
 export type LinkedPerson = { linkId: string; name: string };
 
 /** The children a guardian watches (side "guardian") or the guardians watching a child (side "child"). */
