@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { ChevronRight, LogOut, MapPin, UserRoundCog } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, LogOut, MapPin } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { AppShell } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
@@ -10,6 +10,7 @@ import type { AssistantSettings } from "@/types/safety";
 const avatars: AssistantSettings["avatar"][] = ["Мило", "Ари", "Номи", "Туяа", "Мяу", "Бамбар", "Пип", "Рокки"];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const { settings, update } = useAssistantSettings();
 
   return (
@@ -18,10 +19,25 @@ export default function SettingsPage() {
         <div aria-hidden="true" className="pointer-events-none absolute right-[-6rem] top-[12%] size-72 rounded-full bg-[#06b6d4]/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 -left-24 size-80 rounded-full bg-[#0e7490]/30 blur-3xl" />
         <header className="relative z-10 mx-auto flex h-14 w-full max-w-[390px] items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.length > 1) {
+                router.back();
+              } else {
+                router.replace("/");
+              }
+            }}
+            aria-label="Өмнөх хуудас руу буцах"
+            className="grid size-10 shrink-0 place-items-center rounded-xl text-[#d8e8eb] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+          >
+            <ChevronLeft size={22} aria-hidden="true" />
+          </button>
           <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]"><MapPin size={22} fill="currentColor" strokeWidth={2.2} /></span>
           <span className="text-[18px] font-bold tracking-[-0.04em]">SafePath</span>
-          <div className="pl-30 "><span className="inline-flex items-center justify-center  rounded-full border border-b-cyan-200 px-4 py-1.5 text-sm text-cyan-200 text-2xl">
-  Тохиргоо</span></div>
+          <span className="ml-auto inline-flex items-center justify-center rounded-full border border-cyan-200/40 px-3 py-1.5 text-sm text-cyan-200">
+            Тохиргоо
+          </span>
           
         </header>
 
