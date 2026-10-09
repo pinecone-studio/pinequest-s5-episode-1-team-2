@@ -87,9 +87,19 @@ export default async function GuardianLinkPage() {
                       </div>
 
                       <div className="mt-4 grid gap-3">
-                        <form action={changeLinkedChildRole} className="grid min-w-0 gap-2">
-                          <input type="hidden" name="childId" value={child.userId} />
-                          <label htmlFor={`role-${child.linkId}`} className="text-xs font-medium text-(--sp-muted)">
+                        <form
+                          action={changeLinkedChildRole}
+                          className="grid min-w-0 gap-2"
+                        >
+                          <input
+                            type="hidden"
+                            name="childId"
+                            value={child.userId}
+                          />
+                          <label
+                            htmlFor={`role-${child.linkId}`}
+                            className="text-xs font-medium text-(--sp-muted)"
+                          >
                             Үүрэг
                           </label>
                           <select
@@ -108,7 +118,10 @@ export default async function GuardianLinkPage() {
                             Хадгалах
                           </button>
                         </form>
-                        <form action={unlink} className="border-t border-(--sp-line) pt-2">
+                        <form
+                          action={unlink}
+                          className="border-t border-(--sp-line) pt-2"
+                        >
                           <input
                             type="hidden"
                             name="linkId"
