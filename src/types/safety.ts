@@ -61,4 +61,9 @@ export type SafetyAssistantRequest = CompanionProfile & {
   distanceFromSafeZone: number;
   destination: string | null;
   navigationInstruction?: string;
+  nearbyLandmarks?: {
+    name: string;
+    type: string;
+    distance: number;
+  }[];
 };

@@ -34,12 +34,13 @@ export async function signup(
   const values = {
     name: text(formData, "name"),
     email: text(formData, "email"),
-    role: text(formData, "role"),
   };
+
   const parsed = SignupFormSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
@@ -50,7 +51,7 @@ export async function signup(
     };
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, role } = parsed.data;
   const { users } = await getCollections();
   const id = crypto.randomUUID();
 
@@ -78,8 +79,7 @@ export async function signup(
   }
 
   await createSession(id);
-  // The role is chosen next, on /role.
-  redirect("/role");
+  redirect(homeFor(role));
 }
 
 export async function login(

@@ -1,5 +1,5 @@
 "use client";
- 
+
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +8,7 @@ import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
- 
+
 const LiveMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
   loading: () => (
@@ -17,7 +17,7 @@ const LiveMap = dynamic(() => import("@/components/live-map"), {
     </div>
   ),
 });
- 
+
 const TOKENS = {
   "--sp-primary": "#4F8FA8",
   "--sp-primary-deep": "#3D7891",
@@ -37,16 +37,16 @@ const TOKENS = {
   "--sp-risk": "#E57C66",
   "--sp-risk-bg": "rgba(229,124,102,0.13)",
 } as React.CSSProperties;
- 
+
 type Tone = "safe" | "caution" | "risk";
- 
+
 function toneOf(level?: string): Tone {
   if (level === "HIGH_RISK") return "risk";
   if (level === "CAUTION" || level === "MEDIUM_RISK" || level === "MEDIUM")
     return "caution";
   return "safe";
 }
- 
+
 const TONE = {
   safe: {
     label: "Аюулгүй",
@@ -67,7 +67,7 @@ const TONE = {
     bar: "bg-(--sp-risk)",
   },
 } as const;
- 
+
 function distanceMeters(
   a: { latitude: number; longitude: number },
   b: { latitude: number; longitude: number },
@@ -83,12 +83,12 @@ function distanceMeters(
       Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
 }
- 
+
 function formatDistance(m: number) {
   if (m < 1000) return `${Math.max(10, Math.round(m / 10) * 10)} м`;
   return `${(m / 1000).toFixed(1)} км`;
 }
- 
+
 function formatRelative(ts: number | null, now: number) {
   if (!ts) return "Хүлээгдэж байна";
   const s = Math.max(0, Math.round((now - ts) / 1000));
@@ -100,7 +100,7 @@ function formatRelative(ts: number | null, now: number) {
     minute: "2-digit",
   });
 }
- 
+
 function useNow(intervalMs = 10_000) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -110,28 +110,28 @@ function useNow(intervalMs = 10_000) {
   return now;
 }
 type TimelineEvent = { time: string; label: string; done: boolean };
- 
+
 const timeline: TimelineEvent[] = [
   { time: "08:05", label: "Гэрээс гарсан", done: true },
   { time: "08:24", label: "Сургуульд ирсэн", done: true },
   { time: "16:10", label: "Сургуулиас гарсан", done: true },
   { time: "16:40", label: "Гэртээ ирэх ёстой", done: false },
 ];
- 
+
 export default function GuardianPage() {
   const { location, status: locationStatus, error } = useGeolocation();
   const { settings } = useAssistantSettings();
   const now = useNow();
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
- 
+
   const childName = settings.userName || "Тэмүүлэн";
   const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
- 
+
   const loc = location as
     | (typeof location & { timestamp?: number; accuracy?: number })
     | null;
- 
+
   const [prevLocation, setPrevLocation] = useState(location);
   const [lastUpdate, setLastUpdate] = useState<number | null>(
     loc ? (loc.timestamp ?? now) : null,
@@ -140,17 +140,17 @@ export default function GuardianPage() {
     setPrevLocation(location);
     setLastUpdate(loc ? (loc.timestamp ?? now) : null);
   }
- 
+
   const safetyState = useMemo(
     () => (location ? calculateSafetyState({ location }) : null),
     [location],
   );
- 
+
   const tone = toneOf(safetyState?.riskLevel);
   const zone = safetyState?.nearestSafeZone;
   const distance = location && zone ? distanceMeters(location, zone) : null;
   const inside = Boolean(safetyState?.isInsideSafeZone);
- 
+
   const headline = !safetyState
     ? "Байршлыг тогтоож байна"
     : tone === "risk"
@@ -158,7 +158,7 @@ export default function GuardianPage() {
       : inside
         ? "Аюулгүй бүсэд байна"
         : "Аюулгүй бүсээс гадуур";
- 
+
   const subline = !zone
     ? (error ?? "Түр хүлээнэ үү")
     : inside
@@ -166,7 +166,7 @@ export default function GuardianPage() {
       : `Хамгийн ойр: ${zone.name} · ${
           distance !== null ? formatDistance(distance) : "—"
         }`;
- 
+
   const currentRoute: [number, number][] =
     location && zone
       ? [
@@ -174,13 +174,13 @@ export default function GuardianPage() {
           [zone.latitude, zone.longitude],
         ]
       : [];
- 
+
   const familiarRoute: [number, number][] = [
     [SAFE_ZONES[0].latitude, SAFE_ZONES[0].longitude],
     [47.9212, 106.9176],
     [SAFE_ZONES[1].latitude, SAFE_ZONES[1].longitude],
   ];
- 
+
   return (
     <AppShell>
       <div
@@ -206,7 +206,7 @@ export default function GuardianPage() {
             </div>
             <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
           </header>
- 
+
           <section
             role={tone === "risk" ? "alert" : "status"}
             aria-live="polite"
@@ -226,7 +226,7 @@ export default function GuardianPage() {
               {subline} · {formatRelative(lastUpdate, now)}
             </p>
           </section>
- 
+
           <div id="location" className="px-4">
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
               {location ? (
@@ -239,13 +239,13 @@ export default function GuardianPage() {
                     familiarRoute={familiarRoute}
                     className="h-full rounded-none border-0"
                   />
- 
+
                   {typeof loc?.accuracy === "number" && (
                     <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
                       ±{Math.round(loc.accuracy)} м
                     </span>
                   )}
- 
+
                   <button
                     type="button"
                     onClick={() => setMapKey((k) => k + 1)}
@@ -263,7 +263,7 @@ export default function GuardianPage() {
                       <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
                     </svg>
                   </button>
- 
+
                   <div
                     aria-label="Газрын зургийн тэмдэглэгээ"
                     className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
@@ -285,7 +285,7 @@ export default function GuardianPage() {
               )}
             </div>
           </div>
- 
+
           <section className="px-5 pt-4" aria-label="Одоогийн мэдээлэл">
             <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-(--sp-line) py-3">
               <Info
@@ -329,7 +329,7 @@ export default function GuardianPage() {
               </div>
             </dl>
           </section>
- 
+
           <section id="events" className="px-5 pt-5">
             <h2 className="text-[16px] font-semibold">Өнөөдрийн үйл явдал</h2>
             <ol className="relative mt-3 ml-1 border-l border-(--sp-line)">
@@ -360,13 +360,13 @@ export default function GuardianPage() {
             </ol>
           </section>
         </main>
- 
+
         <TabBar
           active={activeTab}
           onSelect={setActiveTab}
           alert={tone === "risk"}
         />
- 
+
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
           <div className="grid grid-cols-2 gap-2">
             <a
@@ -389,9 +389,9 @@ export default function GuardianPage() {
     </AppShell>
   );
 }
- 
+
 type TabId = "people" | "map" | "alerts" | "settings";
- 
+
 const TABS: {
   id: TabId;
   label: string;
@@ -423,7 +423,7 @@ const TABS: {
     icon: (f) => <GearIcon filled={f} />,
   },
 ];
- 
+
 function TabBar({
   active,
   onSelect,
@@ -478,7 +478,7 @@ function TabBar({
     </nav>
   );
 }
- 
+
 function IconBase({
   filled,
   children,
@@ -501,7 +501,7 @@ function IconBase({
     </svg>
   );
 }
- 
+
 function PeopleIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
@@ -512,7 +512,7 @@ function PeopleIcon({ filled }: { filled: boolean }) {
     </IconBase>
   );
 }
- 
+
 function MapIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
@@ -525,7 +525,7 @@ function MapIcon({ filled }: { filled: boolean }) {
     </IconBase>
   );
 }
- 
+
 function BellIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
@@ -539,7 +539,7 @@ function BellIcon({ filled }: { filled: boolean }) {
     </IconBase>
   );
 }
- 
+
 function GearIcon({ filled }: { filled: boolean }) {
   return (
     <IconBase filled={filled}>
@@ -552,7 +552,7 @@ function GearIcon({ filled }: { filled: boolean }) {
     </IconBase>
   );
 }
- 
+
 function Legend({ dot, label }: { dot: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -561,7 +561,7 @@ function Legend({ dot, label }: { dot: string; label: string }) {
     </span>
   );
 }
- 
+
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -570,5 +570,3 @@ function Info({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
- 
- 

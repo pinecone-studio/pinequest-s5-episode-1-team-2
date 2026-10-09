@@ -24,8 +24,8 @@ export function LocationSharingStatus() {
 
   return (
     <div className="mt-3 text-center">
-      <p role="status" className="flex items-center justify-center gap-2 text-[13px] text-[#737373]">
-        <span className={`size-2 shrink-0 rounded-full ${!paused && status === "sharing" ? "bg-[#2e7d4f]" : "bg-[#c8c8c4]"}`} aria-hidden="true" />
+      <p role="status" className="flex items-center justify-center gap-2 text-[13px] text-[#b7c7cc]">
+        <span className={`size-2 shrink-0 rounded-full ${!paused && status === "sharing" ? "bg-[#67e8a5]" : "bg-[#60747b]"}`} aria-hidden="true" />
         {text}
       </p>
       {canToggle && (
@@ -33,13 +33,13 @@ export function LocationSharingStatus() {
           type="button"
           disabled={saving}
           onClick={() => void setPaused(!paused)}
-          className="mt-1 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#111111] underline decoration-[#c8c8c4] underline-offset-4 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]"
+          className="mt-1 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
         >
           {paused ? "Үргэлжлүүлэх" : "Түр зогсоох"}
         </button>
       )}
-      {canToggle && !paused && <p className="text-[12px] text-[#9a9a96]">Түр зогсоовол асран хамгаалагч тань үүнийг харах болно.</p>}
-      {saveFailed && <p role="alert" className="text-[12px] text-[#c64242]">Хадгалж чадсангүй. Дахин оролдоно уу.</p>}
+      {canToggle && !paused && <p className="text-[12px] text-[#84979d]">Түр зогсоовол асран хамгаалагч тань үүнийг харах болно.</p>}
+      {saveFailed && <p role="alert" className="text-[12px] text-[#fda4af]">Хадгалж чадсангүй. Дахин оролдоно уу.</p>}
     </div>
   );
 }
