@@ -106,15 +106,15 @@ export default function TrackerPage() {
     [settings],
   );
 
-  const navigationInstruction =
-    route?.nextInstruction;
-
-
- 
   const currentLocation =
     demoMode
       ? demoLocation
       : location;
+  const currentLatitude = currentLocation?.latitude;
+  const currentLongitude = currentLocation?.longitude;
+  const navigationInstruction = currentLocation
+    ? route?.nextInstruction
+    : undefined;
 
 
   const moveDemoLocation = useCallback(
@@ -174,9 +174,7 @@ export default function TrackerPage() {
 
 
   useEffect(() => {
-    if (!currentLocation) {
-      setRoute(null);
-      setRouteStatus("loading");
+    if (currentLatitude === undefined || currentLongitude === undefined) {
       return;
     }
 
@@ -198,8 +196,8 @@ export default function TrackerPage() {
     setRouteStatus("loading");
 
     const origin = {
-      lat: currentLocation.latitude,
-      lon: currentLocation.longitude,
+      lat: currentLatitude,
+      lon: currentLongitude,
     };
 
     const destination = {
@@ -341,11 +339,7 @@ export default function TrackerPage() {
         setRoute(null);
         setRouteStatus("error");
       });
-  }, [
-    currentLocation?.latitude,
-    currentLocation?.longitude,
-    demoMode,
-  ]);
+  }, [currentLatitude, currentLongitude, demoMode]);
 
   useEffect(() => {
     return () => {
@@ -719,14 +713,17 @@ export default function TrackerPage() {
 
 
   useEffect(() => {
+    const audio = audioElement.current;
+    const cachedSpeech = speechCache.current;
+
     return () => {
       requestController.current?.abort();
 
       speechController.current?.abort();
 
-      audioElement.current?.pause();
+      audio?.pause();
 
-      speechCache.current.forEach(
+      cachedSpeech.forEach(
         (url) => {
           URL.revokeObjectURL(url);
         },
@@ -961,8 +958,10 @@ export default function TrackerPage() {
           </button>
         </div>
 
-        <a href="tel:+97600000000" className="mx-auto mt-2 inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
-        <Link href="/tracker/code" className="mx-auto inline-flex min-h-11 items-center px-4 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Холбох код</Link>
+        <nav aria-label="Тусламж болон холбох код" className="relative z-10 mt-2 flex items-center justify-center gap-2">
+          <a href="tel:+97600000000" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
+          <Link href="/tracker/code" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Холбох код</Link>
+        </nav>
         <audio
           ref={audioElement}
           className="sr-only"
