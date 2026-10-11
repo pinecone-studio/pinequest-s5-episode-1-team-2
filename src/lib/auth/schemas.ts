@@ -39,6 +39,7 @@ export const SignupFormSchema = z
     name,
     email,
     password: newPassword,
+    role,
     confirmPassword: z.string({ error: "Нууц үгээ дахин оруулна уу." }),
   })
   .refine((value) => value.password === value.confirmPassword, {

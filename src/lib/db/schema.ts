@@ -47,7 +47,6 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           createdAt: { bsonType: "date" },
         },
       },
-      $expr: { $ne: ["$guardianId", "$childId"] },
     },
     indexes: [
       { key: { guardianId: 1, childId: 1 }, name: "guardian_child_unique", unique: true },

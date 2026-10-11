@@ -1,5 +1,6 @@
 import { ArrowUpRight, MapPin, ShieldCheck, UserRound } from "lucide-react";
 import { setRole } from "@/app/actions/auth";
+import { InstallAppPrompt } from "@/components/install-app-prompt";
 import { AppShell } from "@/components/safe-path";
 
 export function RoleHome() {
@@ -96,6 +97,7 @@ export function RoleHome() {
           <span className="size-1.5 rounded-full bg-[#22d3ee]" />
           Аюулгүй аялал эндээс эхэлнэ
         </p>
+        <InstallAppPrompt />
       </main>
     </AppShell>
   );
