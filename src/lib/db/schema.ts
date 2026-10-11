@@ -128,6 +128,48 @@ export const SCHEMA: Record<string, CollectionSchema> = {
       { key: { expiresAt: 1 }, name: "expiresAt_ttl", expireAfterSeconds: 0 },
     ],
   },
+  geofenceStates: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "isInside", "insideZoneId", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          isInside: { bsonType: "bool" },
+          insideZoneId: { bsonType: ["string", "null"] },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [{ key: { updatedAt: 1 }, name: "updatedAt" }],
+  },
+  safetyAlerts: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "type", "transitionKey", "message", "createdAt", "readBy"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER"] },
+          transitionKey: { bsonType: "string", minLength: 1, maxLength: 200 },
+          zoneName: { bsonType: "string", maxLength: 40 },
+          message: { bsonType: "string", minLength: 1, maxLength: 200 },
+          createdAt: { bsonType: "date" },
+          readBy: { bsonType: "array", items: { bsonType: "string" } },
+        },
+      },
+    },
+    indexes: [
+      { key: { transitionKey: 1 }, name: "transitionKey_unique", unique: true },
+      { key: { childId: 1, createdAt: -1 }, name: "childId_createdAt_desc" },
+      // Safety events are retained for 90 days, then automatically removed.
+      { key: { createdAt: 1 }, name: "createdAt_ttl_90_days", expireAfterSeconds: 90 * 24 * 60 * 60 },
+    ],
+  },
 };
 
 /** Creates the collections and indexes, or brings existing ones up to date. Safe to run again. */

@@ -7,6 +7,7 @@ import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useChildLocations } from "@/hooks/use-child-locations";
+import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 
@@ -110,20 +111,13 @@ function useNow(intervalMs = 10_000) {
   }, [intervalMs]);
   return now;
 }
-type TimelineEvent = { time: string; label: string; done: boolean };
-
-const timeline: TimelineEvent[] = [
-  { time: "08:05", label: "Гэрээс гарсан", done: true },
-  { time: "08:24", label: "Сургуульд ирсэн", done: true },
-  { time: "16:10", label: "Сургуулиас гарсан", done: true },
-  { time: "16:40", label: "Гэртээ ирэх ёстой", done: false },
-];
-
 export default function GuardianPage() {
   const { location, status: locationStatus, error } = useGeolocation();
   const { settings } = useAssistantSettings();
   const { children: linkedChildren, failed: childrenLoadFailed } = useChildLocations();
+  const { alerts, failed: alertsLoadFailed, markRead: markSafetyAlertRead } = useSafetyAlerts();
   const now = useNow();
+  const unreadAlertCount = alerts.filter((alert) => !alert.read).length;
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
 
@@ -390,41 +384,61 @@ export default function GuardianPage() {
             </dl>
           </section>
 
-          <section id="events" className="px-5 pt-5">
-            <h2 className="text-[16px] font-semibold">Өнөөдрийн үйл явдал</h2>
-            <ol className="relative mt-3 ml-1 border-l border-(--sp-line)">
-              {timeline.map((event) => (
-                <li
-                  key={event.time + event.label}
-                  className="relative pb-4 pl-5 last:pb-0"
-                >
-                  <span
-                    className={`absolute -left-1.25 top-1.5 size-2.5 rounded-full ${
-                      event.done
-                        ? "bg-(--sp-secondary)"
-                        : "border border-(--sp-muted) bg-black"
-                    }`}
-                  />
-                  <div
-                    className={`flex items-baseline gap-3 ${
-                      event.done ? "" : "text-(--sp-muted)"
-                    }`}
-                  >
-                    <time className="w-11 shrink-0 text-xs tabular-nums text-(--sp-muted)">
-                      {event.time}
-                    </time>
-                    <p className="text-[14px] leading-5">{event.label}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+          <section id="events" className="px-5 pt-5" aria-labelledby="safety-alerts-heading">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="safety-alerts-heading" className="text-[16px] font-semibold">Аюулгүй байдлын мэдэгдэл</h2>
+              {unreadAlertCount > 0 && (
+                <span className="rounded-full bg-(--sp-risk-bg) px-2.5 py-1 text-xs font-semibold text-(--sp-risk)">
+                  {unreadAlertCount} шинэ
+                </span>
+              )}
+            </div>
+            {alertsLoadFailed ? (
+              <p className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
+                Мэдэгдлийг авч чадсангүй. Сүлжээ болон нэвтрэлтийн төлөвөө шалгана уу.
+              </p>
+            ) : alerts.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
+                Одоогоор аюулгүй бүсийн мэдэгдэл алга. Автомат мэдэгдэл ажиллахын тулд хүүхдэдээ аюулгүй бүс тохируулж, байршил хуваалцахыг асаана уу.
+                <Link href="/guardian/zones" className="mt-2 inline-block font-medium text-(--sp-primary)">Аюулгүй бүс тохируулах →</Link>
+              </div>
+            ) : (
+              <ol className="mt-3 space-y-2.5">
+                {alerts.map((alert) => {
+                  const alertTime = new Date(alert.createdAt).getTime();
+                  const isUrgent = alert.type !== "ZONE_ENTER";
+                  const label = alert.type === "ZONE_EXIT"
+                    ? "Аюулгүй бүсээс гарсан"
+                    : alert.type === "ZONE_ENTER"
+                      ? "Аюулгүй бүсэд орсон"
+                      : "Аюулгүй бүсийн гадна илэрсэн";
+                  return (
+                    <li key={alert.id} className={`rounded-xl border p-3 ${alert.read ? "border-(--sp-line) bg-(--sp-surface)" : isUrgent ? "border-[rgba(229,124,102,0.45)] bg-[rgba(229,124,102,0.08)]" : "border-[rgba(114,184,176,0.35)] bg-[rgba(114,184,176,0.06)]"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className={`text-sm font-semibold ${isUrgent ? "text-(--sp-risk)" : "text-(--sp-safe)"}`}>{label}</p>
+                          <p className="mt-1 text-xs text-(--sp-muted)">{alert.childName} · {formatRelative(alertTime, now)}</p>
+                        </div>
+                        {!alert.read && (
+                          <button type="button" onClick={() => { void markSafetyAlertRead(alert.id); }} className="shrink-0 rounded-lg border border-(--sp-line) px-2.5 py-1.5 text-xs font-medium text-(--sp-ink) hover:bg-white/5">
+                            Уншсан
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-(--sp-ink)">{alert.message}</p>
+                      {alert.zoneName && <p className="mt-1 text-xs text-(--sp-muted)">Бүс: {alert.zoneName}</p>}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </section>
         </main>
 
         <TabBar
           active={activeTab}
           onSelect={setActiveTab}
-          alert={tone === "risk"}
+          alert={tone === "risk" || unreadAlertCount > 0}
         />
 
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">

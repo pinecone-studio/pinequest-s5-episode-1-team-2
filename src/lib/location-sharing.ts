@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { zonesByChild } from "@/lib/child-zones";
-import { getCollections } from "@/lib/db/mongo";
+import { updateChildGeofenceState } from "@/lib/safety-alerts";
+import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import type { ChildLocation, SharingState } from "@/types/location";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,30 +36,82 @@ export async function getSharingState(childId: string): Promise<SharingState> {
  * guardian is linked, nothing is stored and any old position is removed.
  */
 export async function saveChildLocation(childId: string, { ageMs, ...position }: LocationReport) {
-  const { locations } = await getCollections();
+  const { locations, geofenceStates, safetyAlerts } = await getCollections();
   const state = await getSharingState(childId);
   if (state.paused || state.watchers === 0) {
-    await locations.deleteOne({ _id: childId });
-    return { ...state, shared: false };
+    await Promise.all([
+      locations.deleteOne({ _id: childId }),
+      geofenceStates.deleteOne({ _id: childId }),
+      ...(state.watchers === 0 ? [safetyAlerts.deleteMany({ childId })] : []),
+    ]);
+    return { ...state, shared: false, geofenceCheck: "skipped" as const };
   }
 
-  await locations.replaceOne({ _id: childId }, { ...position, updatedAt: new Date(Date.now() - ageMs) }, { upsert: true });
-  return { ...state, shared: true };
+  const updatedAt = new Date(Date.now() - ageMs);
+  // The timestamp condition is part of the MongoDB write, so concurrent delayed reports
+  // cannot overwrite a newer sample between a separate read and write.
+  try {
+    await locations.updateOne(
+      {
+        _id: childId,
+        $or: [
+          { updatedAt: { $lte: updatedAt } },
+          { updatedAt: { $exists: false } },
+        ],
+      },
+      { $set: { ...position, updatedAt } },
+      { upsert: true },
+    );
+  } catch (error) {
+    // With upsert enabled, a newer existing _id makes the conditional update miss and
+    // MongoDB reports the attempted duplicate _id. Leave that newer position untouched.
+    if (isDuplicateKey(error)) {
+      return { ...state, shared: true, geofenceCheck: "skipped-stale-report" as const, alertsCreated: 0 };
+    }
+    throw error;
+  }
+
+  // Old cached readings may refresh the UI's "last updated" timestamp, but they must not
+  // generate a fresh safety event. Only geofence-check a location measured in the last 2 min.
+  if (ageMs > 120_000) {
+    return { ...state, shared: true, geofenceCheck: "skipped-stale-reading" as const, alertsCreated: 0 };
+  }
+
+  try {
+    const alertsCreated = await updateChildGeofenceState(childId, { ...position, updatedAt });
+    return { ...state, shared: true, geofenceCheck: "ok" as const, alertsCreated };
+  } catch (error) {
+    console.error("SAFEPATH_GEOFENCE_CHECK_FAILED", error);
+    return { ...state, shared: true, geofenceCheck: "failed" as const, alertsCreated: 0 };
+  }
 }
 
 /** Pausing also deletes the stored position at once, so guardians stop seeing it immediately. */
 export async function setSharingPaused(childId: string, paused: boolean): Promise<SharingState> {
-  const { users, locations } = await getCollections();
+  const { users, locations, geofenceStates } = await getCollections();
   await users.updateOne({ _id: childId }, { $set: { locationPaused: paused } });
-  if (paused) await locations.deleteOne({ _id: childId });
+  if (paused) {
+    await Promise.all([
+      locations.deleteOne({ _id: childId }),
+      // Resume starts from a fresh baseline so no movement during a pause is inferred.
+      geofenceStates.deleteOne({ _id: childId }),
+    ]);
+  }
   return getSharingState(childId);
 }
 
 /** After a link is removed: a child nobody is linked to any more keeps no stored position or safe zones. */
 export async function forgetUnwatchedChild(childId: string) {
-  const { guardianLinks, locations, safeZones } = await getCollections();
+  const { guardianLinks, locations, safeZones, geofenceStates, safetyAlerts } = await getCollections();
   const watched = await guardianLinks.countDocuments({ childId }, { limit: 1 });
-  if (!watched) await Promise.all([locations.deleteOne({ _id: childId }), safeZones.deleteMany({ childId })]);
+  if (!watched) {
+    await Promise.all([
+      locations.deleteOne({ _id: childId }),
+      safeZones.deleteMany({ childId }),
+      geofenceStates.deleteOne({ _id: childId }),
+      safetyAlerts.deleteMany({ childId }),
+    ]);
+  }
 }
 
 /** The children linked to this guardian, oldest link first, each with their latest position if they are sharing. */
