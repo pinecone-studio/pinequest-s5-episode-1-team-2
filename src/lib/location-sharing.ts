@@ -120,7 +120,7 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
   const links = await guardianLinks.find({ guardianId }).sort({ createdAt: 1 }).toArray();
   const childIds = links.map((link) => link.childId);
   const [children, positions, zones] = await Promise.all([
-    users.find({ _id: { $in: childIds } }, { projection: { name: 1, locationPaused: 1 } }).toArray(),
+    users.find({ _id: { $in: childIds } }, { projection: { name: 1, childName: 1, locationPaused: 1 } }).toArray(),
     locations.find({ _id: { $in: childIds } }).toArray(),
     zonesByChild(childIds),
   ]);
@@ -134,7 +134,7 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
     const position = paused ? undefined : latest.get(childId);
     return {
       childId,
-      name: child?.name ?? "—",
+      name: child?.childName ?? child?.name ?? "—",
       zones: zones.get(childId) ?? [],
       paused,
       position: position
