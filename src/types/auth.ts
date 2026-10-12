@@ -17,6 +17,9 @@ export type UserRecord = {
   name: string;
   /** For the call buttons, which hard-code tel:+97600000000 today. Include the country code. */
   phone: string | null;
+  /** Optional child-specific profile for accounts that represent both guardian and child. */
+  childName?: string;
+  childPhone?: string | null;
   /** The role for this account; null only for accounts created before role persistence. */
   role: Role | null;
   /** The child paused location sharing. Missing means not paused, so older accounts need no update. */
