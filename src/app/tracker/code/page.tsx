@@ -74,7 +74,10 @@ export default async function TrackerCodePage() {
                       <span aria-hidden="true" className="grid size-9 place-items-center rounded-full bg-[#0e7490]/35 text-sm font-semibold text-[#67e8f9]">
                         {guardian.name?.[0] ?? "Э"}
                       </span>
-                      <span className="text-[16px] font-medium text-white">{guardian.name}</span>
+                      <div>
+                        <span className="block text-[16px] font-medium text-white">{guardian.name}</span>
+                        {guardian.phone && <a href={`tel:${guardian.phone}`} className="block text-[13px] text-[#9fb4bb]">{guardian.phone}</a>}
+                      </div>
                     </div>
                     <form action={unlink}>
                       <input type="hidden" name="linkId" value={guardian.linkId} />

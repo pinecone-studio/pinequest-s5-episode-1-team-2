@@ -25,6 +25,8 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           email: { bsonType: "string", pattern: "^[^\\p{Lu}]+$" },
           passwordHash: { bsonType: "string" },
           name: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
+          childName: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
+          childPhone: { bsonType: "string" },
           phone: { bsonType: ["string", "null"] },
           role: { bsonType: ["string", "null"], enum: [...ROLES, null] },
           locationPaused: { bsonType: "bool" },

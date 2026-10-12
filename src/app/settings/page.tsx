@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft, LogOut, MapPin } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { AppShell } from "@/components/safe-path";
+import { ProfileForm } from "@/components/auth/profile-form";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import type { AssistantSettings } from "@/types/safety";
 
@@ -40,6 +41,8 @@ export default function SettingsPage() {
           </span>
           
         </header>
+
+        <ProfileForm />
 
         <form className="relative z-10 mx-auto w-full max-w-[390px] pt-5" onSubmit={(event) => event.preventDefault()}>
           <h1 className="mb-6 text-[29px] font-bold leading-[1.08] tracking-[-0.055em] text-white">AI найз</h1>

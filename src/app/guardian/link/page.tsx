@@ -73,9 +73,14 @@ export default async function GuardianLinkPage() {
                         <span className="grid size-9 place-items-center rounded-full bg-(--sp-primary-soft) text-sm font-semibold text-(--sp-primary)">
                           {child.name?.[0] ?? "Х"}
                         </span>
-                        <span className="text-[16px] font-medium text-(--sp-ink)">
-                          {child.name}
-                        </span>
+                        <div>
+                          <span className="block text-[16px] font-medium text-(--sp-ink)">
+                            {child.name}
+                          </span>
+                          {child.phone && (
+                          <a href={`tel:${child.phone}`} className="block text-[13px] text-(--sp-muted)">{child.phone}</a>
+                        )}
+                        </div>
                       </div>
 
                       <form action={unlink}>
