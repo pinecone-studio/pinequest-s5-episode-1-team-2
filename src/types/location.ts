@@ -1,20 +1,16 @@
 import type { SafeZone } from "@/types/safety";
 
-/** A document in `locations`: the latest position a child shared. `_id` is the child's user id, so there is one per child. */
+/** A document in locations: the latest position a child shared. */
 export type LocationRecord = {
   _id: string;
   latitude: number;
   longitude: number;
   /** Metres, as reported by the phone. */
   accuracy: number;
-  /**
-   * When the phone measured this position, in server time (server clock minus the reading's age),
-   * so neither a wrong phone clock nor a re-sent old reading can make it look fresh.
-   */
   updatedAt: Date;
 };
 
-/** A document in `safeZones`: a place a guardian marked as safe for one child. Any guardian linked to the child can manage it. */
+/** A place a guardian marked as safe for one child. */
 export type SafeZoneRecord = {
   _id: string;
   childId: string;
@@ -30,15 +26,19 @@ export type SafeZoneRecord = {
 export type ChildLocation = {
   childId: string;
   name: string;
-  /** The child's safe zones, oldest first. Empty until a guardian adds one. */
   zones: SafeZone[];
-  /** The child paused sharing on purpose. The position is then always null. */
   paused: boolean;
-  /** null while the child is not sharing: paused, page closed, no reading yet, or nothing for a day. */
-  position: { latitude: number; longitude: number; accuracy: number; updatedAt: string } | null;
+  position: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    updatedAt: string;
+  } | null;
+  /** Estimated speed in km/h, when enough location data is available. */
+  speedKmh?: number | null;
 };
 
-/** The child's own view of their sharing: whether it is paused and how many guardians can see them. */
+/** The child's own view of their sharing. */
 export type SharingState = {
   paused: boolean;
   watchers: number;

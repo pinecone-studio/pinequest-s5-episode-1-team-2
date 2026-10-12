@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
+import { useChildLocations } from "@/hooks/use-child-locations";
+import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 
@@ -42,7 +44,7 @@ type Tone = "safe" | "caution" | "risk";
 
 function toneOf(level?: string): Tone {
   if (level === "HIGH_RISK") return "risk";
-  if (level === "CAUTION" || level === "MEDIUM_RISK" || level === "MEDIUM")
+  if (level === "WARNING" || level === "CAUTION" || level === "MEDIUM_RISK" || level === "MEDIUM")
     return "caution";
   return "safe";
 }
@@ -121,7 +123,10 @@ const timeline: TimelineEvent[] = [
 export default function GuardianPage() {
   const { location, status: locationStatus, error } = useGeolocation();
   const { settings } = useAssistantSettings();
+  const { children: linkedChildren, failed: childrenLoadFailed } = useChildLocations();
+  const { alerts, failed: alertsLoadFailed, markRead: markSafetyAlertRead } = useSafetyAlerts();
   const now = useNow();
+  const unreadAlertCount = alerts.filter((alert) => !alert.read).length;
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
 
@@ -142,19 +147,22 @@ export default function GuardianPage() {
   }
 
   const safetyState = useMemo(
-    () => (location ? calculateSafetyState({ location }) : null),
-    [location],
+    () =>
+      monitoredLocation
+        ? calculateSafetyState({ location: monitoredLocation, safeZones: monitoredZones })
+        : null,
+    [monitoredLocation?.latitude, monitoredLocation?.longitude, monitoredZones],
   );
 
   const tone = toneOf(safetyState?.riskLevel);
   const zone = safetyState?.nearestSafeZone;
-  const distance = location && zone ? distanceMeters(location, zone) : null;
+  const distance = monitoredLocation && zone ? distanceMeters(monitoredLocation, zone) : null;
   const inside = Boolean(safetyState?.isInsideSafeZone);
 
   const headline = !safetyState
     ? "Байршлыг тогтоож байна"
     : tone === "risk"
-      ? "Маршрутаас хазайсан байна"
+      ? "Аюулгүй бүсээс гарсан байна"
       : inside
         ? "Аюулгүй бүсэд байна"
         : "Аюулгүй бүсээс гадуур";
@@ -168,9 +176,9 @@ export default function GuardianPage() {
         }`;
 
   const currentRoute: [number, number][] =
-    location && zone
+    monitoredLocation && zone
       ? [
-          [location.latitude, location.longitude],
+          [monitoredLocation.latitude, monitoredLocation.longitude],
           [zone.latitude, zone.longitude],
         ]
       : [];
@@ -229,12 +237,12 @@ export default function GuardianPage() {
 
           <div id="location" className="px-4">
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
-              {location ? (
+              {displayLocation ? (
                 <>
                   <LiveMap
                     key={mapKey}
-                    location={location}
-                    safeZones={SAFE_ZONES}
+                    location={displayLocation}
+                    safeZones={monitoredZones}
                     currentRoute={currentRoute}
                     familiarRoute={familiarRoute}
                     className="h-full rounded-none border-0"
@@ -242,7 +250,7 @@ export default function GuardianPage() {
 
                   {typeof loc?.accuracy === "number" && (
                     <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
-                      ±{Math.round(loc.accuracy)} м
+                      ±{Math.round(displayLocation.accuracy)} м
                     </span>
                   )}
 
@@ -278,9 +286,11 @@ export default function GuardianPage() {
                 </>
               ) : (
                 <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-(--sp-muted)">
-                  {locationStatus === "loading"
-                    ? "Одоогийн байршлыг тогтоож байна…"
-                    : error || "Байршил хараахан олдсонгүй"}
+                  {linkedChildren && linkedChildren.length > 0 && !monitoredLocation
+                    ? "Хүүхдийн байршлын мэдээлэл хараахан ирээгүй байна"
+                    : locationStatus === "loading"
+                      ? "Одоогийн байршлыг тогтоож байна…"
+                      : error || "Байршил хараахан олдсонгүй"}
                 </div>
               )}
             </div>
@@ -364,7 +374,7 @@ export default function GuardianPage() {
         <TabBar
           active={activeTab}
           onSelect={setActiveTab}
-          alert={tone === "risk"}
+          alert={tone === "risk" || unreadAlertCount > 0}
         />
 
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
