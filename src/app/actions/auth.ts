@@ -14,7 +14,6 @@ import { allowAttempt } from "@/lib/auth/rate-limit";
 import { homeFor } from "@/lib/auth/routes";
 import {
   LoginFormSchema,
-  NAME_MAX_LENGTH,
   PairingCodeFormSchema,
   ProfileFormSchema,
   SetRoleFormSchema,
@@ -34,12 +33,16 @@ export async function signup(
   formData: FormData,
 ): Promise<FormState> {
   const values = {
+    name: text(formData, "name"),
     email: text(formData, "email"),
+    role: text(formData, "role"),
   };
 
   const parsed = SignupFormSchema.safeParse({
+    name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
@@ -50,9 +53,7 @@ export async function signup(
     };
   }
 
-  const { email, password } = parsed.data;
-  // A placeholder until the person sets their real name in settings.
-  const name = email.split("@")[0].slice(0, NAME_MAX_LENGTH) || "Хэрэглэгч";
+  const { email, password, name, role } = parsed.data;
   const { users } = await getCollections();
   const id = crypto.randomUUID();
 
@@ -79,9 +80,8 @@ export async function signup(
     throw error;
   }
 
-  await createSession(id);
-  // The role is chosen next, on /role.
-  redirect("/role");
+  await createSession(id, role);
+  redirect(homeFor(role));
 }
 
 export async function login(

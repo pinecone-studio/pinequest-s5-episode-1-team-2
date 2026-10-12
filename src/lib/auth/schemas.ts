@@ -67,3 +67,15 @@ export const PairingCodeFormSchema = z.object({
       error: "Кодоо зөв оруулна уу.",
     }),
 });
+
+/** Digits with an optional leading +; spaces and dashes are allowed when typing and dropped before saving. */
+const phone = z
+  .string({ error: "Утасны дугаараа оруулна уу." })
+  .trim()
+  .transform((value) => value.replace(/[\s-]/g, ""))
+  .pipe(z.string().regex(/^\+?\d{8,15}$/, { error: "Утасны дугаараа зөв оруулна уу." }));
+
+export const ProfileFormSchema = z.object({
+  name,
+  phone,
+});
