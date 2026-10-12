@@ -11,32 +11,37 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
   const selected = children.find((child) => child.childId === wanted) ?? children[0];
 
   return (
-    <AppShell>
-      <main className="min-h-dvh pb-[calc(24px+env(safe-area-inset-bottom))]">
-        <BackHeader title="Аюулгүй бүс" />
-        <div className="px-5 pt-2">
+    <AppShell className="!max-w-none">
+      <main className="min-h-dvh pb-[calc(32px+env(safe-area-inset-bottom))]">
+        <div className="mx-auto w-full max-w-[1180px]">
+          <BackHeader title="Аюулгүй бүс" />
+        <div className="px-5 pt-2 sm:px-8 lg:pt-5">
           {!selected ? (
-            <div className="pt-6 text-[14px] text-[#737373]">
-              <p>Эхлээд хүүхдээ холбоно уу.</p>
-              <Link href="/guardian/link" className="mt-2 inline-flex min-h-11 items-center font-medium text-[#111111] underline underline-offset-4">Хүүхэд холбох</Link>
+            <div className="mt-6 rounded-3xl border border-[#e9e9e5] bg-[#fafaf8] p-6 sm:p-8">
+              <p className="text-lg font-semibold tracking-tight">Хүүхдийн байршлыг харахын тулд эхлээд холбоно уу.</p>
+              <p className="mt-2 text-sm leading-6 text-[#737373]">Холбосны дараа аюулгүй бүс үүсгэж, газрын зураг дээр харах боломжтой.</p>
+              <Link href="/guardian/link" className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-[#111111] px-5 text-sm font-semibold text-white">Хүүхэд холбох</Link>
             </div>
           ) : (
             <>
               {children.length > 1 && (
-                <nav className="mb-3 flex gap-2 overflow-x-auto" aria-label="Хүүхэд сонгох">
+                <nav className="mb-5 flex gap-2 overflow-x-auto pb-1" aria-label="Хүүхэд сонгох">
                   {children.map((child) => (
                     <Link
                       key={child.childId}
                       href={`/guardian/zones?child=${child.childId}`}
                       aria-current={child.childId === selected.childId ? "page" : undefined}
-                      className={`inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium ${child.childId === selected.childId ? "border-[#111111] bg-[#111111] text-white" : "border-[#e7e7e5] text-[#393a36]"}`}
+                      className={`inline-flex min-h-11 shrink-0 items-center rounded-full border px-5 text-sm font-medium transition-colors ${child.childId === selected.childId ? "border-[#111111] bg-[#111111] text-white" : "border-[#e7e7e5] bg-white text-[#393a36] hover:bg-[#f7f7f5]"}`}
                     >
                       {child.name}
                     </Link>
                   ))}
                 </nav>
               )}
-              <p className="mb-3 text-[14px] leading-6 text-[#737373]">{selected.name} эдгээр бүсийн гадна гарвал эрсдэл нэмэгдэнэ.</p>
+              <section className="mb-6 rounded-2xl bg-[#f7f7f5] px-5 py-4 sm:px-6">
+                <p className="text-sm font-semibold text-[#252622]">{selected.name}-ийн аюулгүй бүсүүд</p>
+                <p className="mt-1 text-sm leading-6 text-[#737373]">Гэр, сургууль зэрэг газрыг тэмдэглэж, хүүхдийн байршлыг бүсүүдтэй харьцуулан хянаарай.</p>
+              </section>
               <ZoneEditor
                 key={selected.childId}
                 childId={selected.childId}
@@ -45,6 +50,7 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
               />
             </>
           )}
+        </div>
         </div>
       </main>
     </AppShell>
