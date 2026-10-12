@@ -3,8 +3,9 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { Camera, Map as MapIcon, MapPin } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
+import ArNavigationCamera from "@/components/ar-navigation-camera";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
@@ -46,6 +47,7 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
+  const [navigationView, setNavigationView] = useState<"map" | "camera">("map");
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [zonesLoadError, setZonesLoadError] = useState("");
@@ -966,51 +968,60 @@ export default function TrackerPage() {
           className="relative z-10 flex flex-1 flex-col items-center pb-5 text-center"
           aria-label="Милотой ярилцах"
         >
+          <div className="mt-3 grid w-full grid-cols-2 gap-2" aria-label="Навигацийн харагдац">
+            <button
+              type="button"
+              onClick={() => setNavigationView("map")}
+              aria-pressed={navigationView === "map"}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${navigationView === "map" ? "border-[#67e8f9]/70 bg-[#0e7490] text-white" : "border-[#67e8f9]/20 bg-[#101c22] text-[#b7c7cc]"}`}
+            >
+              <MapIcon size={17} /> Газрын зураг
+            </button>
+            <button
+              type="button"
+              onClick={() => setNavigationView("camera")}
+              aria-pressed={navigationView === "camera"}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${navigationView === "camera" ? "border-[#67e8f9]/70 bg-[#0e7490] text-white" : "border-[#67e8f9]/20 bg-[#101c22] text-[#b7c7cc]"}`}
+            >
+              <Camera size={17} /> Камераар чиглүүлэх
+            </button>
+          </div>
 
-
-
-          <div className="relative mt-2 flex h-[clamp(300px,47dvh,440px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
-
-            {currentLocation ? (
-              <CompanionMap
-                location={
-                  currentLocation
-                }
-                destination={
-                  targetZone ?? undefined
-                }
-                currentRoute={
-                  route?.route ?? []
-                }
-                variant="companion"
+          <div className="relative mt-2 flex h-[clamp(360px,57dvh,560px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
+            {navigationView === "camera" && currentLocation ? (
+              <ArNavigationCamera
+                location={currentLocation}
+                route={route?.route ?? []}
+                instruction={navigationInstruction ?? route?.nextInstruction ?? "Аюулгүй бүс рүү буцах зам тооцоолж байна…"}
+                destinationName={targetZone?.name ?? "Аюулгүй бүс"}
+                distanceMeters={route?.distanceMeters ?? null}
               />
+            ) : currentLocation ? (
+              <>
+                <CompanionMap
+                  location={currentLocation}
+                  destination={targetZone ?? undefined}
+                  currentRoute={route?.route ?? []}
+                  variant="companion"
+                />
+                <CompanionMark
+                  state={
+                    safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING"
+                      ? "warning"
+                      : speechStatus === "playing"
+                        ? "speaking"
+                        : "idle"
+                  }
+                  avatar={settings.avatar}
+                  name={settings.name || "Мило"}
+                  className="companion-avatar--compact relative z-10"
+                />
+              </>
             ) : (
               <p role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
                 {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
               </p>
             )}
-
-            <CompanionMark
-              state={
-                safetyState?.riskLevel ===
-                  "HIGH_RISK" ||
-                safetyState?.riskLevel ===
-                  "WARNING"
-                  ? "warning"
-                  : speechStatus ===
-                      "playing"
-                    ? "speaking"
-                    : "idle"
-              }
-              avatar={
-                settings.avatar
-              }
-              name={
-                settings.name ||
-                "Мило"
-              }
-              className="companion-avatar--compact relative z-10"
-            />
           </div>
           {!demoMode && !zonesLoaded && (
             <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
