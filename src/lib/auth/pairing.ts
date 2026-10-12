@@ -46,6 +46,9 @@ export async function linkToSelf(userId: string) {
   }
 }
 
+/** Shown for a child who has not set a name in settings yet. */
+export const CHILD_PLACEHOLDER_NAME = "Хүүхэд";
+
 export type LinkedPerson = { linkId: string; name: string };
 
 /** The children a guardian watches (side "guardian") or the guardians watching a child (side "child"). */
@@ -54,9 +57,23 @@ export async function listLinkedPeople(userId: string, side: "guardian" | "child
   const mine = side === "guardian" ? "guardianId" : "childId";
   const theirs = side === "guardian" ? "childId" : "guardianId";
   const links = await guardianLinks.find({ [mine]: userId }).sort({ createdAt: 1 }).toArray();
-  const people = await users.find({ _id: { $in: links.map((link) => link[theirs]) } }, { projection: { name: 1 } }).toArray();
-  const names = new Map(people.map((person) => [person._id, person.name]));
-  return links.map((link) => ({ linkId: link._id, name: names.get(link[theirs]) ?? "—" }));
+  const people = await users.find({ _id: { $in: links.map((link) => link[theirs]) } }, { projection: { name: 1, phone: 1, childName: 1, childPhone: 1 } }).toArray();
+  // The child side of a link shows the child's own name and phone.
+  const asChild = side === "guardian";
+  const details = new Map(
+    people.map((person) => [
+      person._id,
+      {
+        // `name` and `phone` are the guardian's, so a child with none of its own set must not show them.
+        name: asChild ? (person.childName ?? CHILD_PLACEHOLDER_NAME) : person.name,
+        phone: asChild ? (person.childPhone ?? null) : person.phone,
+      },
+    ]),
+  );
+  return links.map((link) => {
+    const person = details.get(link[theirs]);
+    return { linkId: link._id, name: person?.name ?? "—", phone: person?.phone ?? null };
+  });
 }
 
 /** Either side may end a link. Returns whether something was removed. */
