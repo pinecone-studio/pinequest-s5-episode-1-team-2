@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Firebase Android client configuration (add locally for native push setup)
+/android/app/google-services.json
+
+# Never commit downloaded Firebase service-account keys
+/service-account*.json
+/*firebase-adminsdk*.json
+/*.service-account.json

@@ -1,4 +1,4 @@
-export type SafetyAlertType = "OUTSIDE_SAFE_ZONES" | "ZONE_EXIT" | "ZONE_ENTER";
+export type SafetyAlertType = "OUTSIDE_SAFE_ZONES" | "ZONE_EXIT" | "ZONE_ENTER" | "SOS";
 
 /** The latest known geofence state for one child's location sharing. */
 export type GeofenceStateRecord = {

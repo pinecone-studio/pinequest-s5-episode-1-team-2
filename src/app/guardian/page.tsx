@@ -111,15 +111,6 @@ function useNow(intervalMs = 10_000) {
   }, [intervalMs]);
   return now;
 }
-type TimelineEvent = { time: string; label: string; done: boolean };
-
-const timeline: TimelineEvent[] = [
-  { time: "08:05", label: "Гэрээс гарсан", done: true },
-  { time: "08:24", label: "Сургуульд ирсэн", done: true },
-  { time: "16:10", label: "Сургуулиас гарсан", done: true },
-  { time: "16:40", label: "Гэртээ ирэх ёстой", done: false },
-];
-
 export default function GuardianPage() {
   const { location, status: locationStatus, error } = useGeolocation();
   const { settings } = useAssistantSettings();
@@ -133,18 +124,27 @@ export default function GuardianPage() {
   const childName = settings.userName || "Тэмүүлэн";
   const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
 
-  const loc = location as
-    | (typeof location & { timestamp?: number; accuracy?: number })
+  // The guardian dashboard must assess the linked child's reported position,
+  // not the guardian's own phone GPS. Use the child's configured zones when available.
+  const monitoredChild = linkedChildren?.find((child) => child.position) ?? null;
+  const monitoredLocation = monitoredChild?.position
+    ? {
+        latitude: monitoredChild.position.latitude,
+        longitude: monitoredChild.position.longitude,
+        accuracy: monitoredChild.position.accuracy,
+        lastUpdated: new Date(monitoredChild.position.updatedAt).getTime(),
+      }
+    : null;
+  const monitoredZones = monitoredChild?.zones?.length
+    ? monitoredChild.zones
+    : SAFE_ZONES;
+  const displayLocation = monitoredLocation ?? location;
+  const lastUpdate = monitoredLocation
+    ? monitoredLocation.lastUpdated
+    : null;
+  const loc = displayLocation as
+    | (typeof displayLocation & { timestamp?: number; accuracy?: number })
     | null;
-
-  const [prevLocation, setPrevLocation] = useState(location);
-  const [lastUpdate, setLastUpdate] = useState<number | null>(
-    loc ? (loc.timestamp ?? now) : null,
-  );
-  if (location !== prevLocation) {
-    setPrevLocation(location);
-    setLastUpdate(loc ? (loc.timestamp ?? now) : null);
-  }
 
   const safetyState = useMemo(
     () =>
@@ -235,6 +235,50 @@ export default function GuardianPage() {
             </p>
           </section>
 
+          <section className="mx-4 mb-4 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label="Холбогдсон хүүхдүүд">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">Холбогдсон хүүхдүүд</h2>
+              <span className="text-xs text-(--sp-muted)">5 сек тутам шинэчилнэ</span>
+            </div>
+            {childrenLoadFailed ? (
+              <p className="text-sm text-(--sp-muted)">Байршлын мэдээлэл авч чадсангүй. Нэвтэрсэн эрх болон холболтоо шалгана уу.</p>
+            ) : linkedChildren === null ? (
+              <p className="text-sm text-(--sp-muted)">Хүүхдийн мэдээлэл ачаалж байна…</p>
+            ) : linkedChildren.length === 0 ? (
+              <p className="text-sm text-(--sp-muted)">Одоогоор холбогдсон хүүхэд алга. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана.</p>
+            ) : (
+              <div className="space-y-3">
+                {linkedChildren.map((child) => {
+                  const point = child.position;
+                  const meters = location && point ? distanceMeters(location, point) : null;
+                  const age = point ? Math.max(0, (now - new Date(point.updatedAt).getTime()) / 1000) : null;
+                  const fresh = age !== null && age < 120;
+                  return (
+                    <div key={child.childId} className="rounded-xl border border-(--sp-line) p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">{child.name}</p>
+                          <p className="mt-1 text-xs text-(--sp-muted)">
+                            {child.paused ? "Байршил хуваалцахыг түр зогсоосон" : !point ? "Байршил хүлээгдэж байна" : fresh ? `Шинэчлэгдсэн: ${formatRelative(new Date(point.updatedAt).getTime(), now)}` : `Хамгийн сүүлд ${formatRelative(new Date(point.updatedAt).getTime(), now)}`}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] ${fresh ? "bg-[var(--sp-safe-bg)] text-[var(--sp-safe)]" : "bg-[var(--sp-caution-bg)] text-[var(--sp-caution)]"}`}>
+                          {child.paused ? "Түр зогссон" : fresh ? "Live" : "Хуучин мэдээлэл"}
+                        </span>
+                      </div>
+                      {point && !child.paused && (
+                        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-(--sp-line) pt-3">
+                          <div><p className="text-xs text-(--sp-muted)">Таны байршлаас</p><p className="mt-1 text-sm font-semibold">{meters === null ? "—" : formatDistance(meters)}</p></div>
+                          <div><p className="text-xs text-(--sp-muted)">Хүүхдийн хурд</p><p className="mt-1 text-sm font-semibold">{child.speedKmh == null ? "Хэмжиж байна…" : `${child.speedKmh} км/ц`}</p></div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           <div id="location" className="px-4">
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
               {displayLocation ? (
@@ -248,7 +292,7 @@ export default function GuardianPage() {
                     className="h-full rounded-none border-0"
                   />
 
-                  {typeof loc?.accuracy === "number" && (
+                  {typeof displayLocation.accuracy === "number" && (
                     <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
                       ±{Math.round(displayLocation.accuracy)} м
                     </span>
@@ -340,34 +384,56 @@ export default function GuardianPage() {
             </dl>
           </section>
 
-          <section id="events" className="px-5 pt-5">
-            <h2 className="text-[16px] font-semibold">Өнөөдрийн үйл явдал</h2>
-            <ol className="relative mt-3 ml-1 border-l border-(--sp-line)">
-              {timeline.map((event) => (
-                <li
-                  key={event.time + event.label}
-                  className="relative pb-4 pl-5 last:pb-0"
-                >
-                  <span
-                    className={`absolute -left-1.25 top-1.5 size-2.5 rounded-full ${
-                      event.done
-                        ? "bg-(--sp-secondary)"
-                        : "border border-(--sp-muted) bg-black"
-                    }`}
-                  />
-                  <div
-                    className={`flex items-baseline gap-3 ${
-                      event.done ? "" : "text-(--sp-muted)"
-                    }`}
-                  >
-                    <time className="w-11 shrink-0 text-xs tabular-nums text-(--sp-muted)">
-                      {event.time}
-                    </time>
-                    <p className="text-[14px] leading-5">{event.label}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+          <section id="events" className="px-5 pt-5" aria-labelledby="safety-alerts-heading">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="safety-alerts-heading" className="text-[16px] font-semibold">Аюулгүй байдлын мэдэгдэл</h2>
+              {unreadAlertCount > 0 && (
+                <span className="rounded-full bg-(--sp-risk-bg) px-2.5 py-1 text-xs font-semibold text-(--sp-risk)">
+                  {unreadAlertCount} шинэ
+                </span>
+              )}
+            </div>
+            {alertsLoadFailed ? (
+              <p className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
+                Мэдэгдлийг авч чадсангүй. Сүлжээ болон нэвтрэлтийн төлөвөө шалгана уу.
+              </p>
+            ) : alerts.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
+                Одоогоор аюулгүй бүсийн мэдэгдэл алга. Автомат мэдэгдэл ажиллахын тулд хүүхдэдээ аюулгүй бүс тохируулж, байршил хуваалцахыг асаана уу.
+                <Link href="/guardian/zones" className="mt-2 inline-block font-medium text-(--sp-primary)">Аюулгүй бүс тохируулах →</Link>
+              </div>
+            ) : (
+              <ol className="mt-3 space-y-2.5">
+                {alerts.map((alert) => {
+                  const alertTime = new Date(alert.createdAt).getTime();
+                  const isUrgent = alert.type !== "ZONE_ENTER";
+                  const label = alert.type === "SOS"
+                    ? "🆘 ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
+                    : alert.type === "ZONE_EXIT"
+                      ? "Аюулгүй бүсээс гарсан"
+                      : alert.type === "ZONE_ENTER"
+                        ? "Аюулгүй бүсэд орсон"
+                        : "Аюулгүй бүсийн гадна илэрсэн";
+                  return (
+                    <li key={alert.id} className={`rounded-xl border p-3 ${alert.type === "SOS" ? "border-rose-500/70 bg-rose-500/10" : alert.read ? "border-(--sp-line) bg-(--sp-surface)" : isUrgent ? "border-[rgba(229,124,102,0.45)] bg-[rgba(229,124,102,0.08)]" : "border-[rgba(114,184,176,0.35)] bg-[rgba(114,184,176,0.06)]"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className={`text-sm font-semibold ${isUrgent ? "text-(--sp-risk)" : "text-(--sp-safe)"}`}>{label}</p>
+                          <p className="mt-1 text-xs text-(--sp-muted)">{alert.childName} · {formatRelative(alertTime, now)}</p>
+                        </div>
+                        {!alert.read && (
+                          <button type="button" onClick={() => { void markSafetyAlertRead(alert.id); }} className="shrink-0 rounded-lg border border-(--sp-line) px-2.5 py-1.5 text-xs font-medium text-(--sp-ink) hover:bg-white/5">
+                            Уншсан
+                          </button>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-(--sp-ink)">{alert.message}</p>
+                      {alert.zoneName && <p className="mt-1 text-xs text-(--sp-muted)">Бүс: {alert.zoneName}</p>}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
           </section>
         </main>
 
@@ -580,3 +646,4 @@ function Info({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+

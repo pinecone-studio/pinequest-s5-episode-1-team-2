@@ -2,6 +2,7 @@ import { MongoClient, type Db } from "mongodb";
 import type { GuardianLink, PairingCode, RateLimit, UserRecord } from "@/types/auth";
 import type { LocationRecord, SafeZoneRecord } from "@/types/location";
 import type { GeofenceStateRecord, SafetyAlertRecord } from "@/types/alerts";
+import type { PushTokenRecord } from "@/types/push";
 
 // Kept on globalThis so dev hot reloads reuse one connection instead of opening a new one each time.
 const globalForMongo = globalThis as typeof globalThis & { mongoClient?: Promise<MongoClient> };
@@ -36,6 +37,7 @@ export async function getCollections() {
     safeZones: db.collection<SafeZoneRecord>("safeZones"),
     geofenceStates: db.collection<GeofenceStateRecord>("geofenceStates"),
     safetyAlerts: db.collection<SafetyAlertRecord>("safetyAlerts"),
+    pushTokens: db.collection<PushTokenRecord>("pushTokens"),
   };
 }
 
