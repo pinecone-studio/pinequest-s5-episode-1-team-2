@@ -1,8 +1,21 @@
 import { getCurrentUser } from "@/lib/auth/dal";
 import { allowAttempt } from "@/lib/auth/rate-limit";
-import { LocationReportSchema, saveChildLocation } from "@/lib/location-sharing";
+import { LocationReportSchema, listChildLocations, saveChildLocation } from "@/lib/location-sharing";
 
 export const runtime = "nodejs";
+
+/**
+ * A guardian may read only the children explicitly linked to their signed-in account.
+ * A child cannot use this endpoint to enumerate other users.
+ */
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return Response.json({ error: "Unauthorized." }, { status: 401 });
+  if (user.role !== "guardian") return Response.json({ error: "Only guardian accounts can read linked child locations." }, { status: 403 });
+
+  const children = await listChildLocations(user.id);
+  return Response.json({ children }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+}
 
 /** The child's phone reports where it is. The child is always the signed-in user, never an id from the body. */
 export async function POST(request: Request) {

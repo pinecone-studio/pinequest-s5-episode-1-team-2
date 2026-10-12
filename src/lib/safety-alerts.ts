@@ -2,6 +2,7 @@ import { getDistanceMeters } from "@/lib/geofence";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import type { GuardianSafetyAlert, SafetyAlertRecord, SafetyAlertType } from "@/types/alerts";
 import type { SafeZoneRecord } from "@/types/location";
+import { sendSafetyAlertPush } from "@/lib/push/firebase";
 
 const MAX_ALERTS = 50;
 
@@ -101,6 +102,15 @@ export async function updateChildGeofenceState(
       if (!isDuplicateKey(error)) throw error;
       // Another overlapping request already wrote this same transition.
     }
+
+    if (alertCreated) {
+      try {
+        await sendSafetyAlertPush(childId, { alertId: alert._id, type: alert.type, message: alert.message });
+      } catch {
+        // The in-app event remains saved even when FCM or network delivery is unavailable.
+        console.error("SAFEPATH_GEOFENCE_PUSH_DELIVERY_FAILED");
+      }
+    }
   }
 
   await geofenceStates.replaceOne(
@@ -159,4 +169,37 @@ export async function markGuardianSafetyAlertRead(
 
   await safetyAlerts.updateOne({ _id: alertId }, { $addToSet: { readBy: guardianId } });
   return "ok";
+}
+
+
+/** Creates an explicit SOS alert for every currently linked guardian.
+ * The alert deliberately stores no coordinates; guardians can use the existing
+ * authenticated live-location feed to see the most recent shared position.
+ */
+export async function createChildSosAlert(
+  childId: string,
+): Promise<"created" | "no-guardians"> {
+  const { guardianLinks, safetyAlerts } = await getCollections();
+  const linkedGuardians = await guardianLinks.countDocuments({ childId }, { limit: 1 });
+  if (!linkedGuardians) return "no-guardians";
+
+  const now = new Date();
+  const alert: SafetyAlertRecord = {
+    _id: crypto.randomUUID(),
+    childId,
+    type: "SOS",
+    transitionKey: `sos:${childId}:${crypto.randomUUID()}`,
+    message: "Хүүхэд яаралтай тусламж хүссэн. Боломжтой бол хүүхэдтэй шууд холбогдож, SafePath дээрх хамгийн сүүлийн байршлыг шалгана уу.",
+    createdAt: now,
+    readBy: [],
+  };
+
+  await safetyAlerts.insertOne(alert);
+  try {
+    await sendSafetyAlertPush(childId, { alertId: alert._id, type: alert.type, message: alert.message });
+  } catch {
+    // SOS is still stored in the in-app feed; push failure must not erase the event.
+    console.error("SAFEPATH_SOS_PUSH_DELIVERY_FAILED");
+  }
+  return "created";
 }

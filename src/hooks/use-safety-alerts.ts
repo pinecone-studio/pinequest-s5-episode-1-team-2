@@ -11,7 +11,7 @@ function isAlert(value: unknown): value is GuardianSafetyAlert {
   return typeof alert.id === "string"
     && typeof alert.childId === "string"
     && typeof alert.childName === "string"
-    && (alert.type === "OUTSIDE_SAFE_ZONES" || alert.type === "ZONE_EXIT" || alert.type === "ZONE_ENTER")
+    && (alert.type === "OUTSIDE_SAFE_ZONES" || alert.type === "ZONE_EXIT" || alert.type === "ZONE_ENTER" || alert.type === "SOS")
     && (typeof alert.zoneName === "string" || alert.zoneName === null)
     && typeof alert.message === "string"
     && typeof alert.createdAt === "string"

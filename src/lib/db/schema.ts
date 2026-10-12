@@ -145,6 +145,27 @@ export const SCHEMA: Record<string, CollectionSchema> = {
     },
     indexes: [{ key: { updatedAt: 1 }, name: "updatedAt" }],
   },
+  pushTokens: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["token", "userId", "role", "platform", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          token: { bsonType: "string", minLength: 20, maxLength: 4096 },
+          userId: { bsonType: "string" },
+          role: { bsonType: "string", enum: ["guardian", "child"] },
+          platform: { bsonType: "string", enum: ["android", "ios"] },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { token: 1 }, name: "push_token_unique", unique: true },
+      { key: { userId: 1, role: 1, updatedAt: -1 }, name: "user_role_updatedAt" },
+    ],
+  },
   safetyAlerts: {
     validator: {
       $jsonSchema: {
@@ -154,7 +175,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
         properties: {
           _id: { bsonType: "string" },
           childId: { bsonType: "string" },
-          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER"] },
+          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS"] },
           transitionKey: { bsonType: "string", minLength: 1, maxLength: 200 },
           zoneName: { bsonType: "string", maxLength: 40 },
           message: { bsonType: "string", minLength: 1, maxLength: 200 },
