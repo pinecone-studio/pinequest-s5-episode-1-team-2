@@ -1,8 +1,8 @@
-import {unlink} from "@/app/actions/auth";
-import {CodeEntry} from "@/components/auth/pairing";
-import {BackHeader, AppShell} from "@/components/safe-path";
-import {requireRole} from "@/lib/auth/dal";
-import {listLinkedPeople} from "@/lib/auth/pairing";
+import { unlink } from "@/app/actions/auth";
+import { CodeEntry } from "@/components/auth/pairing";
+import { BackHeader, AppShell } from "@/components/safe-path";
+import { requireRole } from "@/lib/auth/dal";
+import { listLinkedPeople } from "@/lib/auth/pairing";
 
 const TOKENS = {
   "--sp-primary": "#4F8FA8",
@@ -35,7 +35,7 @@ export default async function GuardianLinkPage() {
         />
 
         <main className="relative min-h-dvh pb-[calc(40px+env(safe-area-inset-bottom))]">
-          <div className="[&_header]:border-b [&_header]:border-(--sp-line) [&_a]:text-(--sp-ink) [&_button]:text-(--sp-ink) [&_a:hover]:bg-(--sp-primary-soft) [&_button:hover]:bg-(--sp-primary-soft) [&_a:hover]:text-(--sp-primary) [&_button:hover]:text-(--sp-primary) [&_a]:transition-all [&_button]:transition-all [&_a]:rounded-full [&_button]:rounded-full">
+          <div className="[&_header]:border-b [&_header]:border-(--sp-line) [&_a]:text-(--sp-ink) [&_a:hover]:bg-(--sp-primary-soft) [&_a:hover]:text-(--sp-primary) [&_a]:transition-all [&_a]:rounded-full">
             <BackHeader title="Хүмүүс" />
           </div>
 
