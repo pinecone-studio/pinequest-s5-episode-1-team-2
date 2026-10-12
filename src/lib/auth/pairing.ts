@@ -46,7 +46,7 @@ export async function linkToSelf(userId: string) {
   }
 }
 
-export type LinkedPerson = { linkId: string; name: string; phone: string | null };
+export type LinkedPerson = { linkId: string; name: string };
 
 /** The children a guardian watches (side "guardian") or the guardians watching a child (side "child"). */
 export async function listLinkedPeople(userId: string, side: "guardian" | "child"): Promise<LinkedPerson[]> {
@@ -54,22 +54,9 @@ export async function listLinkedPeople(userId: string, side: "guardian" | "child
   const mine = side === "guardian" ? "guardianId" : "childId";
   const theirs = side === "guardian" ? "childId" : "guardianId";
   const links = await guardianLinks.find({ [mine]: userId }).sort({ createdAt: 1 }).toArray();
-  const people = await users.find({ _id: { $in: links.map((link) => link[theirs]) } }, { projection: { name: 1, phone: 1, childName: 1, childPhone: 1 } }).toArray();
-  // The child side of a link is shown with the child's own name and phone once they set them.
-  const asChild = side === "guardian";
-  const details = new Map(
-    people.map((person) => [
-      person._id,
-      {
-        name: (asChild ? person.childName : undefined) ?? person.name,
-        phone: (asChild ? person.childPhone : undefined) ?? person.phone,
-      },
-    ]),
-  );
-  return links.map((link) => {
-    const person = details.get(link[theirs]);
-    return { linkId: link._id, name: person?.name ?? "—", phone: person?.phone ?? null };
-  });
+  const people = await users.find({ _id: { $in: links.map((link) => link[theirs]) } }, { projection: { name: 1 } }).toArray();
+  const names = new Map(people.map((person) => [person._id, person.name]));
+  return links.map((link) => ({ linkId: link._id, name: names.get(link[theirs]) ?? "—" }));
 }
 
 /** Either side may end a link. Returns whether something was removed. */

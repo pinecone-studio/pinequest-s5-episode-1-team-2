@@ -11,8 +11,9 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { toCompanionProfile } from "@/lib/assistant-settings";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { calculateSafetyState } from "@/lib/risk-engine";
+import { getSafeZoneProximities } from "@/lib/geofence";
 import { SAFE_ZONES } from "@/lib/safe-zones";
-import type { SafetyAssistantRequest, SafetyState } from "@/types/safety";
+import type { SafeZone, SafetyAssistantRequest, SafetyState } from "@/types/safety";
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
@@ -45,6 +46,52 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
+  const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
+  const [zonesLoaded, setZonesLoaded] = useState(false);
+  const [zonesLoadError, setZonesLoadError] = useState("");
+  const [sosConfirm, setSosConfirm] = useState(false);
+  const [sosStatus, setSosStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sosMessage, setSosMessage] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    async function loadSavedZones() {
+      try {
+        const response = await fetch("/api/tracker/safe-zones", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Safe zones could not be loaded.");
+        const payload: unknown = await response.json();
+        if (
+          !payload ||
+          typeof payload !== "object" ||
+          !("zones" in payload) ||
+          !isSafeZoneList(payload.zones)
+        ) {
+          throw new Error("Invalid safe-zone response.");
+        }
+        if (active) {
+          setSavedZones(payload.zones);
+          setZonesLoadError("");
+        }
+      } catch {
+        if (!controller.signal.aborted && active) {
+          setZonesLoadError("Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу.");
+        }
+      } finally {
+        if (active) setZonesLoaded(true);
+      }
+    }
+
+    void loadSavedZones();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   const [demoLocation, setDemoLocation] = useState({
     latitude: SAFE_ZONES[0].latitude,
@@ -55,9 +102,7 @@ export default function TrackerPage() {
 
 
 
-  const [assistantMessage, setAssistantMessage] = useState(
-    "Байршил тогтоож байна…",
-  );
+  const [assistantMessage, setAssistantMessage] = useState("");
 
   const [assistantLoading, setAssistantLoading] = useState(false);
 
@@ -70,7 +115,7 @@ export default function TrackerPage() {
     useState<RouteResult | null>(null);
 
   const [routeStatus, setRouteStatus] =
-    useState<"loading" | "ready" | "error">("loading");
+    useState<"idle" | "loading" | "ready" | "error">("idle");
 
 
   const routeController =
@@ -78,6 +123,9 @@ export default function TrackerPage() {
 
   const lastRouteAt =
     useRef(0);
+
+  const lastRouteTargetId =
+    useRef<string | null>(null);
 
   const lastAutomaticRequest =
     useRef<string | null>(null);
@@ -112,10 +160,33 @@ export default function TrackerPage() {
       : location;
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
-  const navigationInstruction = currentLocation
-    ? route?.nextInstruction
-    : undefined;
+  const activeZones = demoMode ? SAFE_ZONES : savedZones;
+  const targetZone = useMemo(() => {
+    if (!currentLocation || activeZones.length === 0) return null;
+    return getSafeZoneProximities(currentLocation, activeZones)[0]?.zone ?? null;
+  }, [activeZones, currentLocation]);
 
+  const sendSos = useCallback(async () => {
+    if (demoMode || sosStatus === "sending") return;
+    setSosStatus("sending");
+    setSosMessage("SOS дохио илгээж байна…");
+    try {
+      const response = await fetch("/api/sos", { method: "POST", cache: "no-store" });
+      const payload: unknown = await response.json().catch(() => null);
+      const message = payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
+        ? payload.message
+        : payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+          ? payload.error
+          : "SOS хүсэлтийн хариуг уншиж чадсангүй.";
+      if (!response.ok) throw new Error(message);
+      setSosStatus("sent");
+      setSosMessage(message);
+      setSosConfirm(false);
+    } catch (error) {
+      setSosStatus("error");
+      setSosMessage(error instanceof Error ? error.message : "SOS дохио илгээж чадсангүй.");
+    }
+  }, [demoMode, sosStatus]);
 
   const moveDemoLocation = useCallback(
     (
@@ -163,14 +234,20 @@ export default function TrackerPage() {
 
   const safetyState = useMemo(
     () =>
-      currentLocation
+      currentLocation && activeZones.length > 0
         ? calculateSafetyState({
             location: currentLocation,
+            safeZones: activeZones,
             routeDeviation,
           })
         : null,
-    [currentLocation, routeDeviation],
+    [activeZones, currentLocation, routeDeviation],
   );
+
+  const navigationInstruction =
+    safetyState && !safetyState.isInsideSafeZone && targetZone
+      ? route?.nextInstruction
+      : undefined;
 
 
   useEffect(() => {
@@ -178,16 +255,36 @@ export default function TrackerPage() {
       return;
     }
 
+    if (!targetZone) {
+      routeController.current?.abort();
+      lastRouteAt.current = 0;
+      lastRouteTargetId.current = null;
+      setRoute(null);
+      setRouteStatus("idle");
+      return;
+    }
+
+    if (safetyState?.isInsideSafeZone) {
+      routeController.current?.abort();
+      lastRouteAt.current = 0;
+      setRoute(null);
+      setRouteStatus("idle");
+      return;
+    }
+
     const now = Date.now();
+    const targetChanged = lastRouteTargetId.current !== targetZone.id;
 
     if (
       !demoMode &&
+      !targetChanged &&
       lastRouteAt.current !== 0 &&
       now - lastRouteAt.current < 10_000
     ) {
       return;
     }
 
+    lastRouteTargetId.current = targetZone.id;
     lastRouteAt.current = now;
     routeController.current?.abort();
 
@@ -201,8 +298,8 @@ export default function TrackerPage() {
     };
 
     const destination = {
-      lat: SAFE_ZONES[0].latitude,
-      lon: SAFE_ZONES[0].longitude,
+      lat: targetZone.latitude,
+      lon: targetZone.longitude,
     };
 
     const isValidRoute = (value: unknown): value is RouteResult => {
@@ -339,7 +436,7 @@ export default function TrackerPage() {
         setRoute(null);
         setRouteStatus("error");
       });
-  }, [currentLatitude, currentLongitude, demoMode]);
+  }, [currentLatitude, currentLongitude, demoMode, safetyState?.isInsideSafeZone, targetZone?.id, targetZone?.latitude, targetZone?.longitude]);
 
   useEffect(() => {
     return () => {
@@ -580,7 +677,7 @@ export default function TrackerPage() {
             state.distanceToNearestZoneMeters,
 
           destination:
-            SAFE_ZONES[0].name,
+            targetZone?.name ?? state.nearestSafeZone.name,
 
           nearbyLandmarks: [],
 
@@ -674,42 +771,60 @@ export default function TrackerPage() {
         navigationInstruction,
         profile,
         speakMessage,
+        targetZone,
       ],
     );
 
   const automaticRequestKey =
-    safetyState
+    safetyState &&
+    !safetyState.isInsideSafeZone &&
+    targetZone &&
+    routeStatus === "ready"
       ? [
           safetyState.riskLevel,
           safetyState.routeDeviation,
+          targetZone.id,
           navigationInstruction ?? "",
-          demoMode
-            ? `${demoLocation.latitude}:${demoLocation.longitude}`
-            : "",
         ].join(":")
       : null;
 
   useEffect(() => {
-    if (
-      !safetyState ||
-      !automaticRequestKey ||
-      lastAutomaticRequest.current ===
-        automaticRequestKey
-    ) {
+    if (!safetyState || !targetZone) return;
+
+    if (safetyState.isInsideSafeZone) {
+      const safeKey = `inside:${targetZone.id}`;
+      if (lastAutomaticRequest.current === safeKey) return;
+      lastAutomaticRequest.current = safeKey;
+      requestSequence.current += 1;
+      requestController.current?.abort();
+      speechSequence.current += 1;
+      speechController.current?.abort();
+      audioElement.current?.pause();
+      if (audioElement.current) audioElement.current.currentTime = 0;
+      setAssistantLoading(false);
+      setSpeechStatus("idle");
+      setSpeechError("");
+      setAssistantMessage(`Та ${targetZone.name} аюулгүй бүсэд байна. Тайван байгаарай.`);
       return;
     }
 
-    lastAutomaticRequest.current =
-      automaticRequestKey;
+    if (!safetyState.isInsideSafeZone && routeStatus === "error") {
+      const routeErrorKey = `route-error:${targetZone.id}:${safetyState.riskLevel}`;
+      if (lastAutomaticRequest.current !== routeErrorKey) {
+        lastAutomaticRequest.current = routeErrorKey;
+        void requestAssistantMessage(safetyState);
+      }
+      return;
+    }
 
-    void requestAssistantMessage(
-      safetyState,
-    );
-  }, [
-    automaticRequestKey,
-    requestAssistantMessage,
-    safetyState,
-  ]);
+    if (
+      !automaticRequestKey ||
+      lastAutomaticRequest.current === automaticRequestKey
+    ) return;
+
+    lastAutomaticRequest.current = automaticRequestKey;
+    void requestAssistantMessage(safetyState);
+  }, [automaticRequestKey, requestAssistantMessage, routeStatus, safetyState, targetZone]);
 
 
   useEffect(() => {
@@ -862,7 +977,7 @@ export default function TrackerPage() {
                   currentLocation
                 }
                 destination={
-                  SAFE_ZONES[0]
+                  targetZone ?? undefined
                 }
                 currentRoute={
                   route?.route ?? []
@@ -897,19 +1012,34 @@ export default function TrackerPage() {
               className="companion-avatar--compact relative z-10"
             />
           </div>
-          {routeStatus === "loading" && (
+          {!demoMode && !zonesLoaded && (
             <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
-              Буцах замыг тооцоолж байна…
+              Аюулгүй бүсүүдийг ачаалж байна…
             </p>
           )}
-          {routeStatus === "error" && (
+          {!demoMode && zonesLoadError && (
+            <p role="alert" className="mt-3 text-sm text-[#fda4af]">
+              {zonesLoadError}
+            </p>
+          )}
+          {!demoMode && zonesLoaded && !zonesLoadError && savedZones.length === 0 && (
+            <p role="status" className="mt-3 max-w-[320px] text-sm leading-6 text-[#fbbf24]">
+              Танд аюулгүй бүс тохируулаагүй байна. Асран хамгаалагчаасаа бүс нэмүүлээрэй.
+            </p>
+          )}
+          {routeStatus === "loading" && targetZone && (
+            <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
+              {targetZone.name} руу буцах замыг тооцоолж байна…
+            </p>
+          )}
+          {routeStatus === "error" && targetZone && (
             <p role="status" className="mt-3 text-sm text-[#fda4af]">
-              Буцах замыг тооцоолж чадсангүй.
+              Буцах замыг тооцоолж чадсангүй. Байршлаа шалгаад дахин оролдоно уу.
             </p>
           )}
           <p className="text-[16px] font-semibold text-[#67e8f9]">{settings.name || "Мило"}</p>
           <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#f1f7f8]">
-            {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : "Байршил тогтоож байна…")}
+            {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : zonesLoadError || (zonesLoaded && !demoMode && savedZones.length === 0 ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй." : "Байршил болон аюулгүй бүс ачаалж байна…"))}
           </p>
           {assistantLoading && <span className="mt-3 text-sm text-[#b7c7cc]">Мило бодож байна…</span>}
           {speechStatus === "loading" && <span className="mt-2 text-sm text-[#b7c7cc]">Дуу бэлдэж байна…</span>}
@@ -921,13 +1051,41 @@ export default function TrackerPage() {
               <span className="text-3xl text-[#67e8f9]" aria-hidden="true">➜</span>
               <div className="min-w-0">
                 <p className="font-semibold">{navigationInstruction}</p>
-                {route?.distanceMeters != null && <p className="mt-1 text-sm text-[#b7c7cc]">Гэр хүртэл ойролцоогоор {formatDistance(route.distanceMeters)}</p>}
+                {route?.distanceMeters != null && <p className="mt-1 text-sm text-[#b7c7cc]">{targetZone?.name ?? "Аюулгүй бүс"} хүртэл ойролцоогоор {formatDistance(route.distanceMeters)}</p>}
               </div>
             </div>
           )}
         </section>
 
         <LocationSharingStatus />
+
+        <section className="mt-3 rounded-2xl border border-rose-500/35 bg-rose-500/5 p-4" aria-label="Яаралтай тусламж">
+          <p className="text-sm leading-6 text-[#f4c7c7]">Аюултай санагдвал холбогдсон асран хамгаалагчдаа SOS дохио илгээнэ.</p>
+          <button
+            type="button"
+            disabled={demoMode || sosStatus === "sending"}
+            onClick={() => {
+              setSosConfirm(true);
+              setSosStatus("idle");
+              setSosMessage("");
+            }}
+            className="mt-3 min-h-14 w-full rounded-2xl border border-rose-400/60 bg-rose-600 px-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.18)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+          >
+            🆘 Яаралтай тусламж — SOS
+          </button>
+          {demoMode && <p className="mt-2 text-xs leading-5 text-[#b7c7cc]">Demo Mode үед бодит SOS илгээхгүй.</p>}
+          {sosConfirm && !demoMode && (
+            <div className="mt-3 rounded-xl border border-rose-400/35 bg-[#140d12] p-3">
+              <p className="text-sm font-semibold text-white">Асран хамгаалагчдаа SOS дохио илгээх үү?</p>
+              <p className="mt-1 text-xs leading-5 text-[#d9b4b9]">Тэд SafePath-ийн мэдэгдэл дээр яаралтай тусламж хүссэнийг харна. Хэрэв шууд аюул тулгарвал яаралтай тусламж руу залгаарай.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setSosConfirm(false)} className="min-h-11 rounded-xl border border-white/15 px-3 text-sm font-medium text-white">Болих</button>
+                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="min-h-11 rounded-xl bg-rose-600 px-3 text-sm font-bold text-white disabled:opacity-50">{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}</button>
+              </div>
+            </div>
+          )}
+          {sosMessage && <p role={sosStatus === "error" ? "alert" : "status"} className={`mt-3 rounded-xl px-3 py-2 text-sm leading-5 ${sosStatus === "error" ? "bg-rose-500/10 text-rose-200" : sosStatus === "sent" ? "bg-emerald-500/10 text-emerald-200" : "text-[#d4e1e5]"}`}>{sosMessage}</p>}
+        </section>
 
         <div className="pt-2">
           <button
@@ -988,6 +1146,21 @@ export default function TrackerPage() {
   );
 }
 
+
+function isSafeZoneList(value: unknown): value is SafeZone[] {
+  return Array.isArray(value) && value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const zone = item as Record<string, unknown>;
+    return (
+      typeof zone.id === "string" &&
+      typeof zone.name === "string" &&
+      typeof zone.latitude === "number" && Number.isFinite(zone.latitude) &&
+      typeof zone.longitude === "number" && Number.isFinite(zone.longitude) &&
+      typeof zone.radiusMeters === "number" && Number.isFinite(zone.radiusMeters) &&
+      zone.radiusMeters >= 50 && zone.radiusMeters <= 2000
+    );
+  });
+}
 
 function formatDistance(
   meters: number,

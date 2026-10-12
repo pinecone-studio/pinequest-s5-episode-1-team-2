@@ -36,8 +36,10 @@ const newPassword = z
 
 export const SignupFormSchema = z
   .object({
+    name,
     email,
     password: newPassword,
+    role,
     confirmPassword: z.string({ error: "Нууц үгээ дахин оруулна уу." }),
   })
   .refine((value) => value.password === value.confirmPassword, {
@@ -64,16 +66,4 @@ export const PairingCodeFormSchema = z.object({
     .regex(new RegExp(`^[${PAIRING_CODE_ALPHABET}]{${PAIRING_CODE_LENGTH}}$`), {
       error: "Кодоо зөв оруулна уу.",
     }),
-});
-
-/** Digits with an optional leading +; spaces and dashes are allowed when typing and dropped before saving. */
-const phone = z
-  .string({ error: "Утасны дугаараа оруулна уу." })
-  .trim()
-  .transform((value) => value.replace(/[\s-]/g, ""))
-  .pipe(z.string().regex(/^\+?\d{8,15}$/, { error: "Утасны дугаараа зөв оруулна уу." }));
-
-export const ProfileFormSchema = z.object({
-  name,
-  phone,
 });

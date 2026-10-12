@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ChevronLeft, LogOut, MapPin } from "lucide-react";
 import { logout } from "@/app/actions/auth";
 import { AppShell } from "@/components/safe-path";
@@ -13,6 +14,11 @@ const avatars: AssistantSettings["avatar"][] = ["Мило", "Ари", "Номи"
 export default function SettingsPage() {
   const router = useRouter();
   const { settings, update } = useAssistantSettings();
+  const [pushToken, setPushToken] = useState("");
+
+  useEffect(() => {
+    setPushToken(window.localStorage.getItem("safepath:push-token") ?? "");
+  }, []);
 
   return (
     <AppShell>
@@ -138,7 +144,8 @@ export default function SettingsPage() {
 </div>       
 </form>
 
-        <form action={logout} className="relative z-10 mx-auto w-full max-w-[390px]">
+        <form action={logout} onSubmit={() => window.localStorage.removeItem("safepath:push-token")} className="relative z-10 mx-auto w-full max-w-[390px]">
+          <input type="hidden" name="pushToken" value={pushToken} readOnly />
           <button type="submit" className="flex min-h-14 w-full items-center gap-3 border-t border-white/15 text-left text-[15px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
             <LogOut className="size-5 text-[#c2d0d5]" strokeWidth={1.8} aria-hidden="true" />
             <span className="flex-1">Гарах</span>

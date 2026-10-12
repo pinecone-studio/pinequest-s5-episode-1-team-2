@@ -15,9 +15,6 @@ export type UserRecord = {
   passwordHash: string;
   /** The name Milo uses (today: AssistantSettings.userName). */
   name: string;
-  /** Name and phone shown for this account on its child phone, set in settings. Missing means use `name` / `phone`. */
-  childName?: string;
-  childPhone?: string;
   /** For the call buttons, which hard-code tel:+97600000000 today. Include the country code. */
   phone: string | null;
   /** null until the user picks one after their first login. */

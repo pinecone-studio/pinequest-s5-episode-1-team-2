@@ -133,7 +133,18 @@ export async function login(
   redirect("/role");
 }
 
-export async function logout() {
+export async function logout(formData: FormData) {
+  const userId = await getSessionUserId();
+  const token = formData.get("pushToken");
+  if (userId && typeof token === "string" && token.length >= 20 && token.length <= 4096) {
+    try {
+      const { pushTokens } = await getCollections();
+      await pushTokens.deleteOne({ userId, token });
+    } catch {
+      // A logout must still complete when the database is briefly unavailable.
+      console.error("SAFEPATH_LOGOUT_PUSH_TOKEN_CLEANUP_FAILED");
+    }
+  }
   await deleteSession();
   redirect("/login");
 }
