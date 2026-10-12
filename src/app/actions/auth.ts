@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import * as z from "zod";
-import { getSessionUserId, requireRole } from "@/lib/auth/dal";
+import { getSessionUserId, requireRole, requireUser } from "@/lib/auth/dal";
 import {
   createPairingCode,
   redeemPairingCode,
@@ -14,7 +14,9 @@ import { allowAttempt } from "@/lib/auth/rate-limit";
 import { homeFor } from "@/lib/auth/routes";
 import {
   LoginFormSchema,
+  NAME_MAX_LENGTH,
   PairingCodeFormSchema,
+  ProfileFormSchema,
   SetRoleFormSchema,
   SignupFormSchema,
 } from "@/lib/auth/schemas";
@@ -32,15 +34,12 @@ export async function signup(
   formData: FormData,
 ): Promise<FormState> {
   const values = {
-    name: text(formData, "name"),
     email: text(formData, "email"),
   };
 
   const parsed = SignupFormSchema.safeParse({
-    name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
-    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
@@ -51,7 +50,9 @@ export async function signup(
     };
   }
 
-  const { name, email, password, role } = parsed.data;
+  const { email, password } = parsed.data;
+  // A placeholder until the person sets their real name in settings.
+  const name = email.split("@")[0].slice(0, NAME_MAX_LENGTH) || "Хэрэглэгч";
   const { users } = await getCollections();
   const id = crypto.randomUUID();
 
@@ -78,8 +79,9 @@ export async function signup(
     throw error;
   }
 
-  await createSession(id, role);
-  redirect(homeFor(role), "replace");
+  await createSession(id);
+  // The role is chosen next, on /role.
+  redirect("/role");
 }
 
 export async function login(
@@ -131,7 +133,18 @@ export async function login(
   redirect(homeFor(role), "replace");
 }
 
-export async function logout() {
+export async function logout(formData: FormData) {
+  const userId = await getSessionUserId();
+  const token = formData.get("pushToken");
+  if (userId && typeof token === "string" && token.length >= 20 && token.length <= 4096) {
+    try {
+      const { pushTokens } = await getCollections();
+      await pushTokens.deleteOne({ userId, token });
+    } catch {
+      // A logout must still complete when the database is briefly unavailable.
+      console.error("SAFEPATH_LOGOUT_PUSH_TOKEN_CLEANUP_FAILED");
+    }
+  }
   await deleteSession();
   redirect("/login");
 }
@@ -167,6 +180,51 @@ export async function setRole(formData: FormData) {
   await createSession(userId, role);
 
   redirect(homeFor(role), "replace");
+}
+
+/**
+ * Saves the name and phone for the role this device acts as: the guardian's own, or the child's.
+ * They are kept apart because one account is both, and each side shows the other's details.
+ */
+export async function updateProfile(
+  _state: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const user = await requireUser();
+
+  if (!user.role) {
+    redirect("/role");
+  }
+
+  const parsed = ProfileFormSchema.safeParse({
+    name: formData.get("name"),
+    phone: formData.get("phone"),
+  });
+
+  if (!parsed.success) {
+    return {
+      errors: z.flattenError(parsed.error).fieldErrors,
+      values: { name: text(formData, "name"), phone: text(formData, "phone") },
+    };
+  }
+
+  const { name, phone } = parsed.data;
+  const { users } = await getCollections();
+  await users.updateOne(
+    { _id: user.id },
+    {
+      $set:
+        user.role === "child"
+          ? { childName: name, childPhone: phone }
+          : { name, phone },
+    },
+  );
+
+  revalidatePath("/guardian/link");
+  revalidatePath("/tracker/code");
+  revalidatePath("/guardian");
+
+  return { success: "Хадгаллаа.", values: { name, phone } };
 }
 
 /** Child: show a code for a guardian to type in. */

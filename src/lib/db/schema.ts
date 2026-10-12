@@ -25,6 +25,8 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           email: { bsonType: "string", pattern: "^[^\\p{Lu}]+$" },
           passwordHash: { bsonType: "string" },
           name: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
+          childName: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
+          childPhone: { bsonType: "string" },
           phone: { bsonType: ["string", "null"] },
           role: { bsonType: ["string", "null"], enum: [...ROLES, null] },
           locationPaused: { bsonType: "bool" },
@@ -126,6 +128,69 @@ export const SCHEMA: Record<string, CollectionSchema> = {
       // MongoDB removes expired codes in the background, about once a minute,
       // so redeeming must still check expiresAt.
       { key: { expiresAt: 1 }, name: "expiresAt_ttl", expireAfterSeconds: 0 },
+    ],
+  },
+  geofenceStates: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "isInside", "insideZoneId", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          isInside: { bsonType: "bool" },
+          insideZoneId: { bsonType: ["string", "null"] },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [{ key: { updatedAt: 1 }, name: "updatedAt" }],
+  },
+  pushTokens: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["token", "userId", "role", "platform", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          token: { bsonType: "string", minLength: 20, maxLength: 4096 },
+          userId: { bsonType: "string" },
+          role: { bsonType: "string", enum: ["guardian", "child"] },
+          platform: { bsonType: "string", enum: ["android", "ios"] },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { token: 1 }, name: "push_token_unique", unique: true },
+      { key: { userId: 1, role: 1, updatedAt: -1 }, name: "user_role_updatedAt" },
+    ],
+  },
+  safetyAlerts: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "type", "transitionKey", "message", "createdAt", "readBy"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS"] },
+          transitionKey: { bsonType: "string", minLength: 1, maxLength: 200 },
+          zoneName: { bsonType: "string", maxLength: 40 },
+          message: { bsonType: "string", minLength: 1, maxLength: 200 },
+          createdAt: { bsonType: "date" },
+          readBy: { bsonType: "array", items: { bsonType: "string" } },
+        },
+      },
+    },
+    indexes: [
+      { key: { transitionKey: 1 }, name: "transitionKey_unique", unique: true },
+      { key: { childId: 1, createdAt: -1 }, name: "childId_createdAt_desc" },
+      // Safety events are retained for 90 days, then automatically removed.
+      { key: { createdAt: 1 }, name: "createdAt_ttl_90_days", expireAfterSeconds: 90 * 24 * 60 * 60 },
     ],
   },
 };
