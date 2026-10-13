@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
@@ -113,6 +114,7 @@ function useNow(intervalMs = 10_000) {
 }
 export default function GuardianPage() {
   const { location, status: locationStatus, error } = useGeolocation();
+  const isOnline = useNetworkStatus();
   const { settings } = useAssistantSettings();
   const { children: linkedChildren, failed: childrenLoadFailed } = useChildLocations();
   const { alerts, failed: alertsLoadFailed, markRead: markSafetyAlertRead } = useSafetyAlerts();
@@ -200,6 +202,11 @@ export default function GuardianPage() {
           className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
         />
         <main className="relative min-h-dvh pb-[calc(150px+env(safe-area-inset-bottom))]">
+          {!isOnline && (
+            <div role="status" aria-live="polite" className="mx-4 mt-3 rounded-xl border border-amber-300/35 bg-amber-950/70 px-3 py-2 text-sm leading-5 text-amber-100">
+              Интернет тасарсан байна. Хүүхдийн сүүлийн мэдээлэл харагдаж болох ч шинэ байршил, Safe Zone дохио серверээс шинэчлэгдэхгүй байж болно.
+            </div>
+          )}
           <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0">
               <Link

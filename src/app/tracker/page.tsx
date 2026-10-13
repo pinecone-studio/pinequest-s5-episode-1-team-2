@@ -9,6 +9,7 @@ import ArNavigationCamera from "@/components/ar-navigation-camera";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
+import { useNetworkStatus } from "@/hooks/use-network-status";
 import { toCompanionProfile } from "@/lib/assistant-settings";
 import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { calculateSafetyState } from "@/lib/risk-engine";
@@ -44,6 +45,7 @@ export default function TrackerPage() {
     status: locationStatus,
     error: locationError,
   } = useGeolocation();
+  const isOnline = useNetworkStatus();
 
   const { settings } = useAssistantSettings();
 
@@ -940,6 +942,11 @@ export default function TrackerPage() {
       <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
+        {!isOnline && (
+          <div role="status" aria-live="polite" className="relative z-20 mb-3 rounded-xl border border-amber-300/35 bg-amber-950/70 px-3 py-2 text-sm leading-5 text-amber-100">
+            Интернет тасарсан байна. GPS-ийн хамгийн сүүлийн байршил төхөөрөмж дээр харагдаж болох ч маршрут, серверийн AI, мэдэгдэл шинэчлэгдэхгүй байж болно.
+          </div>
+        )}
         <div className="relative z-10 flex justify-center pb-3">
           <button
             type="button"
@@ -1090,6 +1097,8 @@ export default function TrackerPage() {
                 distanceMeters={route?.distanceMeters ?? null}
                 autoStart={autoOpenCamera}
                 onAutoStartAttempted={() => setAutoOpenCamera(false)}
+                voice={profile.voice}
+                speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
               />
             ) : currentLocation ? (
               <>

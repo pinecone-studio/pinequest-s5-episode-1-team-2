@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Camera, CameraOff, Compass, MapPin, ScanEye, LoaderCircle, Sparkles } from "lucide-react";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { Camera, CameraOff, Compass, MapPin, ScanEye, LoaderCircle, Sparkles, Volume2, VolumeX } from "lucide-react";
 
 type Coordinate = {
   latitude: number;
@@ -26,6 +27,8 @@ type ArNavigationCameraProps = {
   distanceMeters: number | null;
   autoStart?: boolean;
   onAutoStartAttempted?: () => void;
+  voice?: "female" | "male";
+  speechSpeed?: "normal" | "slow";
 };
 
 type DeviceOrientationWithCompass = DeviceOrientationEvent & {
@@ -41,7 +44,7 @@ const EARTH_RADIUS_METERS = 6_371_000;
 const CameraMiniMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
   loading: () => (
-    <div className="grid h-full w-full place-items-center bg-[#f4f5f3] text-xs text-[#4b5563]">
+    <div className="grid h-full w-full place-items-center bg-[#f4f5f3] px-4 text-center text-[16px] leading-6 text-[#374151]">
       Газрын зураг ачаалж байна…
     </div>
   ),
@@ -141,8 +144,12 @@ export default function ArNavigationCamera({
   distanceMeters: remainingDistance,
   autoStart = false,
   onAutoStartAttempted,
+  voice = "female",
+  speechSpeed = "normal",
 }: ArNavigationCameraProps) {
+  const isOnline = useNetworkStatus();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sceneAbortRef = useRef<AbortController | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const cameraRequestInFlightRef = useRef(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -155,6 +162,14 @@ export default function ArNavigationCamera({
   const [sceneDescription, setSceneDescription] = useState("");
   const [sceneRouteContext, setSceneRouteContext] = useState<SceneRouteContext | null>(null);
   const [sceneError, setSceneError] = useState("");
+  const [voiceGuidanceEnabled, setVoiceGuidanceEnabled] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [speechError, setSpeechError] = useState("");
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
+  const speechSequenceRef = useRef(0);
+  const speechObjectUrlRef = useRef<string | null>(null);
+  const lastAnnouncedInstructionRef = useRef("");
 
   useEffect(() => {
     const video = videoRef.current;
@@ -222,7 +237,183 @@ export default function ArNavigationCamera({
     ? 0
     : Math.max(-34, Math.min(34, relativeBearing * 0.58));
 
+  const stopSpeech = useCallback(() => {
+    speechSequenceRef.current += 1;
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
+    const audio = speechAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    if (speechObjectUrlRef.current) {
+      URL.revokeObjectURL(speechObjectUrlRef.current);
+      speechObjectUrlRef.current = null;
+    }
+    setSpeechStatus("idle");
+  }, []);
+
+  const playSpeech = useCallback(async (text: string) => {
+    const normalizedText = text.replace(/\s+/g, " ").trim().slice(0, 260);
+    if (!normalizedText) return;
+    if (!isOnline) {
+      setSpeechStatus("error");
+      setSpeechError("Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү.");
+      return;
+    }
+
+    speechAbortRef.current?.abort();
+    const controller = new AbortController();
+    speechAbortRef.current = controller;
+    const sequence = ++speechSequenceRef.current;
+    const audio = speechAudioRef.current;
+    if (!audio) {
+      setSpeechError("Дуу тоглуулах боломжгүй байна. Дэлгэцээ дахин нээнэ үү.");
+      setSpeechStatus("error");
+      return;
+    }
+
+    audio.pause();
+    if (speechObjectUrlRef.current) {
+      URL.revokeObjectURL(speechObjectUrlRef.current);
+      speechObjectUrlRef.current = null;
+    }
+    audio.removeAttribute("src");
+    audio.load();
+    setSpeechError("");
+    setSpeechStatus("loading");
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: normalizedText, voice }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        let message = "Дууны үйлчилгээ ажиллахгүй байна.";
+        try {
+          const payload: unknown = await response.json();
+          if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+            const serverMessage = payload.error;
+            message = serverMessage === "Speech is not configured."
+              ? "Монгол хэлний дууны үйлчилгээ тохируулаагүй байна."
+              : serverMessage === "Too many requests."
+                ? "Дууны хүсэлт олон байна. Түр хүлээгээд дахин оролдоно уу."
+                : serverMessage === "Unauthorized."
+                  ? "Дуугаар заавар авахын тулд дахин нэвтэрнэ үү."
+                  : "Дууны үйлчилгээ түр ажиллахгүй байна.";
+          }
+        } catch {
+          // Keep the safe generic message if the API does not return JSON.
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      if (!blob.size || !blob.type.startsWith("audio/")) {
+        throw new Error("Дууны өгөгдөл буруу байна.");
+      }
+      if (sequence !== speechSequenceRef.current || controller.signal.aborted) return;
+      const objectUrl = URL.createObjectURL(blob);
+      speechObjectUrlRef.current = objectUrl;
+      audio.src = objectUrl;
+      audio.currentTime = 0;
+      audio.playbackRate = speechSpeed === "slow" ? 0.86 : 1;
+      await audio.play();
+      if (sequence === speechSequenceRef.current) setSpeechStatus("playing");
+    } catch (error) {
+      if (controller.signal.aborted || sequence !== speechSequenceRef.current) return;
+      setSpeechStatus("error");
+      setSpeechError(error instanceof Error ? error.message : "Дууг тоглуулж чадсангүй. Интернетээ шалгана уу.");
+    } finally {
+      if (sequence === speechSequenceRef.current) speechAbortRef.current = null;
+    }
+  }, [isOnline, speechSpeed, voice]);
+
+  useEffect(() => {
+    const text = instruction.replace(/\s+/g, " ").trim();
+    if (!voiceGuidanceEnabled || !text || text === lastAnnouncedInstructionRef.current) return;
+    lastAnnouncedInstructionRef.current = text;
+    void playSpeech(text);
+  }, [instruction, playSpeech, voiceGuidanceEnabled]);
+
+  useEffect(() => () => {
+    speechAbortRef.current?.abort();
+    const audio = speechAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+    }
+    if (speechObjectUrlRef.current) URL.revokeObjectURL(speechObjectUrlRef.current);
+  }, []);
+
+  // Camera and remote AI/audio requests are not reliable or appropriate while the app is
+  // backgrounded. Stop the camera on hide and require the person to explicitly turn it on again.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+
+      const activeStream = activeStreamRef.current;
+      if (activeStream) {
+        activeStream.getTracks().forEach((track) => track.stop());
+        activeStreamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setStream(null);
+        setCameraLoading(false);
+        setCameraError("Апп background болсон тул камер аюулгүй байдлаар зогслоо. Буцаж ирээд «Камер асаах» товчийг дахин дарна уу.");
+      }
+
+      sceneAbortRef.current?.abort();
+      sceneAbortRef.current = null;
+      setIsAnalyzingScene(false);
+      setVoiceGuidanceEnabled(false);
+      lastAnnouncedInstructionRef.current = "";
+      stopSpeech();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [stopSpeech]);
+
+  // GPS and the camera feed remain device-local, but scene recognition and server TTS need a network.
+  useEffect(() => {
+    if (isOnline) {
+      setSceneError((current) => current === "Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу." ? "" : current);
+      setSpeechError((current) => current === "Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү." ? "" : current);
+      setSpeechStatus((current) => current === "error" && !speechAbortRef.current ? "idle" : current);
+      return;
+    }
+
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = null;
+    setIsAnalyzingScene(false);
+    setSceneError("Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу.");
+    setVoiceGuidanceEnabled(false);
+    stopSpeech();
+    setSpeechStatus("error");
+    setSpeechError("Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү.");
+  }, [isOnline, stopSpeech]);
+
+  const toggleVoiceGuidance = useCallback(() => {
+    if (voiceGuidanceEnabled) {
+      setVoiceGuidanceEnabled(false);
+      lastAnnouncedInstructionRef.current = "";
+      stopSpeech();
+      setSpeechError("");
+      return;
+    }
+
+    setVoiceGuidanceEnabled(true);
+    const currentInstruction = instruction.replace(/\s+/g, " ").trim();
+    lastAnnouncedInstructionRef.current = currentInstruction;
+    void playSpeech(currentInstruction || "Дуугаар чиглүүлэлт идэвхжлээ. GPS маршрутаа шалгаж байна.");
+  }, [instruction, playSpeech, stopSpeech, voiceGuidanceEnabled]);
+
   const stopCamera = useCallback(() => {
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = null;
+    setIsAnalyzingScene(false);
     const activeStream = activeStreamRef.current;
     if (activeStream) {
       activeStream.getTracks().forEach((track) => track.stop());
@@ -239,7 +430,10 @@ export default function ArNavigationCamera({
     setSceneDescription("");
     setSceneRouteContext(null);
     setIsAnalyzingScene(false);
-  }, []);
+    setVoiceGuidanceEnabled(false);
+    lastAnnouncedInstructionRef.current = "";
+    stopSpeech();
+  }, [stopSpeech]);
 
   const startCamera = useCallback(async () => {
     if (cameraRequestInFlightRef.current || activeStreamRef.current) return;
@@ -324,6 +518,10 @@ export default function ArNavigationCamera({
   }, []);
 
   const analyzeScene = useCallback(async () => {
+    if (!isOnline) {
+      setSceneError("Интернет холболтгүй байна. Сүлжээнд холбогдсоны дараа дахин оролдоно уу.");
+      return;
+    }
     const video = videoRef.current;
     if (!stream || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1) {
       setSceneError("Эхлээд камераа асаагаад дүрс гарч ирэхийг хүлээнэ үү.");
@@ -335,6 +533,9 @@ export default function ArNavigationCamera({
     setSceneError("");
     setSceneDescription("");
     setSceneRouteContext(null);
+    const controller = new AbortController();
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = controller;
 
     try {
       // Downscale the still frame before upload to reduce mobile data and request size.
@@ -379,6 +580,7 @@ export default function ArNavigationCamera({
             routeReady: route.length >= 2,
           },
         }),
+        signal: controller.signal,
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -417,11 +619,14 @@ export default function ArNavigationCamera({
         });
       }
     } catch (error) {
-      setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+      if (!controller.signal.aborted) {
+        setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+      }
     } finally {
+      if (sceneAbortRef.current === controller) sceneAbortRef.current = null;
       setIsAnalyzingScene(false);
     }
-  }, [destinationName, heading, instruction, isAnalyzingScene, relativeBearing, remainingDistance, route.length, stream, targetBearing]);
+  }, [destinationName, heading, instruction, isAnalyzingScene, isOnline, relativeBearing, remainingDistance, route.length, stream, targetBearing]);
 
   // The parent requests this only after the five-minute Safe Zone exit countdown expires.
   // getUserMedia may still be blocked by the browser if camera permission has not been granted.
@@ -445,9 +650,9 @@ export default function ArNavigationCamera({
       ) : (
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.3),transparent_58%),linear-gradient(160deg,#1b3037,#050a0e)]">
           <div className="absolute inset-0 grid place-items-center">
-            <div className="flex max-w-[250px] flex-col items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-5 py-4 text-center text-[#d4e1e5] backdrop-blur-sm">
+            <div className="flex max-w-[250px] flex-col items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-5 py-4 text-center text-[16px] leading-6 text-[#f3f7f7] backdrop-blur-sm">
               <Camera size={36} strokeWidth={1.4} />
-              <p className="text-sm leading-5">Арын камерыг асаагаад зам дээрх чиглэлийн сумыг хараарай.</p>
+              <p className="text-[16px] leading-6">Арын камерыг асаагаад зам дээрх чиглэлийн сумыг хараарай.</p>
             </div>
           </div>
         </div>
@@ -462,13 +667,14 @@ export default function ArNavigationCamera({
           <div className="min-w-0 text-left">
             <p className="text-[22px] font-bold leading-6 tracking-tight">{formatDistance(remainingDistance) || "—"}</p>
             <p className="mt-0.5 truncate text-[13px] font-semibold text-white/95">{destinationName}</p>
+            {!isOnline && <p className="mt-1 text-[10px] font-bold text-amber-100">Интернетгүй · AI/дуу түр зогссон</p>}
           </div>
         </div>
         <button
           type="button"
           onClick={() => (stream ? stopCamera() : void startCamera())}
           disabled={cameraLoading}
-          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[16px] border border-white/20 bg-[#071116]/85 px-3 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-[#122730] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          className="inline-flex min-h-14 shrink-0 items-center justify-center gap-2 rounded-[16px] border border-white/20 bg-[#071116]/85 px-3 text-[15px] font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-[#122730] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
           aria-label={cameraLoading ? "Камер нээж байна" : stream ? "Камерыг унтраах" : "Арын камерыг асаах"}
         >
           {stream ? <CameraOff size={18} /> : <Camera size={18} />}
@@ -477,17 +683,28 @@ export default function ArNavigationCamera({
       </div>
 
       {cameraError && (
-        <p role="alert" className="absolute inset-x-3 top-[82px] z-30 rounded-xl border border-rose-200/30 bg-rose-950/90 px-3 py-2 text-xs leading-5 text-rose-50 shadow-lg">
+        <p role="alert" className="absolute inset-x-3 top-[82px] z-30 rounded-xl border border-rose-200/30 bg-rose-950/95 px-4 py-3 text-[15px] leading-6 text-rose-50 shadow-lg">
           {cameraError}
         </p>
       )}
 
-      <div className="absolute inset-x-3 top-[126px] z-30 flex justify-end">
+      <div className="absolute inset-x-3 top-[126px] z-30 grid grid-cols-2 items-stretch gap-2">
+        <button
+          type="button"
+          onClick={toggleVoiceGuidance}
+          disabled={!isOnline && !voiceGuidanceEnabled}
+          aria-pressed={voiceGuidanceEnabled}
+          className={`inline-flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 py-3 text-[14px] font-bold leading-5 text-center shadow-lg backdrop-blur-md transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-55 ${voiceGuidanceEnabled ? "border-emerald-200/40 bg-emerald-950/90 text-emerald-50 hover:bg-emerald-900" : "border-white/20 bg-[#071116]/90 text-white hover:bg-[#122730]"}`}
+          aria-label={voiceGuidanceEnabled ? "Дуугаар чиглүүлэлтийг унтраах" : "Дуугаар чиглүүлэлтийг асаах"}
+        >
+          {voiceGuidanceEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+          <span>{voiceGuidanceEnabled ? "Дуу асаалттай" : "Дуугаар зааварлах"}</span>
+        </button>
         <button
           type="button"
           onClick={() => void analyzeScene()}
-          disabled={!stream || isAnalyzingScene}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-100/30 bg-[#052b35]/90 px-3 py-2 text-xs font-bold text-cyan-50 shadow-lg backdrop-blur-md transition hover:bg-[#064452] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          disabled={!stream || isAnalyzingScene || !isOnline}
+          className="inline-flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl border border-cyan-100/30 bg-[#052b35]/90 px-2 py-3 text-[14px] font-bold leading-5 text-center text-cyan-50 shadow-lg backdrop-blur-md transition hover:bg-[#064452] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
           aria-label={isAnalyzingScene ? "Орчныг AI-аар таньж байна" : "Камерын дүрсээс орчныг AI-аар таних"}
         >
           {isAnalyzingScene ? <LoaderCircle size={17} className="animate-spin" /> : <ScanEye size={17} />}
@@ -495,24 +712,31 @@ export default function ArNavigationCamera({
         </button>
       </div>
 
+      {(speechStatus === "loading" || speechStatus === "playing" || speechError) && (
+        <div className={`absolute inset-x-3 ${speechError || speechStatus !== "idle" ? "top-[222px]" : "top-[174px]"} z-30 mx-auto max-w-lg rounded-xl border border-white/15 bg-[#071820]/95 px-4 py-3 text-[15px] leading-6 text-white shadow-lg backdrop-blur-md`} role={speechError ? "alert" : "status"} aria-live="polite">
+          {speechError ? speechError : speechStatus === "loading" ? "Монгол хэлний дууны заавар бэлдэж байна…" : "GPS зааврыг дуугаар уншиж байна…"}
+          {speechError && <p className="mt-1 text-white/70">Серверийн ELEVENLABS_API_KEY болон дууны voice ID тохиргоог шалгаарай.</p>}
+        </div>
+      )}
+
       {(sceneDescription || sceneError) && (
-        <div className="absolute inset-x-3 top-[174px] z-30 mx-auto max-w-lg rounded-2xl border border-cyan-100/25 bg-[#071820]/95 px-3 py-3 shadow-xl backdrop-blur-md" aria-live="polite">
-          <div className="mb-1.5 flex items-center gap-2 text-xs font-bold text-cyan-100">
+        <div className={`absolute inset-x-3 ${speechError || speechStatus !== "idle" ? "top-[276px]" : "top-[174px]"} z-30 mx-auto max-w-lg rounded-2xl border border-cyan-100/25 bg-[#071820]/95 px-4 py-4 shadow-xl backdrop-blur-md`} aria-live="polite">
+          <div className="mb-2 flex items-center gap-2 text-[15px] font-bold text-cyan-100">
             <Sparkles size={15} /> AI орчны тайлбар
           </div>
-          {sceneDescription && <p className="text-sm leading-5 text-white">{sceneDescription}</p>}
+          {sceneDescription && <p className="text-[16px] leading-6 text-white">{sceneDescription}</p>}
           {sceneRouteContext && (
             <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-100/80">GPS маршрутын заавар</p>
+              <p className="text-[13px] font-bold tracking-wide text-cyan-100/90">GPS маршрутын заавар</p>
               <p className="mt-1 text-sm font-semibold leading-5 text-white">{sceneRouteContext.instruction || "GPS заавар хүлээгдэж байна."}</p>
-              <p className="mt-1 text-[11px] leading-4 text-white/70">
+              <p className="mt-1 text-[14px] leading-5 text-white/80">
                 {sceneRouteContext.destinationName || destinationName}
                 {sceneRouteContext.remainingDistanceMeters !== null
                   ? ` · ${formatDistance(sceneRouteContext.remainingDistanceMeters)} үлдсэн`
                   : " · зай тооцоолж байна"}
               </p>
               {sceneRouteContext.relativeBearingDegrees !== null && (
-                <p className="mt-1 text-[11px] text-cyan-100/90">
+                <p className="mt-2 text-[14px] text-cyan-100/90">
                   {Math.abs(sceneRouteContext.relativeBearingDegrees) < 18
                     ? "Луужингийн чиглэл: урагш"
                     : sceneRouteContext.relativeBearingDegrees > 0
@@ -523,13 +747,13 @@ export default function ArNavigationCamera({
             </div>
           )}
           {sceneError && <p role="alert" className="text-sm leading-5 text-rose-100">{sceneError}</p>}
-          <p className="mt-2 text-[10px] leading-4 text-white/60">AI зурагт харагдаж буй орчныг тайлбарлана. GPS маршрутын заавар үндсэн хэвээр; зураг дангаараа зам хөндлөн гарах аюулгүй байдлыг батлахгүй.</p>
+          <p className="mt-3 text-[13px] leading-5 text-white/75">AI зурагт харагдаж буй орчныг тайлбарлана. GPS маршрутын заавар үндсэн хэвээр; зураг дангаараа зам хөндлөн гарах аюулгүй байдлыг батлахгүй.</p>
         </div>
       )}
 
       {/* Floating turn instruction. The arrows below deliberately sit on the camera view, not inside a compass dial. */}
       <div className="absolute inset-x-4 top-[17%] z-20 flex justify-center">
-        <div className="max-w-full rounded-full border border-white/25 bg-black/50 px-3 py-1.5 text-center text-xs font-semibold text-white shadow-lg backdrop-blur-md">
+        <div className="max-w-full rounded-full border border-white/25 bg-black/50 px-3 py-1.5 text-center text-[16px] font-bold text-white shadow-lg backdrop-blur-md">
           {relativeBearing === null
             ? (route.length < 2 ? "Зам тооцоолж байна…" : "Луужинг уншиж байна…")
             : Math.abs(relativeBearing) < 18
@@ -562,7 +786,7 @@ export default function ArNavigationCamera({
       </div>
 
       {heading !== null && (
-        <div className="absolute right-3 top-[25%] z-20 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-2.5 py-1.5 text-[10px] font-medium text-white/90 backdrop-blur-md">
+        <div className="absolute right-3 top-[25%] z-20 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/65 px-3 py-2 text-[13px] font-semibold text-white/90 backdrop-blur-md">
           <Compass size={13} className="text-cyan-200" /> {Math.round(heading)}°
         </div>
       )}
@@ -583,13 +807,31 @@ export default function ArNavigationCamera({
 
       <div className="absolute inset-x-3 bottom-[29%] z-30 flex justify-center pb-2">
         <div className="max-w-full rounded-[14px] border border-white/20 bg-[#08141c]/90 px-3 py-2 text-center shadow-[0_5px_22px_rgba(0,0,0,.4)] backdrop-blur-md">
-          <p className="line-clamp-2 text-xs font-semibold leading-4 text-white">{instruction || "Аюулгүй бүс рүү буцах замыг тооцоолж байна…"}</p>
-          <p className="mt-1 text-[10px] font-medium text-cyan-100/90">
+          <p className="line-clamp-2 text-[16px] font-bold leading-5 text-white">{instruction || "Аюулгүй бүс рүү буцах замыг тооцоолж байна…"}</p>
+          <p className="mt-1 text-[13px] font-semibold text-cyan-100/90">
             {remainingDistance === null ? "Зай хүлээгдэж байна" : `${formatDistance(remainingDistance)} үлдсэн`}
             {heading === null ? ` · ${compassNote}` : ` · Луужин ${Math.round(heading)}°`}
           </p>
         </div>
       </div>
+
+      <audio
+        ref={speechAudioRef}
+        className="sr-only"
+        preload="none"
+        onPlaying={() => setSpeechStatus("playing")}
+        onEnded={() => {
+          setSpeechStatus("idle");
+          if (speechObjectUrlRef.current) {
+            URL.revokeObjectURL(speechObjectUrlRef.current);
+            speechObjectUrlRef.current = null;
+          }
+        }}
+        onError={() => {
+          setSpeechStatus("error");
+          setSpeechError("Дууг тоглуулж чадсангүй. Дахин оролдоно уу.");
+        }}
+      />
 
     </div>
   );
