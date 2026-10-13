@@ -7,7 +7,6 @@ import { getSessionUserId, requireRole, requireUser } from "@/lib/auth/dal";
 import {
   createPairingCode,
   redeemPairingCode,
-  linkToSelf,
   removeLink,
 } from "@/lib/auth/pairing";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
@@ -15,7 +14,6 @@ import { allowAttempt } from "@/lib/auth/rate-limit";
 import { homeFor } from "@/lib/auth/routes";
 import {
   LoginFormSchema,
-  NAME_MAX_LENGTH,
   PairingCodeFormSchema,
   ProfileFormSchema,
   SetRoleFormSchema,
@@ -35,12 +33,16 @@ export async function signup(
   formData: FormData,
 ): Promise<FormState> {
   const values = {
+    name: text(formData, "name"),
     email: text(formData, "email"),
+    role: text(formData, "role"),
   };
 
   const parsed = SignupFormSchema.safeParse({
+    name: formData.get("name"),
     email: formData.get("email"),
     password: formData.get("password"),
+    role: formData.get("role"),
     confirmPassword: formData.get("confirmPassword"),
   });
 
@@ -51,9 +53,7 @@ export async function signup(
     };
   }
 
-  const { email, password } = parsed.data;
-  // A placeholder until the person sets their real name in settings.
-  const name = email.split("@")[0].slice(0, NAME_MAX_LENGTH) || "Хэрэглэгч";
+  const { email, password, name, role } = parsed.data;
   const { users } = await getCollections();
   const id = crypto.randomUUID();
 
@@ -64,6 +64,7 @@ export async function signup(
       passwordHash: await hashPassword(password),
       name,
       phone: null,
+      role,
       createdAt: new Date(),
     });
   } catch (error) {
@@ -79,6 +80,8 @@ export async function signup(
     throw error;
   }
 
+  await createSession(id, role);
+  redirect(homeFor(role));
   // The guardian and child sides of a new account are already linked, with no code.
   await linkToSelf(id);
   // The role is picked per device on the home page, not stored on the account.
@@ -130,9 +133,9 @@ export async function login(
     };
   }
 
-  // The role is per device, so every login asks for it again on /role.
-  await createSession(user._id);
-  redirect("/role", "replace");
+  const role = user.role ?? null;
+  await createSession(user._id, role);
+  redirect(homeFor(role), "replace");
 }
 
 export async function logout(formData: FormData) {
@@ -151,6 +154,7 @@ export async function logout(formData: FormData) {
   redirect("/login");
 }
 
+/** Persists a role for a legacy account that has not chosen one yet. */
 /**
  * Picks the role for this device only, so one account can be the guardian on one phone and
  * the child on another. Nothing about the role is stored on the account.
@@ -171,6 +175,16 @@ export async function setRole(formData: FormData) {
   }
 
   const { role } = parsed.data;
+  const { users } = await getCollections();
+  const updated = await users.updateOne(
+    { _id: userId, role: null },
+    { $set: { role } },
+  );
+
+  if (updated.matchedCount === 0) {
+    const existing = await users.findOne({ _id: userId }, { projection: { role: 1 } });
+    redirect(homeFor(existing?.role ?? null), "replace");
+  }
 
   // Every account is both, so its guardian side always sees its own child side (idempotent).
   await linkToSelf(userId);

@@ -11,8 +11,19 @@ const SCENE_SYSTEM_PROMPT = `Та SafePath нэртэй хүүхэд, гэр б�
 Нэг кадрт бодитоор ХАРАГДАЖ байгаа зүйлсийг л тайлбарла: явган зам, гарц, гэрлэн дохио, автобусны буудал, тэмдэг, барилга зэрэг.
 Монгол кириллээр 1-3 богино өгүүлбэр, нийт 350 тэмдэгтээс ихгүй хариул.
 Зураг бүдэг, харанхуй эсвэл тодорхой бус бол үүнийг шууд хэл; таамгаар нэр, хаяг, гудамж, байршил, зай, чиглэл зохиож болохгүй.
+Доорх GPS маршрут нь чиглүүлэлтийн үндсэн эх сурвалж. Зурагт харагдахгүй зүйлсийг маршруттай холбоотой гэж бүү дүгнэ, GPS зааврыг өөрчилж болохгүй. Зураг маршрутын замтай таарч байгаа эсэх тодорхойгүй бол тодорхойгүй гэдгийг хэл.
 Машин эсвэл зам харагдвал зөвхөн зурагт үндэслэн гарцаар гарах нь аюулгүй гэж хэзээ ч бүү хэл. Хүүхдэд замын захад зогсож, дохио болон асран хамгаалагчийн зааврыг шалгахыг сануул.
 GPS болон тооцоолсон маршрут үндсэн чиглүүлэгч хэвээр; зураг дангаараа бодит байршил, замын аюулгүй байдлыг баталж чадахгүй.`;
+
+type SceneRouteContext = {
+  instruction: string;
+  destinationName: string;
+  remainingDistanceMeters: number | null;
+  targetBearingDegrees: number | null;
+  deviceHeadingDegrees: number | null;
+  relativeBearingDegrees: number | null;
+  routeReady: boolean;
+};
 
 export async function POST(request: Request) {
   const userId = await getSessionUserId();
@@ -49,6 +60,20 @@ export async function POST(request: Request) {
   const instruction = typeof body.instruction === "string"
     ? body.instruction.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 160)
     : "";
+  const routeContext = readSceneRouteContext(body.routeContext);
+  const routeContextPrompt = routeContext
+    ? [
+        "GPS ROUTE CONTEXT (metadata only; it is not evidence about what the camera sees):",
+        `Official route instruction: ${routeContext.instruction || instruction || "not available"}`,
+        `Destination label: ${routeContext.destinationName || "safe destination"}`,
+        `Remaining route distance in meters: ${routeContext.remainingDistanceMeters === null ? "unknown" : Math.round(routeContext.remainingDistanceMeters)}`,
+        `Route shape available: ${routeContext.routeReady ? "yes" : "no"}`,
+        `Bearing from current location toward route look-ahead point in degrees from north: ${routeContext.targetBearingDegrees === null ? "unknown" : Math.round(routeContext.targetBearingDegrees)}`,
+        `Device compass heading in degrees: ${routeContext.deviceHeadingDegrees === null ? "unknown" : Math.round(routeContext.deviceHeadingDegrees)}`,
+        `Route direction relative to device heading in degrees (-180 left / +180 right): ${routeContext.relativeBearingDegrees === null ? "unknown" : Math.round(routeContext.relativeBearingDegrees)}`,
+        "Use this context only to make the visual description relevant. Do not invent route landmarks or claim the visible path is the calculated route unless unmistakable.",
+      ].join("\n")
+    : `Одоогийн маршрутын заавар (зөвхөн хамааралтай бол ашигла, зурагт харагдахгүй зүйл нэмж бүү хэл): ${instruction || "өгөөгүй"}`;
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     return Response.json({ error: "AI үйлчилгээ тохируулаагүй байна. Сервер дээр GEMINI_API_KEY тохируулна уу." }, { status: 503 });
@@ -60,7 +85,7 @@ export async function POST(request: Request) {
       model: process.env.GEMINI_VISION_MODEL?.trim() || DEFAULT_VISION_MODEL,
       contents: [
         {
-          text: `${SCENE_SYSTEM_PROMPT}\n\nОдоогийн маршрутын заавар (зөвхөн хамааралтай бол ашигла, зурагт харагдахгүй зүйл нэмж бүү хэл): ${instruction || "өгөөгүй"}`,
+          text: `${SCENE_SYSTEM_PROMPT}\n\n${routeContextPrompt}`,
         },
         {
           inlineData: {
@@ -80,11 +105,46 @@ export async function POST(request: Request) {
       return Response.json({ error: "Зургаас тодорхой тайлбар гаргаж чадсангүй. Гэрэл сайтай газар дахин оролдоно уу." }, { status: 502 });
     }
 
-    return Response.json({ description });
+    return Response.json({
+      description,
+      // Return validated GPS context separately from AI's visual observations so the UI
+      // can display the navigation engine's instruction without asking vision to invent it.
+      routeContext: routeContext
+        ? {
+            instruction: routeContext.instruction || instruction,
+            destinationName: routeContext.destinationName,
+            remainingDistanceMeters: routeContext.remainingDistanceMeters,
+            relativeBearingDegrees: routeContext.relativeBearingDegrees,
+          }
+        : null,
+    });
   } catch (error) {
     console.error("VISION_DESCRIPTION_ERROR:", error instanceof Error ? error.message : "unknown error");
     return Response.json({ error: "AI орчныг таних үйлчилгээ түр ажиллахгүй байна. Интернетээ шалгаад дахин оролдоно уу." }, { status: 502 });
   }
+}
+
+function readSceneRouteContext(value: unknown): SceneRouteContext | null {
+  if (!isRecord(value)) return null;
+
+  const cleanText = (input: unknown, limit: number) =>
+    typeof input === "string"
+      ? input.replace(/[\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit)
+      : "";
+  const boundedNumber = (input: unknown, min: number, max: number): number | null =>
+    typeof input === "number" && Number.isFinite(input) && input >= min && input <= max
+      ? input
+      : null;
+
+  return {
+    instruction: cleanText(value.instruction, 160),
+    destinationName: cleanText(value.destinationName, 80),
+    remainingDistanceMeters: boundedNumber(value.remainingDistanceMeters, 0, 10_000_000),
+    targetBearingDegrees: boundedNumber(value.targetBearingDegrees, 0, 360),
+    deviceHeadingDegrees: boundedNumber(value.deviceHeadingDegrees, 0, 360),
+    relativeBearingDegrees: boundedNumber(value.relativeBearingDegrees, -180, 180),
+    routeReady: value.routeReady === true,
+  };
 }
 
 function normalizeDescription(value: string | undefined): string | null {

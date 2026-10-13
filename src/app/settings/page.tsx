@@ -48,17 +48,14 @@ export default function SettingsPage() {
           
         </header>
 
-        <ProfileForm
-          afterName={
-            <div>
-              <label htmlFor="user-name" className="text-[13px] font-medium text-cyan-200">Хэрэглэгчийн нэр</label>
-              <input id="user-name" value={settings.userName} onChange={(event) => update("userName", event.target.value)} className="mt-2 min-h-12 w-full border-0 border-b border-white/15 bg-transparent px-0 text-[18px] font-medium text-white outline-none focus:border-[#67e8f9]" />
-            </div>
-          }
-        />
+        <ProfileForm />
 
         <form className="relative z-10 mx-auto w-full max-w-[390px] pt-5" onSubmit={(event) => event.preventDefault()}>
           <h1 className="mb-6 text-[29px] font-bold leading-[1.08] tracking-[-0.055em] text-white">AI найз</h1>
+          <section className="pb-6">
+            <label htmlFor="user-name" className="text-[13px] font-medium text-cyan-200">Хэрэглэгчийн нэр</label>
+            <input id="user-name" value={settings.userName} onChange={(event) => update("userName", event.target.value)} className="mt-2 min-h-12 w-full border-0 border-b border-white/15 bg-transparent px-0 text-[18px] font-medium text-white outline-none focus:border-[#67e8f9]" />
+          </section>
 <SettingsSection title="Дүр">
   <div className="grid grid-cols-4 gap-2" role="group" aria-label="Туслахын дүр">
     {avatars.map((avatar) => {
