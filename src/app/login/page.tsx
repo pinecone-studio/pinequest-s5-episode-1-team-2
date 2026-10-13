@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { MapPin } from "lucide-react";
 import { AppShell } from "@/components/safe-path";
 import { LoginForm } from "@/components/auth/forms";
 import { getCurrentUser } from "@/lib/auth/dal";
@@ -18,6 +19,10 @@ export default async function LoginPage() {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-28 -left-24 size-80 rounded-full bg-[#0e7490]/30 blur-3xl"
         />
+        <div aria-hidden="true" className="pointer-events-none absolute right-[-4.5rem] top-[24%] text-[#67e8f9]/[0.08]">
+          <MapPin size={260} strokeWidth={0.8} />
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute right-8 top-[31%] size-24 rounded-full bg-[#22d3ee]/10 blur-3xl" />
         <header className="relative z-10 mx-auto flex h-14 w-full max-w-[390px] items-center">
           <BrandMark />
         </header>
