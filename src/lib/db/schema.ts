@@ -1,6 +1,5 @@
 import type { Db, Document, IndexDescription } from "mongodb";
 import { NAME_MAX_LENGTH, PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH } from "@/lib/auth/schemas";
-import { ROLES } from "@/types/auth";
 
 type CollectionSchema = {
   validator: Document;
@@ -17,7 +16,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
     validator: {
       $jsonSchema: {
         bsonType: "object",
-        required: ["email", "passwordHash", "name", "phone", "role", "createdAt"],
+        required: ["email", "passwordHash", "name", "phone", "createdAt"],
         additionalProperties: false,
         properties: {
           _id: { bsonType: "string" },
@@ -28,7 +27,6 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           childName: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
           childPhone: { bsonType: "string" },
           phone: { bsonType: ["string", "null"] },
-          role: { bsonType: ["string", "null"], enum: [...ROLES, null] },
           locationPaused: { bsonType: "bool" },
           createdAt: { bsonType: "date" },
         },
