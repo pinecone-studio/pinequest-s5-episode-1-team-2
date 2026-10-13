@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, type ReactNode } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { updateProfile } from "@/app/actions/auth";
 import { NAME_MAX_LENGTH } from "@/lib/auth/schemas";
 import { SafePathLoading } from "@/components/safepath-loading";
@@ -10,7 +10,7 @@ type Profile = { role: "guardian" | "child" | null; name: string; phone: string 
 const input = "mt-2 min-h-12 w-full border-0 border-b border-white/15 bg-transparent px-0 text-[18px] font-medium text-white outline-none focus:border-[#67e8f9]";
 
 /** Settings: the name and phone for this device's role, saved to the database. Hidden until a role is chosen. */
-export function ProfileForm({ afterName }: { afterName?: ReactNode }) {
+export function ProfileForm() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [state, action, pending] = useActionState(updateProfile, undefined);
 
@@ -37,7 +37,6 @@ export function ProfileForm({ afterName }: { afterName?: ReactNode }) {
         <input id="profile-name" name="name" defaultValue={name} maxLength={NAME_MAX_LENGTH} autoComplete="off" className={input} />
         {state?.errors?.name?.map((error) => <p key={error} role="alert" className="mt-2 text-sm text-[#ff8a8a]">{error}</p>)}
       </div>
-      {afterName}
       <div>
         <label htmlFor="profile-phone" className="text-[13px] font-medium text-cyan-200">{child ? "Хүүхдийн утасны дугаар" : "Эцэг эхийн утасны дугаар"}</label>
         <input id="profile-phone" name="phone" type="tel" defaultValue={phone} autoComplete="tel" className={input} />
