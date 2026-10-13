@@ -11,6 +11,13 @@ type Coordinate = {
 
 type RoutePoint = [number, number];
 
+type SceneRouteContext = {
+  instruction: string;
+  destinationName: string;
+  remainingDistanceMeters: number | null;
+  relativeBearingDegrees: number | null;
+};
+
 type ArNavigationCameraProps = {
   location: Coordinate;
   route: RoutePoint[];
@@ -146,6 +153,7 @@ export default function ArNavigationCamera({
   const [compassNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
   const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
+  const [sceneRouteContext, setSceneRouteContext] = useState<SceneRouteContext | null>(null);
   const [sceneError, setSceneError] = useState("");
 
   useEffect(() => {
@@ -229,6 +237,7 @@ export default function ArNavigationCamera({
     setCameraError("");
     setSceneError("");
     setSceneDescription("");
+    setSceneRouteContext(null);
     setIsAnalyzingScene(false);
   }, []);
 
@@ -325,6 +334,7 @@ export default function ArNavigationCamera({
     setIsAnalyzingScene(true);
     setSceneError("");
     setSceneDescription("");
+    setSceneRouteContext(null);
 
     try {
       // Downscale the still frame before upload to reduce mobile data and request size.
@@ -356,7 +366,19 @@ export default function ArNavigationCamera({
       const response = await fetch("/api/vision/describe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image, instruction: instruction.slice(0, 160) }),
+        body: JSON.stringify({
+          image,
+          instruction: instruction.slice(0, 160),
+          routeContext: {
+            instruction: instruction.slice(0, 160),
+            destinationName: destinationName.slice(0, 80),
+            remainingDistanceMeters: Number.isFinite(remainingDistance) ? remainingDistance : null,
+            targetBearingDegrees: targetBearing,
+            deviceHeadingDegrees: heading,
+            relativeBearingDegrees: relativeBearing,
+            routeReady: route.length >= 2,
+          },
+        }),
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -369,12 +391,37 @@ export default function ArNavigationCamera({
         throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
       }
       setSceneDescription(result.description);
+      if (
+        "routeContext" in result &&
+        result.routeContext &&
+        typeof result.routeContext === "object" &&
+        "instruction" in result.routeContext &&
+        typeof result.routeContext.instruction === "string" &&
+        "destinationName" in result.routeContext &&
+        typeof result.routeContext.destinationName === "string"
+      ) {
+        const routeContext = result.routeContext as Record<string, unknown>;
+        setSceneRouteContext({
+          instruction: typeof routeContext.instruction === "string"
+            ? routeContext.instruction.slice(0, 160)
+            : instruction.slice(0, 160),
+          destinationName: typeof routeContext.destinationName === "string"
+            ? routeContext.destinationName.slice(0, 80)
+            : destinationName.slice(0, 80),
+          remainingDistanceMeters: typeof routeContext.remainingDistanceMeters === "number" && Number.isFinite(routeContext.remainingDistanceMeters)
+            ? routeContext.remainingDistanceMeters
+            : null,
+          relativeBearingDegrees: typeof routeContext.relativeBearingDegrees === "number" && Number.isFinite(routeContext.relativeBearingDegrees)
+            ? routeContext.relativeBearingDegrees
+            : null,
+        });
+      }
     } catch (error) {
       setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
     } finally {
       setIsAnalyzingScene(false);
     }
-  }, [instruction, isAnalyzingScene, stream]);
+  }, [destinationName, heading, instruction, isAnalyzingScene, relativeBearing, remainingDistance, route.length, stream, targetBearing]);
 
   // The parent requests this only after the five-minute Safe Zone exit countdown expires.
   // getUserMedia may still be blocked by the browser if camera permission has not been granted.
@@ -454,8 +501,29 @@ export default function ArNavigationCamera({
             <Sparkles size={15} /> AI орчны тайлбар
           </div>
           {sceneDescription && <p className="text-sm leading-5 text-white">{sceneDescription}</p>}
+          {sceneRouteContext && (
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-100/80">GPS маршрутын заавар</p>
+              <p className="mt-1 text-sm font-semibold leading-5 text-white">{sceneRouteContext.instruction || "GPS заавар хүлээгдэж байна."}</p>
+              <p className="mt-1 text-[11px] leading-4 text-white/70">
+                {sceneRouteContext.destinationName || destinationName}
+                {sceneRouteContext.remainingDistanceMeters !== null
+                  ? ` · ${formatDistance(sceneRouteContext.remainingDistanceMeters)} үлдсэн`
+                  : " · зай тооцоолж байна"}
+              </p>
+              {sceneRouteContext.relativeBearingDegrees !== null && (
+                <p className="mt-1 text-[11px] text-cyan-100/90">
+                  {Math.abs(sceneRouteContext.relativeBearingDegrees) < 18
+                    ? "Луужингийн чиглэл: урагш"
+                    : sceneRouteContext.relativeBearingDegrees > 0
+                      ? "Луужингийн чиглэл: баруун тийш"
+                      : "Луужингийн чиглэл: зүүн тийш"}
+                </p>
+              )}
+            </div>
+          )}
           {sceneError && <p role="alert" className="text-sm leading-5 text-rose-100">{sceneError}</p>}
-          <p className="mt-2 text-[10px] leading-4 text-white/60">Нэг кадрыг AI-д илгээж тайлбарлуулсан. Зураг дангаараа гарц аюулгүй эсэхийг батлахгүй.</p>
+          <p className="mt-2 text-[10px] leading-4 text-white/60">AI зурагт харагдаж буй орчныг тайлбарлана. GPS маршрутын заавар үндсэн хэвээр; зураг дангаараа зам хөндлөн гарах аюулгүй байдлыг батлахгүй.</p>
         </div>
       )}
 
