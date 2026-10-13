@@ -1216,8 +1216,8 @@ export default function TrackerPage() {
         </div>
 
         <nav aria-label="Тусламж болон холбох код" className="relative z-10 mt-2 flex items-center justify-center gap-2">
-          <a href="tel:+97600000000" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
-          <Link href="/tracker/code" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тохиргоо</Link>
+          <a href="tel:+97600000000" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тусламж хэрэгтэй</a>
+          <Link href="/tracker/code" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тохиргоо</Link>
         </nav>
         <audio
           ref={audioElement}
