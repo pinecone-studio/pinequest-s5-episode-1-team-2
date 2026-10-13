@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Camera, CameraOff, Compass, MapPin } from "lucide-react";
+import { Camera, CameraOff, Compass, MapPin, ScanEye, LoaderCircle, Sparkles } from "lucide-react";
 
 type Coordinate = {
   latitude: number;
@@ -144,6 +144,9 @@ export default function ArNavigationCamera({
   const [heading, setHeading] = useState<number | null>(null);
   const [compassEnabled, setCompassEnabled] = useState(false);
   const [compassNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
+  const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
+  const [sceneDescription, setSceneDescription] = useState("");
+  const [sceneError, setSceneError] = useState("");
 
   useEffect(() => {
     const video = videoRef.current;
@@ -224,6 +227,9 @@ export default function ArNavigationCamera({
     setHeading(null);
     setCompassNote("Утсаа хөдөлгөж луужинг тохируулна уу.");
     setCameraError("");
+    setSceneError("");
+    setSceneDescription("");
+    setIsAnalyzingScene(false);
   }, []);
 
   const startCamera = useCallback(async () => {
@@ -308,6 +314,68 @@ export default function ArNavigationCamera({
     }
   }, []);
 
+  const analyzeScene = useCallback(async () => {
+    const video = videoRef.current;
+    if (!stream || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1) {
+      setSceneError("Эхлээд камераа асаагаад дүрс гарч ирэхийг хүлээнэ үү.");
+      return;
+    }
+    if (isAnalyzingScene) return;
+
+    setIsAnalyzingScene(true);
+    setSceneError("");
+    setSceneDescription("");
+
+    try {
+      // Downscale the still frame before upload to reduce mobile data and request size.
+      const maxDimension = 768;
+      const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Зургийг боловсруулах боломжгүй байна.");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const image = await new Promise<string>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error("Камерын зураг бэлдэж чадсангүй."));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") resolve(reader.result);
+            else reject(new Error("Камерын зургийг уншиж чадсангүй."));
+          };
+          reader.onerror = () => reject(new Error("Камерын зургийг уншиж чадсангүй."));
+          reader.readAsDataURL(blob);
+        }, "image/jpeg", 0.72);
+      });
+
+      const response = await fetch("/api/vision/describe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image, instruction: instruction.slice(0, 160) }),
+      });
+      const result: unknown = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message = result && typeof result === "object" && "error" in result && typeof result.error === "string"
+          ? result.error
+          : "Орчныг таньж чадсангүй. Дахин оролдоно уу.";
+        throw new Error(message);
+      }
+      if (!result || typeof result !== "object" || !("description" in result) || typeof result.description !== "string") {
+        throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
+      }
+      setSceneDescription(result.description);
+    } catch (error) {
+      setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+    } finally {
+      setIsAnalyzingScene(false);
+    }
+  }, [instruction, isAnalyzingScene, stream]);
+
   // The parent requests this only after the five-minute Safe Zone exit countdown expires.
   // getUserMedia may still be blocked by the browser if camera permission has not been granted.
   useEffect(() => {
@@ -365,6 +433,30 @@ export default function ArNavigationCamera({
         <p role="alert" className="absolute inset-x-3 top-[82px] z-30 rounded-xl border border-rose-200/30 bg-rose-950/90 px-3 py-2 text-xs leading-5 text-rose-50 shadow-lg">
           {cameraError}
         </p>
+      )}
+
+      <div className="absolute inset-x-3 top-[126px] z-30 flex justify-end">
+        <button
+          type="button"
+          onClick={() => void analyzeScene()}
+          disabled={!stream || isAnalyzingScene}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-100/30 bg-[#052b35]/90 px-3 py-2 text-xs font-bold text-cyan-50 shadow-lg backdrop-blur-md transition hover:bg-[#064452] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          aria-label={isAnalyzingScene ? "Орчныг AI-аар таньж байна" : "Камерын дүрсээс орчныг AI-аар таних"}
+        >
+          {isAnalyzingScene ? <LoaderCircle size={17} className="animate-spin" /> : <ScanEye size={17} />}
+          <span>{isAnalyzingScene ? "Таньж байна…" : "Орчныг AI-аар таних"}</span>
+        </button>
+      </div>
+
+      {(sceneDescription || sceneError) && (
+        <div className="absolute inset-x-3 top-[174px] z-30 mx-auto max-w-lg rounded-2xl border border-cyan-100/25 bg-[#071820]/95 px-3 py-3 shadow-xl backdrop-blur-md" aria-live="polite">
+          <div className="mb-1.5 flex items-center gap-2 text-xs font-bold text-cyan-100">
+            <Sparkles size={15} /> AI орчны тайлбар
+          </div>
+          {sceneDescription && <p className="text-sm leading-5 text-white">{sceneDescription}</p>}
+          {sceneError && <p role="alert" className="text-sm leading-5 text-rose-100">{sceneError}</p>}
+          <p className="mt-2 text-[10px] leading-4 text-white/60">Нэг кадрыг AI-д илгээж тайлбарлуулсан. Зураг дангаараа гарц аюулгүй эсэхийг батлахгүй.</p>
+        </div>
       )}
 
       {/* Floating turn instruction. The arrows below deliberately sit on the camera view, not inside a compass dial. */}
