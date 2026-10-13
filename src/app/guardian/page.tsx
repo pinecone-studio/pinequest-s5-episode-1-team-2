@@ -9,14 +9,17 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
-import { SafePathLoading } from "@/components/safepath-loading";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 
 const LiveMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => <SafePathLoading className="h-full min-h-80" label="Газрын зураг ачаалж байна…" />,
+  loading: () => (
+    <div className="grid h-full min-h-80 place-items-center text-sm text-(--sp-muted)">
+      Газрын зураг ачаалж байна…
+    </div>
+  ),
 });
 
 const TOKENS = {
@@ -282,7 +285,7 @@ export default function GuardianPage() {
             {childrenLoadFailed ? (
               <p className="text-sm text-(--sp-muted)">Байршлын мэдээлэл авч чадсангүй. Нэвтэрсэн эрх болон холболтоо шалгана уу.</p>
             ) : linkedChildren === null ? (
-              <SafePathLoading className="justify-start px-0 py-1" label="Хүүхдийн мэдээлэл ачаалж байна…" />
+              <p className="text-sm text-(--sp-muted)">Хүүхдийн мэдээлэл ачаалж байна…</p>
             ) : linkedChildren.length === 0 ? (
               <p className="text-sm text-(--sp-muted)">Одоогоор холбогдсон хүүхэд алга. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана.</p>
             ) : (
@@ -372,7 +375,7 @@ export default function GuardianPage() {
                   {linkedChildren && linkedChildren.length > 0 && !monitoredLocation
                     ? "Хүүхдийн байршлын мэдээлэл хараахан ирээгүй байна"
                     : locationStatus === "loading"
-                      ? <SafePathLoading className="flex-col gap-1" label="Одоогийн байршлыг тогтоож байна…" />
+                      ? "Одоогийн байршлыг тогтоож байна…"
                       : error || "Байршил хараахан олдсонгүй"}
                 </div>
               )}

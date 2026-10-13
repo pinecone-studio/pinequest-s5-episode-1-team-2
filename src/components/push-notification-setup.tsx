@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { SafePathLoading } from "@/components/safepath-loading";
 import { SAFETY_NOTIFICATION_CHANNEL_ID, SOS_NOTIFICATION_CHANNEL_ID } from "@/lib/push/channels";
 
 const TOKEN_STORAGE_KEY = "safepath:push-token";
@@ -165,9 +164,9 @@ export default function PushNotificationSetup() {
           type="button"
           onClick={enableNotifications}
           disabled={status === "requesting"}
-          className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-60"
+          className="min-h-10 shrink-0 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-60"
         >
-          {status === "requesting" && <SafePathLoading variant="button" />}{status === "requesting" ? "Түр хүлээнэ үү…" : status === "error" || status === "denied" ? "Дахин шалгах" : "Идэвхжүүлэх"}
+          {status === "requesting" ? "Түр хүлээнэ үү…" : status === "error" || status === "denied" ? "Дахин шалгах" : "Идэвхжүүлэх"}
         </button>
       )}
     </section>

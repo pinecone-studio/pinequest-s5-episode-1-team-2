@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useState } from "react";
 import { updateProfile } from "@/app/actions/auth";
 import { NAME_MAX_LENGTH } from "@/lib/auth/schemas";
-import { SafePathLoading } from "@/components/safepath-loading";
 
 type Profile = { role: "guardian" | "child" | null; name: string; phone: string };
 
@@ -23,8 +22,7 @@ export function ProfileForm() {
     return () => { cancelled = true; };
   }, []);
 
-  if (!profile) return <SafePathLoading className="py-8" label="Мэдээлэл ачаалж байна…" />;
-  if (!profile.role) return null;
+  if (!profile?.role) return null;
   const child = profile.role === "child";
   const name = state?.values?.name ?? profile.name;
   const phone = state?.values?.phone ?? profile.phone;
@@ -43,7 +41,7 @@ export function ProfileForm() {
         {state?.errors?.phone?.map((error) => <p key={error} role="alert" className="mt-2 text-sm text-[#ff8a8a]">{error}</p>)}
       </div>
       {state?.success && <p role="status" className="text-sm text-cyan-200">{state.success}</p>}
-      <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0e7490] to-[#0891b2] px-5 text-[15px] font-bold text-white disabled:opacity-50">{pending && <SafePathLoading variant="button" />}{pending ? "Түр хүлээнэ үү…" : "Хадгалах"}</button>
+      <button type="submit" disabled={pending} className="min-h-12 rounded-2xl bg-gradient-to-r from-[#0e7490] to-[#0891b2] px-5 text-[15px] font-bold text-white disabled:opacity-50">{pending ? "Түр хүлээнэ үү…" : "Хадгалах"}</button>
     </form>
   );
 }

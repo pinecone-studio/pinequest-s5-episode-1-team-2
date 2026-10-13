@@ -7,7 +7,7 @@ export function toUser(record: UserRecord): User {
     email: record.email,
     name: record.name,
     phone: record.phone,
-    role: record.role,
+    role: null,
     createdAt: record.createdAt,
   };
 }
