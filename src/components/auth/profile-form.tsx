@@ -44,7 +44,7 @@ export function ProfileForm({ afterName }: { afterName?: ReactNode }) {
         {state?.errors?.phone?.map((error) => <p key={error} role="alert" className="mt-2 text-sm text-[#ff8a8a]">{error}</p>)}
       </div>
       {state?.success && <p role="status" className="text-sm text-cyan-200">{state.success}</p>}
-      <button type="submit" disabled={pending} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#0e7490] to-[#0891b2] px-5 text-[15px] font-bold text-white disabled:opacity-50">{pending && <SafePathLoading variant="button" />}{pending ? "Түр хүлээнэ үү…" : "Хадгалах"}</button>
+      <button type="submit" disabled={pending} className="flex min-h-12.5 w-full items-center justify-center gap-2 rounded-2xl border border-[#22d3ee]/60 bg-[#0e7490] px-5 text-[15px] font-semibold text-white shadow-[0_0_20px_-4px_rgba(14,116,144,0.6)] transition-all duration-200 active:scale-[0.98] hover:bg-[#0891b2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">{pending && <SafePathLoading variant="button" />}{pending ? "Түр хүлээнэ үү…" : "Хадгалах"}</button>
     </form>
   );
 }
