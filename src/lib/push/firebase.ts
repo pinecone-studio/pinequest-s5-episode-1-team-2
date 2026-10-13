@@ -1,6 +1,7 @@
 import { importPKCS8, SignJWT } from "jose";
 import { getCollections } from "@/lib/db/mongo";
 import type { SafetyAlertType } from "@/types/alerts";
+import { SAFETY_NOTIFICATION_CHANNEL_ID, SOS_NOTIFICATION_CHANNEL_ID } from "@/lib/push/channels";
 
 const FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -139,7 +140,10 @@ export async function sendSafetyAlertPush(childId: string, alert: SafetyPushInpu
             android: {
               priority: alert.type === "ZONE_ENTER" ? "NORMAL" : "HIGH",
               ttl: "300s",
-              notification: { sound: "default" },
+              notification: {
+                channel_id: alert.type === "SOS" ? SOS_NOTIFICATION_CHANNEL_ID : SAFETY_NOTIFICATION_CHANNEL_ID,
+                sound: "default",
+              },
             },
           },
         }),
