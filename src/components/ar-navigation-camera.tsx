@@ -17,6 +17,8 @@ type ArNavigationCameraProps = {
   instruction: string;
   destinationName: string;
   distanceMeters: number | null;
+  autoStart?: boolean;
+  onAutoStartAttempted?: () => void;
 };
 
 type DeviceOrientationWithCompass = DeviceOrientationEvent & {
@@ -130,9 +132,14 @@ export default function ArNavigationCamera({
   instruction,
   destinationName,
   distanceMeters: remainingDistance,
+  autoStart = false,
+  onAutoStartAttempted,
 }: ArNavigationCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const activeStreamRef = useRef<MediaStream | null>(null);
+  const cameraRequestInFlightRef = useRef(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [heading, setHeading] = useState<number | null>(null);
   const [compassEnabled, setCompassEnabled] = useState(false);
@@ -149,6 +156,7 @@ export default function ArNavigationCamera({
 
     return () => {
       stream.getTracks().forEach((track) => track.stop());
+      if (activeStreamRef.current === stream) activeStreamRef.current = null;
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
@@ -204,7 +212,14 @@ export default function ArNavigationCamera({
     : Math.max(-34, Math.min(34, relativeBearing * 0.58));
 
   const stopCamera = useCallback(() => {
+    const activeStream = activeStreamRef.current;
+    if (activeStream) {
+      activeStream.getTracks().forEach((track) => track.stop());
+      activeStreamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setStream(null);
+    setCameraLoading(false);
     setCompassEnabled(false);
     setHeading(null);
     setCompassNote("Утсаа хөдөлгөж луужинг тохируулна уу.");
@@ -212,50 +227,94 @@ export default function ArNavigationCamera({
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (cameraRequestInFlightRef.current || activeStreamRef.current) return;
+
     setCameraError("");
+    setCameraLoading(true);
+    cameraRequestInFlightRef.current = true;
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError("Камер ашиглах боломжгүй байна. HTTPS хаяг эсвэл шинэчилсэн browser ашиглана уу.");
+      setCameraError("Камер ашиглах боломжгүй байна. HTTPS хаяг эсвэл шинэчилсэн browser ашиглана уу. Android дээр SafePath-ийн HTTPS хаягаар нээнэ үү.");
+      setCameraLoading(false);
+      cameraRequestInFlightRef.current = false;
       return;
     }
 
-    const orientationApi = DeviceOrientationEvent as DeviceOrientationPermissionApi;
-    if (typeof orientationApi.requestPermission === "function") {
-      try {
-        const permission = await orientationApi.requestPermission();
-        setCompassEnabled(permission === "granted");
-        if (permission !== "granted") {
-          setCompassNote("Луужингийн зөвшөөрөл өгөөгүй тул сумны чиглэл утасны луужинтай таарахгүй байж болно.");
-        }
-      } catch {
-        setCompassEnabled(false);
-        setCompassNote("Луужингийн мэдрэгчийг нээж чадсангүй.");
-      }
-    } else {
-      setCompassEnabled(true);
-    }
-
+    let nextStream: MediaStream | null = null;
     try {
-      const nextStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+      // Prefer the rear-facing camera. A simpler fallback helps devices whose WebView
+      // does not support the full constraint set.
+      try {
+        nextStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+      } catch (firstError) {
+        const firstName = firstError instanceof Error ? firstError.name : "";
+        if (firstName === "NotAllowedError" || firstName === "SecurityError") throw firstError;
+        nextStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+      }
+
+      if (!nextStream) {
+        throw new Error("Camera stream was not created.");
+      }
+      activeStreamRef.current = nextStream;
       setStream(nextStream);
+
+      // Compass permission is separate from camera permission on some browsers (notably iOS).
+      // The camera should remain usable even if the compass is unavailable or denied.
+      if (typeof DeviceOrientationEvent !== "undefined") {
+        const orientationApi = DeviceOrientationEvent as DeviceOrientationPermissionApi;
+        if (typeof orientationApi.requestPermission === "function") {
+          try {
+            const permission = await orientationApi.requestPermission();
+            setCompassEnabled(permission === "granted");
+            if (permission !== "granted") {
+              setCompassNote("Луужингийн зөвшөөрөл өгөөгүй тул сумны чиглэл утасны луужинтай таарахгүй байж болно.");
+            }
+          } catch {
+            setCompassEnabled(false);
+            setCompassNote("Луужингийн мэдрэгчийг нээж чадсангүй. Камер ажилласаар байна.");
+          }
+        } else {
+          setCompassEnabled(true);
+        }
+      } else {
+        setCompassEnabled(false);
+        setCompassNote("Энэ төхөөрөмж луужингийн мэдрэгч дэмжихгүй байна. Газрын зургийн маршрутыг дагаарай.");
+      }
     } catch (error) {
+      if (nextStream) nextStream.getTracks().forEach((track) => track.stop());
+      activeStreamRef.current = null;
+      setStream(null);
       const name = error instanceof Error ? error.name : "";
       if (name === "NotAllowedError" || name === "SecurityError") {
-        setCameraError("Камерын зөвшөөрөл хаалттай байна. Browser-ийн Settings дээр Camera-г Allow болгоорой.");
-      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
-        setCameraError("Арын камер олдсонгүй. Төхөөрөмжийн камерыг шалгана уу.");
+        setCameraError("Камерын зөвшөөрөл хаалттай байна. Android Settings эсвэл browser-ийн Site Settings дээр SafePath-ийн Camera зөвшөөрлийг Allow болгоорой.");
+      } else if (name === "NotFoundError" || name === "OverconstrainedError" || name === "DevicesNotFoundError") {
+        setCameraError("Камер олдсонгүй. Төхөөрөмжийн камер байгаа эсэхийг шалгана уу.");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        setCameraError("Камерыг өөр апп ашиглаж байж магадгүй. Бусад камерын аппыг хаагаад дахин оролдоно уу.");
       } else {
-        setCameraError("Камер нээгдсэнгүй. Өөр апп камерыг ашиглаж байгаа эсэх, HTTPS холболтоо шалгаарай.");
+        setCameraError("Камер нээгдсэнгүй. Зөвшөөрөл, HTTPS холболт болон төхөөрөмжийн камерыг шалгаад дахин оролдоно уу.");
       }
+      setCompassEnabled(false);
+    } finally {
+      setCameraLoading(false);
+      cameraRequestInFlightRef.current = false;
     }
   }, []);
+
+  // The parent requests this only after the five-minute Safe Zone exit countdown expires.
+  // getUserMedia may still be blocked by the browser if camera permission has not been granted.
+  useEffect(() => {
+    if (!autoStart) return;
+    onAutoStartAttempted?.();
+    void startCamera();
+  }, [autoStart, onAutoStartAttempted, startCamera]);
 
   return (
     <div className="absolute inset-0 isolate overflow-hidden bg-[#071116] text-white" aria-label="Камераар бодит орчин дээр маршрут чиглүүлэх">
@@ -293,11 +352,12 @@ export default function ArNavigationCamera({
         <button
           type="button"
           onClick={() => (stream ? stopCamera() : void startCamera())}
-          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[16px] border border-white/20 bg-[#071116]/85 px-3 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-[#122730] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
-          aria-label={stream ? "Камерыг унтраах" : "Арын камерыг асаах"}
+          disabled={cameraLoading}
+          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[16px] border border-white/20 bg-[#071116]/85 px-3 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-[#122730] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          aria-label={cameraLoading ? "Камер нээж байна" : stream ? "Камерыг унтраах" : "Арын камерыг асаах"}
         >
           {stream ? <CameraOff size={18} /> : <Camera size={18} />}
-          <span>{stream ? "Унтраах" : "Камер асаах"}</span>
+          <span>{cameraLoading ? "Нээж байна…" : stream ? "Унтраах" : "Камер асаах"}</span>
         </button>
       </div>
 
