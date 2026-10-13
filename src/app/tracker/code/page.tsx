@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ChevronLeft, MapPin } from "lucide-react";
-import { unlink } from "@/app/actions/auth";
+import { ChevronLeft, LogOut, MapPin } from "lucide-react";
+import { logout, unlink } from "@/app/actions/auth";
 import { CodeGenerator } from "@/components/auth/pairing";
 import { AppShell } from "@/components/safe-path";
 import { requireRole } from "@/lib/auth/dal";
@@ -87,6 +87,13 @@ export default async function TrackerCodePage() {
               </ul>
             )}
           </section>
+
+          <form action={logout} className="mt-5">
+            <button type="submit" className="flex min-h-14 w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-5 text-left text-[15px] font-medium text-white transition hover:bg-white/[0.08] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
+              <LogOut className="size-5 text-[#c2d0d5]" strokeWidth={1.8} aria-hidden="true" />
+              <span>Гарах</span>
+            </button>
+          </form>
           </div>
         </div>
       </main>
