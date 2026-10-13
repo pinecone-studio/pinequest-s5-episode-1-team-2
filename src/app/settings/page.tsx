@@ -153,13 +153,25 @@ export default function SettingsPage() {
           </div>       
         </form>
 
-        <form action={logout} onSubmit={() => window.localStorage.removeItem("safepath:push-token")} className="relative z-10 mx-auto w-full max-w-[390px] mt-4">
-          <input type="hidden" name="pushToken" value={pushToken} readOnly />
-          <button type="submit" className="flex min-h-14 w-full items-center gap-3 border-t border-white/15 text-left text-[15px] font-medium text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
-            <LogOut className="size-5 text-[#c2d0d5]" strokeWidth={1.8} aria-hidden="true" />
-            <span className="flex-1">Гарах</span>
-          </button>
-        </form>
+        <form
+  action={logout}
+  onSubmit={() => window.localStorage.removeItem("safepath:push-token")}
+  className="relative z-10 mx-auto w-full max-w-[390px] pt-6"
+>
+  <input type="hidden" name="pushToken" value={pushToken} readOnly />
+
+  <button
+    type="submit"
+    className="group flex min-h-12.5 w-full items-center justify-center gap-2.5 rounded-2xl border border-[#22d3ee]/40 bg-[#0e7490]/30 px-5 text-[15px] font-semibold text-white shadow-[0_0_15px_-3px_rgba(14,116,144,0.3)] transition-all duration-200 hover:border-[#22d3ee]/80 hover:bg-[#0e7490]/60 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+  >
+    <LogOut
+      className="size-4.5 text-[#67e8f9] transition-transform duration-200 group-hover:-translate-x-0.5"
+      strokeWidth={2}
+      aria-hidden="true"
+    />
+    <span>Гарах</span>
+  </button>
+</form>
       </main>
     </AppShell>
   );
