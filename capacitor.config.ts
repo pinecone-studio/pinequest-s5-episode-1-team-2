@@ -16,6 +16,11 @@ const config: CapacitorConfig = {
     // about 5 minutes in the background.
     useLegacyBridge: true,
   },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ["alert", "sound"],
+    },
+  },
 };
 
 export default config;
