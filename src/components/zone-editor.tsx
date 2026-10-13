@@ -2,13 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useActionState, useState } from "react";
+import { SafePathLoading } from "@/components/safepath-loading";
 import { addZone, removeZone } from "@/app/actions/zones";
 import type { FormState } from "@/types/auth";
 import type { SafeZone } from "@/types/safety";
 
 const ZoneMap = dynamic(() => import("@/components/zone-map"), {
   ssr: false,
-  loading: () => <div className="grid h-full place-items-center text-sm text-[#737373]">Газрын зураг ачаалж байна…</div>,
+  loading: () => <SafePathLoading tone="light" className="h-full" label="Газрын зураг ачаалж байна…" />,
 });
 
 type Point = { latitude: number; longitude: number };
@@ -57,8 +58,8 @@ export function ZoneEditor({ childId, zones, childPosition }: { childId: string;
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#eeeeeb] px-5 py-3 sm:px-6">
           <p className="text-xs leading-5 text-[#737373]">{point ? "Байршил сонгогдлоо. Баруун талд нэр, хэмжээг тохируулна уу." : "Шинэ бүсийн төвийг газрын зураг дээр сонгоно уу."}</p>
-          <button type="button" onClick={pickMyLocation} disabled={locating} className="inline-flex min-h-10 shrink-0 items-center rounded-lg px-2 text-xs font-semibold text-[#22231f] underline underline-offset-4 transition hover:bg-[#f7f7f5] disabled:opacity-50">
-            {locating ? "Байршил тогтоож байна…" : "Миний байршил"}
+          <button type="button" onClick={pickMyLocation} disabled={locating} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-2 text-xs font-semibold text-[#22231f] underline underline-offset-4 transition hover:bg-[#f7f7f5] disabled:opacity-50">
+            {locating && <SafePathLoading variant="button" />}{locating ? "Байршил тогтоож байна…" : "Миний байршил"}
           </button>
         </div>
       </section>
@@ -85,8 +86,8 @@ export function ZoneEditor({ childId, zones, childPosition }: { childId: string;
         </div>
         {state?.message && <p role="alert" className="text-sm text-[#c64242]">{state.message}</p>}
         {state?.success && <p role="status" className="text-sm text-[#2e7d4f]">{state.success}</p>}
-        <button type="submit" disabled={pending || !point} className="mt-1 min-h-[50px] rounded-xl bg-[#111111] px-5 text-sm font-semibold text-white transition hover:bg-[#30312d] disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
-          {pending ? "Хадгалж байна…" : "Аюулгүй бүс хадгалах"}
+        <button type="submit" disabled={pending || !point} className="mt-1 inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-[#111111] px-5 text-sm font-semibold text-white transition hover:bg-[#30312d] disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+          {pending && <SafePathLoading variant="button" />}{pending ? "Хадгалж байна…" : "Аюулгүй бүс хадгалах"}
         </button>
       </form>
       </section>
