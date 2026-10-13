@@ -20,16 +20,16 @@ export type UserRecord = {
   /** Optional child-specific profile for accounts that represent both guardian and child. */
   childName?: string;
   childPhone?: string | null;
-  /** The role for this account; null only for accounts created before role persistence. */
-  role: Role | null;
   /** The child paused location sharing. Missing means not paused, so older accounts need no update. */
   locationPaused?: boolean;
   createdAt: Date;
 };
 
 /** What the browser may see. */
-export type User = Pick<UserRecord, "email" | "name" | "phone" | "role" | "createdAt"> & {
+export type User = Pick<UserRecord, "email" | "name" | "phone" | "createdAt"> & {
   id: string;
+  /** The role this device chose on the home page; null until it picks one. It lives in the session, not the database. */
+  role: Role | null;
 };
 
 /** A document in `guardianLinks`. A guardian can read a child's data only while it exists. Revoking deletes it. */
