@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Camera, CameraOff, Compass, MapPin, ScanEye, LoaderCircle, Sparkles } from "lucide-react";
+import { Camera, CameraOff, Compass, MapPin, ScanEye, Sparkles } from "lucide-react";
+import { SafePathLoading } from "@/components/safepath-loading";
 
 type Coordinate = {
   latitude: number;
@@ -33,11 +34,7 @@ const EARTH_RADIUS_METERS = 6_371_000;
 
 const CameraMiniMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => (
-    <div className="grid h-full w-full place-items-center bg-[#f4f5f3] text-xs text-[#4b5563]">
-      Газрын зураг ачаалж байна…
-    </div>
-  ),
+  loading: () => <SafePathLoading tone="light" className="h-full w-full bg-[#f4f5f3]" label="Газрын зураг ачаалж байна…" />,
 });
 
 function distanceMeters(from: Coordinate, to: Coordinate): number {
@@ -443,7 +440,7 @@ export default function ArNavigationCamera({
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-100/30 bg-[#052b35]/90 px-3 py-2 text-xs font-bold text-cyan-50 shadow-lg backdrop-blur-md transition hover:bg-[#064452] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
           aria-label={isAnalyzingScene ? "Орчныг AI-аар таньж байна" : "Камерын дүрсээс орчныг AI-аар таних"}
         >
-          {isAnalyzingScene ? <LoaderCircle size={17} className="animate-spin" /> : <ScanEye size={17} />}
+          {isAnalyzingScene ? <SafePathLoading variant="button" /> : <ScanEye size={17} />}
           <span>{isAnalyzingScene ? "Таньж байна…" : "Орчныг AI-аар таних"}</span>
         </button>
       </div>
@@ -463,7 +460,7 @@ export default function ArNavigationCamera({
       <div className="absolute inset-x-4 top-[17%] z-20 flex justify-center">
         <div className="max-w-full rounded-full border border-white/25 bg-black/50 px-3 py-1.5 text-center text-xs font-semibold text-white shadow-lg backdrop-blur-md">
           {relativeBearing === null
-            ? (route.length < 2 ? "Зам тооцоолж байна…" : "Луужинг уншиж байна…")
+            ? <span className="inline-flex items-center gap-1.5"><SafePathLoading variant="button" />{route.length < 2 ? "Зам тооцоолж байна…" : "Луужинг уншиж байна…"}</span>
             : Math.abs(relativeBearing) < 18
               ? "Шулуун чигээрээ яваарай"
               : relativeBearing > 0
