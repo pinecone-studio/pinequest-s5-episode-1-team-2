@@ -32,6 +32,7 @@ export function ProfileForm({ afterName }: { afterName?: ReactNode }) {
   return (
     <form key={profile.role} action={action} className="relative z-10 mx-auto grid w-full max-w-[390px] gap-4 pt-5">
       <h1 className="text-[29px] font-bold leading-[1.08] tracking-[-0.055em] text-white">{child ? "Хүүхдийн мэдээлэл" : "Эцэг эхийн мэдээлэл"}</h1>
+      <div aria-hidden="true" className="h-px w-full bg-white/15" />
       <div>
         <label htmlFor="profile-name" className="text-[13px] font-medium text-cyan-200">{child ? "Хүүхдийн нэр" : "Эцэг эхийн нэр"}</label>
         <input id="profile-name" name="name" defaultValue={name} maxLength={NAME_MAX_LENGTH} autoComplete="off" className={input} />
