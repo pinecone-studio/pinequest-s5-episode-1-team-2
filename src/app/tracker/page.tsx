@@ -713,11 +713,15 @@ export default function TrackerPage() {
         requestController.current =
           controller;
 
+        // Outside the zone the guidance screen is open, so even the offline message should
+        // point the way home rather than say that everything is fine.
         const fallbackMessage =
-          getSafetyFallback(
-            state.riskLevel,
-            profile.userName,
-          );
+          !state.isInsideSafeZone && targetZone
+            ? getGuidanceFallback(targetZone.name)
+            : getSafetyFallback(
+                state.riskLevel,
+                profile.userName,
+              );
 
         speechSequence.current += 1;
 
@@ -1283,4 +1287,8 @@ function formatDistance(
   return `${(
     meters / 1000
   ).toFixed(1)} км`;
+}
+
+function getGuidanceFallback(zoneName: string) {
+  return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
 }
