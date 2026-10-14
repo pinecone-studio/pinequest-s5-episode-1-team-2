@@ -176,7 +176,8 @@ export async function setRole(formData: FormData) {
   await linkToSelf(userId);
   await createSession(userId, role);
 
-  redirect(homeFor(role), "replace");
+  // Push, not replace: the role picker stays in history so the back button returns to it.
+  redirect(homeFor(role), "push");
 }
 
 /**
