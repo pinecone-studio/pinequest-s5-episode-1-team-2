@@ -67,6 +67,18 @@ select {
   background: #f2f2ef;
 }
 
+/* The AR mini-map sits over a busy camera image, so it keeps clear, full-strength tiles. */
+.safepath-map.ar-minimap .leaflet-tile-pane {
+  filter: grayscale(.3) contrast(.95);
+  opacity: 1;
+}
+
+/* The dome's curved top hides the map's top corners, so the credit moves to the bottom. */
+.ar-minimap .safepath-map__credit {
+  top: auto;
+  bottom: .5rem;
+}
+
 .safepath-map .leaflet-tooltip {
   border: 1px solid var(--border);
   border-radius: 12px;
