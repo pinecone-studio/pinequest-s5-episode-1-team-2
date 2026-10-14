@@ -15,6 +15,8 @@ const config: CapacitorConfig = {
     // Required by the background-geolocation plugin: otherwise location updates stop after
     // about 5 minutes in the background.
     useLegacyBridge: true,
+    // Android 15 draws apps edge-to-edge; without this the page slides under the status bar.
+    adjustMarginsForEdgeToEdge: "auto",
     // Push needs Firebase (android/app/google-services.json). Without it, the push plugin's
     // register() kills the whole app natively, so it stays out of the Android build until
     // Firebase is set up. Add "@capacitor/push-notifications" back here at the same time.
