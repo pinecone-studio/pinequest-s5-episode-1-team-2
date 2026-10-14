@@ -925,19 +925,21 @@ export default function TrackerPage() {
         </div>
 
         {demoMode && (
-          <div className="relative z-10 mb-2 flex items-center justify-center gap-2" aria-label="Demo байршил хөдөлгөх">
-            {([["left", "←"], ["up", "↑"], ["down", "↓"], ["right", "→"]] as const).map(([direction, arrow]) => (
-              <button
-                key={direction}
-                type="button"
-                onClick={() => moveDemoLocation(direction)}
-                className="size-11 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-xl text-[#d4e1e5] active:scale-95"
-                aria-label={`Demo: ${direction}`}
-              >
-                {arrow}
-              </button>
-            ))}
-            {safetyState && <span className="ml-1 text-[11px] font-semibold text-[#b7c7cc]">{safetyState.riskLevel}</span>}
+          <div className="relative z-10 mb-3 flex flex-col items-center gap-2" aria-label="Demo байршил хөдөлгөх">
+            <DemoArrow direction="up" onMove={moveDemoLocation} />
+            <div className="flex gap-2">
+              <DemoArrow direction="left" onMove={moveDemoLocation} />
+              <DemoArrow direction="down" onMove={moveDemoLocation} />
+              <DemoArrow direction="right" onMove={moveDemoLocation} />
+            </div>
+            <p className="text-xs text-[#b7c7cc]">
+              1 алхам ≈ 110м · {demoLocation.latitude.toFixed(6)}, {demoLocation.longitude.toFixed(6)}
+            </p>
+            {safetyState && (
+              <div className="rounded-full border border-[#67e8f9]/20 bg-[#0d2028] px-4 py-2 text-xs font-medium text-[#d4e1e5]">
+                Status: {safetyState.riskLevel}
+              </div>
+            )}
           </div>
         )}
 
@@ -1064,4 +1066,19 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
 
 function getGuidanceFallback(zoneName: string) {
   return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
+}
+
+const DEMO_ARROWS = { up: "↑", down: "↓", left: "←", right: "→" } as const;
+
+function DemoArrow({ direction, onMove }: { direction: keyof typeof DEMO_ARROWS; onMove: (direction: keyof typeof DEMO_ARROWS) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onMove(direction)}
+      className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-xl text-[#d4e1e5] active:scale-95"
+      aria-label={`Demo move ${direction}`}
+    >
+      {DEMO_ARROWS[direction]}
+    </button>
+  );
 }
