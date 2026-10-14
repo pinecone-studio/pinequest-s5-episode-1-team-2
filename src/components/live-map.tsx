@@ -13,10 +13,11 @@ type LiveMapProps = {
   destination?: Pick<SafetyLocation, "latitude" | "longitude">;
   familiarRoute?: [number, number][];
   variant?: "guardian" | "companion";
+  routeColor?: string;
   className?: string;
 };
 
-export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", className = "" }: LiveMapProps) {
+export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -61,7 +62,7 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
           </Circle>
         ))}
         {!companion && familiarRoute.length > 1 && <Polyline positions={familiarRoute} pathOptions={{ color: "#77776f", weight: 3, opacity: 0.45, dashArray: "5 7" }} />}
-        {currentRoute.length > 1 && <Polyline positions={currentRoute} pathOptions={{ color: "#2e7d4f", weight: companion ? 5 : 4, opacity: 0.85 }} />}
+        {currentRoute.length > 1 && <Polyline positions={currentRoute} pathOptions={{ color: routeColor, weight: companion ? 5 : 4, opacity: 0.85 }} />}
         {destination && <CircleMarker
           center={[destination.latitude, destination.longitude]}
           radius={8}
@@ -75,7 +76,7 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
         {companion ? <FollowLocation location={location} /> : <FitMap location={location} safeZones={safeZones} />}
       </MapContainer>
 
-      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute right-2 top-2 z-[400] rounded-xl bg-white/90 px-2 py-1 text-[10px] text-[#737373]">© OpenStreetMap</a>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="safepath-map__credit absolute right-2 top-2 z-[400] rounded-xl bg-white/90 px-2 py-1 text-[10px] text-[#737373]">© OpenStreetMap</a>
       {tileError && <p role="status" className="absolute inset-x-3 bottom-3 z-[400] rounded-xl bg-white/95 px-3 py-2 text-center text-xs leading-5 text-[#737373]">Газрын зураг ачаалсангүй. Интернэт холболтоо шалгана уу.</p>}
 
     </div>

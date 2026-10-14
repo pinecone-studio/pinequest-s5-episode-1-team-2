@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { Camera, CameraOff, Compass, MapPin, ScanEye, Sparkles } from "lucide-react";
+import { useNetworkStatus } from "@/hooks/use-network-status";
+import { Camera, CameraOff, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
 
 type Coordinate = {
@@ -12,13 +13,6 @@ type Coordinate = {
 
 type RoutePoint = [number, number];
 
-type SceneRouteContext = {
-  instruction: string;
-  destinationName: string;
-  remainingDistanceMeters: number | null;
-  relativeBearingDegrees: number | null;
-};
-
 type ArNavigationCameraProps = {
   location: Coordinate;
   route: RoutePoint[];
@@ -27,6 +21,8 @@ type ArNavigationCameraProps = {
   distanceMeters: number | null;
   autoStart?: boolean;
   onAutoStartAttempted?: () => void;
+  voice?: "female" | "male";
+  speechSpeed?: "normal" | "slow";
 };
 
 type DeviceOrientationWithCompass = DeviceOrientationEvent & {
@@ -38,6 +34,37 @@ type DeviceOrientationPermissionApi = typeof DeviceOrientationEvent & {
 };
 
 const EARTH_RADIUS_METERS = 6_371_000;
+
+// Rough half-width of a phone's rear camera view in portrait; used to place the destination sign.
+const CAMERA_HALF_FOV_DEGREES = 28;
+
+// Distance of each chevron group along the virtual ground plane (px), nearest first.
+const CHEVRON_DISTANCES = [0, 290, 560];
+const CHEVRON_WIDTH = 160;
+// Chevrons are drawn longer than wide so they still read clearly once the ground plane squashes them.
+const CHEVRON_STRETCH = 1.6;
+const CHEVRON_LENGTH = CHEVRON_WIDTH * CHEVRON_STRETCH;
+
+// Strongest bend the ground path shows; bigger turns are spelled out in the banner instead.
+const MAX_PATH_BEND_DEGREES = 40;
+
+// The mini-map dome's height: a share of the camera view, within fixed bounds.
+const DOME_MIN_PX = 118;
+const DOME_RATIO = 0.28;
+const DOME_MAX_PX = 172;
+
+// Shared by every overlay: the dome's height and roughly where the ground meets the sky.
+const AR_LAYOUT_VARIABLES = {
+  "--ar-dome": `clamp(${DOME_MIN_PX}px, ${DOME_RATIO * 100}%, ${DOME_MAX_PX}px)`,
+  "--ar-horizon": "47%",
+} as CSSProperties;
+
+// Where the nearest chevron touches the ground, just above the dome.
+const GROUND_ANCHOR = "calc(100% - var(--ar-dome) - 1.25rem)";
+// Vertical space (px) the full-size path needs between the banner and the dome.
+const GROUND_DESIGN_HEIGHT = 240;
+// Height (px) reserved for the top banner.
+const BANNER_RESERVE_PX = 112;
 
 const CameraMiniMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
@@ -101,32 +128,154 @@ function formatDistance(distance: number | null): string {
   return `${(distance / 1000).toFixed(1)} км`;
 }
 
+// Exponential smoothing factor for the compass; lower is steadier but slower to react.
+const HEADING_SMOOTHING = 0.18;
+
+const OFFLINE_SCENE_ERROR = "Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу.";
+const OFFLINE_SPEECH_ERROR = "Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү.";
+
 function readOrientation(event: DeviceOrientationWithCompass): number | null {
   if (typeof event.webkitCompassHeading === "number" && Number.isFinite(event.webkitCompassHeading)) {
     return (event.webkitCompassHeading + 360) % 360;
   }
 
-  if (typeof event.alpha !== "number" || !Number.isFinite(event.alpha)) return null;
+  const { alpha, beta, gamma } = event;
+  if (typeof alpha !== "number" || !Number.isFinite(alpha)) return null;
 
-  // Most browsers expose alpha relative to the device's top edge; account for screen rotation.
+  if (typeof beta === "number" && Number.isFinite(beta) && typeof gamma === "number" && Number.isFinite(gamma)) {
+    // Project the rear camera's direction (device -Z) onto the horizontal plane so the heading
+    // matches where the camera points while the phone is held upright, regardless of screen rotation.
+    const radians = (degrees: number) => (degrees * Math.PI) / 180;
+    const [a, b, g] = [radians(alpha), radians(beta), radians(gamma)];
+    const east = -Math.cos(a) * Math.sin(g) - Math.sin(a) * Math.sin(b) * Math.cos(g);
+    const north = Math.cos(a) * Math.sin(b) * Math.cos(g) - Math.sin(a) * Math.sin(g);
+    if (Math.hypot(east, north) > 0.35) {
+      return ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
+    }
+  }
+
+  // Phone is close to flat: fall back to the top edge's heading, accounting for screen rotation.
   const screenAngle = typeof window !== "undefined" ? (window.screen.orientation?.angle ?? 0) : 0;
-  return ((360 - event.alpha + screenAngle) % 360 + 360) % 360;
+  return ((360 - alpha + screenAngle) % 360 + 360) % 360;
 }
 
-function RouteChevron() {
+const CHEVRON_PATHS = [16, 74, 132].map((top) => {
+  const y = (value: number) => Math.round(value * CHEVRON_STRETCH);
+  return `M120 ${y(top)} 220 ${y(top + 58)} 220 ${y(top + 90)} 120 ${y(top + 34)} 20 ${y(top + 90)} 20 ${y(top + 58)}Z`;
+});
+
+// Three stacked chevrons drawn flat; the ground plane supplies the perspective. Layers from the
+// bottom: soft ground shadow, dark extruded side, blue rim, white top face.
+function ChevronGroup() {
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   return (
-    <svg viewBox="0 0 220 130" aria-hidden="true" className="block h-auto w-full overflow-visible">
-      <g fill="#1478f8" stroke="#0753c7" strokeWidth="2" strokeLinejoin="round">
-        <path d="M110 4 210 51 210 71 110 28 10 71 10 51Z" />
-        <path d="M110 35 198 76 198 96 110 57 22 96 22 76Z" />
-        <path d="M110 66 186 101 186 121 110 88 34 121 34 101Z" />
+    <svg viewBox={`0 0 240 ${240 * CHEVRON_STRETCH}`} aria-hidden="true" className="block size-full overflow-visible">
+      <defs>
+        <linearGradient id={`${id}-face`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="1" stopColor="#dce9ff" />
+        </linearGradient>
+        <filter id={`${id}-shadow`} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="7" />
+        </filter>
+      </defs>
+      <g fill="#001a44" opacity=".4" filter={`url(#${id}-shadow)`} transform="translate(0 26)">
+        {CHEVRON_PATHS.map((d) => <path key={d} d={d} />)}
       </g>
-      <g fill="#ffffff" stroke="#e9f6ff" strokeWidth="1" strokeLinejoin="round">
-        <path d="M110 12 190 50 190 55 110 21 30 55 30 50Z" />
-        <path d="M110 43 178 75 178 80 110 51 42 80 42 75Z" />
-        <path d="M110 74 166 100 166 105 110 82 54 105 54 100Z" />
+      <g fill="#0a4cc0" stroke="#0a4cc0" strokeWidth="22" strokeLinejoin="round" transform="translate(0 18)">
+        {CHEVRON_PATHS.map((d) => <path key={d} d={d} />)}
+      </g>
+      <g fill="#2a7fff" stroke="#2a7fff" strokeWidth="22" strokeLinejoin="round">
+        {CHEVRON_PATHS.map((d) => <path key={d} d={d} />)}
+      </g>
+      <g fill={`url(#${id}-face)`}>
+        {CHEVRON_PATHS.map((d) => <path key={d} d={d} />)}
       </g>
     </svg>
+  );
+}
+
+// Chevron groups laid on a CSS 3D ground plane so they shrink toward the horizon like the real
+// pavement. `bend` (degrees) curves the path toward the next route point; `scale` shrinks the
+// whole path on short screens so it never climbs into the banner.
+function GroundPath({ bend, muted, scale }: { bend: number; muted: boolean; scale: number }) {
+  const farthest = CHEVRON_DISTANCES[CHEVRON_DISTANCES.length - 1] + CHEVRON_LENGTH / 2;
+  // A parabola keeps the nearest chevron pointing ahead while the far ones swing into the turn.
+  const curvature = Math.tan((bend * Math.PI) / 180) / (2 * farthest);
+
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 z-10 overflow-hidden transition-opacity duration-500 ${muted ? "opacity-55" : "opacity-100"}`}
+      aria-hidden="true"
+    >
+      <div
+        className="absolute inset-0"
+        style={{
+          // The vanishing point sits a fixed distance above the anchor so the path keeps its shape at any height.
+          perspective: "560px",
+          perspectiveOrigin: `50% calc(${GROUND_ANCHOR} - 105px)`,
+          transform: `scale(${scale.toFixed(3)})`,
+          transformOrigin: `50% ${GROUND_ANCHOR}`,
+        }}
+      >
+        <div
+          className="absolute left-1/2"
+          style={{ top: GROUND_ANCHOR, transformStyle: "preserve-3d", transform: "rotateX(74deg)" }}
+        >
+          {/* Far groups first so nearer ones paint over them. */}
+          {CHEVRON_DISTANCES.map((distance, index) => ({ distance, index })).reverse().map(({ distance, index }) => {
+            const center = distance + CHEVRON_LENGTH / 2;
+            const offset = curvature * center * center;
+            const angle = (Math.atan(2 * curvature * center) * 180) / Math.PI;
+            return (
+              <div
+                key={index}
+                className="absolute left-0 top-0 transition-transform duration-300 ease-out"
+                style={{
+                  width: CHEVRON_WIDTH,
+                  height: CHEVRON_LENGTH,
+                  transform: `translate3d(${(offset - CHEVRON_WIDTH / 2).toFixed(1)}px, ${-distance - CHEVRON_LENGTH}px, 0) rotate(${angle.toFixed(1)}deg)`,
+                }}
+              >
+                <ChevronGroup />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PinMark() {
+  return (
+    <svg viewBox="0 0 24 32" aria-hidden="true" className="h-8 w-6 shrink-0 drop-shadow-[0_2px_2px_rgba(0,0,0,.25)]">
+      <path d="M12 0C5.4 0 0 5.2 0 11.7 0 20.4 12 32 12 32s12-11.6 12-20.3C24 5.2 18.6 0 12 0Z" fill="#ff4d4f" />
+      <circle cx="12" cy="11.5" r="4.6" fill="#ffffff" />
+    </svg>
+  );
+}
+
+// Compact pill that sits on the dome's rim, so the actions cost no space above the path.
+function ArControl({ label, active = false, disabled = false, onClick, ariaPressed, children }: {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  ariaPressed?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={ariaPressed}
+      className={`pointer-events-auto inline-flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-bold text-white shadow-[0_6px_18px_rgba(0,0,0,.35)] ring-1 backdrop-blur-md transition disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300 ${active ? "bg-emerald-600 ring-emerald-100/60" : "bg-[#0b1620]/85 ring-white/20 enabled:hover:bg-[#16293a]"}`}
+    >
+      {children}
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -138,8 +287,12 @@ export default function ArNavigationCamera({
   distanceMeters: remainingDistance,
   autoStart = false,
   onAutoStartAttempted,
+  voice = "female",
+  speechSpeed = "normal",
 }: ArNavigationCameraProps) {
+  const isOnline = useNetworkStatus();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const sceneAbortRef = useRef<AbortController | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const cameraRequestInFlightRef = useRef(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -150,8 +303,32 @@ export default function ArNavigationCamera({
   const [compassNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
   const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
-  const [sceneRouteContext, setSceneRouteContext] = useState<SceneRouteContext | null>(null);
   const [sceneError, setSceneError] = useState("");
+  const [voiceGuidanceEnabled, setVoiceGuidanceEnabled] = useState(false);
+  const [speechStatus, setSpeechStatus] = useState<"idle" | "loading" | "playing" | "error">("idle");
+  const [speechError, setSpeechError] = useState("");
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
+  const speechSequenceRef = useRef(0);
+  const speechObjectUrlRef = useRef<string | null>(null);
+  const lastAnnouncedInstructionRef = useRef("");
+  // The mini-map never reads lastUpdated; a stable timestamp keeps render pure.
+  const [mountedAt] = useState(() => Date.now());
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [rootHeight, setRootHeight] = useState(0);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const observer = new ResizeObserver(([entry]) => setRootHeight(entry.contentRect.height));
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, []);
+
+  const domeHeight = Math.min(DOME_MAX_PX, Math.max(DOME_MIN_PX, rootHeight * DOME_RATIO));
+  const groundScale = rootHeight
+    ? Math.max(0.5, Math.min(1, (rootHeight - domeHeight - BANNER_RESERVE_PX) / GROUND_DESIGN_HEIGHT))
+    : 1;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -172,24 +349,68 @@ export default function ArNavigationCamera({
   useEffect(() => {
     if (!compassEnabled) return;
 
-    const handleOrientation = (rawEvent: Event) => {
-      const event = rawEvent as DeviceOrientationWithCompass;
-      const nextHeading = readOrientation(event);
-      if (nextHeading === null) {
-        setCompassNote("Луужинг уншиж чадсангүй. Утсаа хөдөлгөж үзнэ үү.");
-        return;
-      }
-      setHeading(nextHeading);
-      setCompassNote("");
+    // Android Chrome's plain `deviceorientation` alpha is relative to an arbitrary start, so listening
+    // to both events would make the heading jump. Use the absolute event alone when it exists.
+    const supportsAbsolute = "ondeviceorientationabsolute" in window;
+    const eventName = supportsAbsolute ? "deviceorientationabsolute" : "deviceorientation";
+    let smoothed: { x: number; y: number } | null = null;
+    let lastPublished: number | null = null;
+    let frame = 0;
+
+    const publish = () => {
+      frame = 0;
+      if (!smoothed) return;
+      const next = ((Math.atan2(smoothed.x, smoothed.y) * 180) / Math.PI + 360) % 360;
+      if (lastPublished !== null && Math.abs(((next - lastPublished + 540) % 360) - 180) < 1) return;
+      lastPublished = next;
+      setHeading(next);
     };
 
-    window.addEventListener("deviceorientationabsolute", handleOrientation);
-    window.addEventListener("deviceorientation", handleOrientation);
+    const handleOrientation = (rawEvent: Event) => {
+      const event = rawEvent as DeviceOrientationWithCompass;
+      const isAbsolute = supportsAbsolute || event.absolute || typeof event.webkitCompassHeading === "number";
+      const rawHeading = isAbsolute ? readOrientation(event) : null;
+      if (rawHeading === null) {
+        setCompassNote(isAbsolute
+          ? "Луужинг уншиж чадсангүй. Утсаа 8 хэлбэрээр хөдөлгөж үзнэ үү."
+          : "Энэ browser хойд зүгийг тодорхойлж чадахгүй байна. Газрын зургийн маршрутыг дагаарай.");
+        return;
+      }
+
+      // Smooth on the unit circle so 359° → 1° does not swing through 180°.
+      const radians = (rawHeading * Math.PI) / 180;
+      const x = Math.sin(radians);
+      const y = Math.cos(radians);
+      smoothed = smoothed
+        ? { x: smoothed.x + (x - smoothed.x) * HEADING_SMOOTHING, y: smoothed.y + (y - smoothed.y) * HEADING_SMOOTHING }
+        : { x, y };
+      setCompassNote("");
+      if (!frame) frame = requestAnimationFrame(publish);
+    };
+
+    window.addEventListener(eventName, handleOrientation);
     return () => {
-      window.removeEventListener("deviceorientationabsolute", handleOrientation);
-      window.removeEventListener("deviceorientation", handleOrientation);
+      window.removeEventListener(eventName, handleOrientation);
+      if (frame) cancelAnimationFrame(frame);
     };
   }, [compassEnabled]);
+
+  // Keep the screen awake while the camera guides the person; released automatically when hidden.
+  useEffect(() => {
+    if (!stream || !("wakeLock" in navigator)) return;
+    let sentinel: WakeLockSentinel | null = null;
+    let cancelled = false;
+    navigator.wakeLock.request("screen").then((lock) => {
+      if (cancelled) void lock.release().catch(() => {});
+      else sentinel = lock;
+    }).catch(() => {
+      // Wake lock is a convenience; navigation still works without it.
+    });
+    return () => {
+      cancelled = true;
+      void sentinel?.release().catch(() => {});
+    };
+  }, [stream]);
 
   const target = useMemo(() => pickLookAheadPoint(location, route), [location, route]);
   const targetBearing = useMemo(
@@ -208,18 +429,232 @@ export default function ArNavigationCamera({
       latitude: location.latitude,
       longitude: location.longitude,
       accuracy: 10,
-      lastUpdated: Date.now(),
+      lastUpdated: mountedAt,
     }),
-    [location.latitude, location.longitude],
+    [location.latitude, location.longitude, mountedAt],
   );
-  const turnRotation = relativeBearing === null
+  const pathBend = relativeBearing === null
     ? 0
-    : Math.max(-55, Math.min(55, relativeBearing));
-  const arrowShift = relativeBearing === null
+    : Math.max(-MAX_PATH_BEND_DEGREES, Math.min(MAX_PATH_BEND_DEGREES, relativeBearing));
+  // The sign floats over the destination's real direction and pins to the screen edge when it is out of view.
+  const destinationRelative = routeDestination && heading !== null
+    ? ((bearingDegrees(location, routeDestination) - heading + 540) % 360) - 180
+    : null;
+  const signShift = destinationRelative === null
     ? 0
-    : Math.max(-34, Math.min(34, relativeBearing * 0.58));
+    : Math.max(-1, Math.min(1, destinationRelative / CAMERA_HALF_FOV_DEGREES));
+  const signEdge = destinationRelative === null || Math.abs(destinationRelative) <= CAMERA_HALF_FOV_DEGREES
+    ? null
+    : destinationRelative > 0 ? "right" : "left";
+  const isNearDestination = remainingDistance !== null && remainingDistance < 15;
+  const isFacingAway = relativeBearing !== null && Math.abs(relativeBearing) > 135;
+  const directionLabel = isNearDestination
+    ? "Зорьсон газартаа ойртлоо"
+    : relativeBearing === null
+      ? (route.length < 2 ? "Зам тооцоолж байна…" : "Луужинг уншиж байна…")
+      : Math.abs(relativeBearing) < 18
+        ? "Шулуун чигээрээ яваарай"
+        : isFacingAway
+          ? "Эргээд буцаж яваарай"
+          : relativeBearing > 0
+            ? "Баруун тийш чиглээрэй"
+            : "Зүүн тийш чиглээрэй";
+  const routeInstruction = instruction || "Аюулгүй бүс рүү буцах замыг тооцоолж байна…";
+  // One banner: the route step leads, and the compass hint takes over only when it matters more.
+  const bannerTitle = isNearDestination || isFacingAway ? directionLabel : routeInstruction;
+  const bannerDetail = isNearDestination
+    ? destinationName
+    : isFacingAway
+      ? routeInstruction
+      : heading !== null
+        ? directionLabel
+        : stream ? compassNote : "";
+  const bannerTone = isNearDestination
+    ? "bg-emerald-700/90 ring-emerald-200/30"
+    : isFacingAway
+      ? "bg-amber-600/90 ring-amber-100/30"
+      : "bg-[#0b1620]/80 ring-white/10";
+
+  const stopSpeech = useCallback(() => {
+    speechSequenceRef.current += 1;
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
+    const audio = speechAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    if (speechObjectUrlRef.current) {
+      URL.revokeObjectURL(speechObjectUrlRef.current);
+      speechObjectUrlRef.current = null;
+    }
+    setSpeechStatus("idle");
+  }, []);
+
+  const playSpeech = useCallback(async (text: string) => {
+    const normalizedText = text.replace(/\s+/g, " ").trim().slice(0, 260);
+    if (!normalizedText) return;
+    if (!isOnline) {
+      setSpeechStatus("error");
+      setSpeechError(OFFLINE_SPEECH_ERROR);
+      return;
+    }
+
+    speechAbortRef.current?.abort();
+    const controller = new AbortController();
+    speechAbortRef.current = controller;
+    const sequence = ++speechSequenceRef.current;
+    const audio = speechAudioRef.current;
+    if (!audio) {
+      setSpeechError("Дуу тоглуулах боломжгүй байна. Дэлгэцээ дахин нээнэ үү.");
+      setSpeechStatus("error");
+      return;
+    }
+
+    audio.pause();
+    if (speechObjectUrlRef.current) {
+      URL.revokeObjectURL(speechObjectUrlRef.current);
+      speechObjectUrlRef.current = null;
+    }
+    audio.removeAttribute("src");
+    audio.load();
+    setSpeechError("");
+    setSpeechStatus("loading");
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: normalizedText, voice }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        let message = "Дууны үйлчилгээ ажиллахгүй байна.";
+        try {
+          const payload: unknown = await response.json();
+          if (payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string") {
+            const serverMessage = payload.error;
+            message = serverMessage === "Speech is not configured."
+              ? "Монгол хэлний дууны үйлчилгээ тохируулаагүй байна."
+              : serverMessage === "Too many requests."
+                ? "Дууны хүсэлт олон байна. Түр хүлээгээд дахин оролдоно уу."
+                : serverMessage === "Unauthorized."
+                  ? "Дуугаар заавар авахын тулд дахин нэвтэрнэ үү."
+                  : "Дууны үйлчилгээ түр ажиллахгүй байна.";
+          }
+        } catch {
+          // Keep the safe generic message if the API does not return JSON.
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      if (!blob.size || !blob.type.startsWith("audio/")) {
+        throw new Error("Дууны өгөгдөл буруу байна.");
+      }
+      if (sequence !== speechSequenceRef.current || controller.signal.aborted) return;
+      const objectUrl = URL.createObjectURL(blob);
+      speechObjectUrlRef.current = objectUrl;
+      audio.src = objectUrl;
+      audio.currentTime = 0;
+      audio.playbackRate = speechSpeed === "slow" ? 0.86 : 1;
+      await audio.play();
+      if (sequence === speechSequenceRef.current) setSpeechStatus("playing");
+    } catch (error) {
+      if (controller.signal.aborted || sequence !== speechSequenceRef.current) return;
+      setSpeechStatus("error");
+      setSpeechError(error instanceof Error ? error.message : "Дууг тоглуулж чадсангүй. Интернетээ шалгана уу.");
+    } finally {
+      if (sequence === speechSequenceRef.current) speechAbortRef.current = null;
+    }
+  }, [isOnline, speechSpeed, voice]);
+
+  useEffect(() => {
+    const text = instruction.replace(/\s+/g, " ").trim();
+    if (!voiceGuidanceEnabled || !text || text === lastAnnouncedInstructionRef.current) return;
+    lastAnnouncedInstructionRef.current = text;
+    void playSpeech(text);
+  }, [instruction, playSpeech, voiceGuidanceEnabled]);
+
+  useEffect(() => () => {
+    speechAbortRef.current?.abort();
+    const audio = speechAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+    }
+    if (speechObjectUrlRef.current) URL.revokeObjectURL(speechObjectUrlRef.current);
+  }, []);
+
+  // Camera and remote AI/audio requests are not reliable or appropriate while the app is
+  // backgrounded. Stop the camera on hide and require the person to explicitly turn it on again.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") return;
+
+      const activeStream = activeStreamRef.current;
+      if (activeStream) {
+        activeStream.getTracks().forEach((track) => track.stop());
+        activeStreamRef.current = null;
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setStream(null);
+        setCameraLoading(false);
+        setCameraError("Апп background болсон тул камер аюулгүй байдлаар зогслоо. Буцаж ирээд «Камер асаах» товчийг дахин дарна уу.");
+      }
+
+      sceneAbortRef.current?.abort();
+      sceneAbortRef.current = null;
+      setIsAnalyzingScene(false);
+      setVoiceGuidanceEnabled(false);
+      lastAnnouncedInstructionRef.current = "";
+      stopSpeech();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [stopSpeech]);
+
+  // GPS and the camera feed remain device-local, but scene recognition and server TTS need a network.
+  useEffect(() => {
+    const handleOffline = () => {
+      sceneAbortRef.current?.abort();
+      sceneAbortRef.current = null;
+      setIsAnalyzingScene(false);
+      setSceneError(OFFLINE_SCENE_ERROR);
+      setVoiceGuidanceEnabled(false);
+      lastAnnouncedInstructionRef.current = "";
+      stopSpeech();
+      setSpeechStatus("error");
+      setSpeechError(OFFLINE_SPEECH_ERROR);
+    };
+
+    window.addEventListener("offline", handleOffline);
+    return () => window.removeEventListener("offline", handleOffline);
+  }, [stopSpeech]);
+
+  // The offline pill already covers both offline notices, and they clear once the network returns.
+  const visibleSceneError = sceneError === OFFLINE_SCENE_ERROR ? "" : sceneError;
+  const visibleSpeechError = speechError === OFFLINE_SPEECH_ERROR ? "" : speechError;
+
+  const toggleVoiceGuidance = useCallback(() => {
+    if (voiceGuidanceEnabled) {
+      setVoiceGuidanceEnabled(false);
+      lastAnnouncedInstructionRef.current = "";
+      stopSpeech();
+      setSpeechError("");
+      return;
+    }
+
+    setVoiceGuidanceEnabled(true);
+    const currentInstruction = instruction.replace(/\s+/g, " ").trim();
+    lastAnnouncedInstructionRef.current = currentInstruction;
+    void playSpeech(currentInstruction || "Дуугаар чиглүүлэлт идэвхжлээ. GPS маршрутаа шалгаж байна.");
+  }, [instruction, playSpeech, stopSpeech, voiceGuidanceEnabled]);
 
   const stopCamera = useCallback(() => {
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = null;
+    setIsAnalyzingScene(false);
     const activeStream = activeStreamRef.current;
     if (activeStream) {
       activeStream.getTracks().forEach((track) => track.stop());
@@ -234,9 +669,11 @@ export default function ArNavigationCamera({
     setCameraError("");
     setSceneError("");
     setSceneDescription("");
-    setSceneRouteContext(null);
     setIsAnalyzingScene(false);
-  }, []);
+    setVoiceGuidanceEnabled(false);
+    lastAnnouncedInstructionRef.current = "";
+    stopSpeech();
+  }, [stopSpeech]);
 
   const startCamera = useCallback(async () => {
     if (cameraRequestInFlightRef.current || activeStreamRef.current) return;
@@ -321,6 +758,10 @@ export default function ArNavigationCamera({
   }, []);
 
   const analyzeScene = useCallback(async () => {
+    if (!isOnline) {
+      setSceneError("Интернет холболтгүй байна. Сүлжээнд холбогдсоны дараа дахин оролдоно уу.");
+      return;
+    }
     const video = videoRef.current;
     if (!stream || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1) {
       setSceneError("Эхлээд камераа асаагаад дүрс гарч ирэхийг хүлээнэ үү.");
@@ -331,7 +772,9 @@ export default function ArNavigationCamera({
     setIsAnalyzingScene(true);
     setSceneError("");
     setSceneDescription("");
-    setSceneRouteContext(null);
+    const controller = new AbortController();
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = controller;
 
     try {
       // Downscale the still frame before upload to reduce mobile data and request size.
@@ -376,6 +819,7 @@ export default function ArNavigationCamera({
             routeReady: route.length >= 2,
           },
         }),
+        signal: controller.signal,
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -388,48 +832,41 @@ export default function ArNavigationCamera({
         throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
       }
       setSceneDescription(result.description);
-      if (
-        "routeContext" in result &&
-        result.routeContext &&
-        typeof result.routeContext === "object" &&
-        "instruction" in result.routeContext &&
-        typeof result.routeContext.instruction === "string" &&
-        "destinationName" in result.routeContext &&
-        typeof result.routeContext.destinationName === "string"
-      ) {
-        const routeContext = result.routeContext as Record<string, unknown>;
-        setSceneRouteContext({
-          instruction: typeof routeContext.instruction === "string"
-            ? routeContext.instruction.slice(0, 160)
-            : instruction.slice(0, 160),
-          destinationName: typeof routeContext.destinationName === "string"
-            ? routeContext.destinationName.slice(0, 80)
-            : destinationName.slice(0, 80),
-          remainingDistanceMeters: typeof routeContext.remainingDistanceMeters === "number" && Number.isFinite(routeContext.remainingDistanceMeters)
-            ? routeContext.remainingDistanceMeters
-            : null,
-          relativeBearingDegrees: typeof routeContext.relativeBearingDegrees === "number" && Number.isFinite(routeContext.relativeBearingDegrees)
-            ? routeContext.relativeBearingDegrees
-            : null,
-        });
-      }
+      if (voiceGuidanceEnabled) void playSpeech(result.description);
     } catch (error) {
-      setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+      if (!controller.signal.aborted) {
+        setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+      }
     } finally {
+      if (sceneAbortRef.current === controller) sceneAbortRef.current = null;
       setIsAnalyzingScene(false);
     }
-  }, [destinationName, heading, instruction, isAnalyzingScene, relativeBearing, remainingDistance, route.length, stream, targetBearing]);
+  }, [destinationName, heading, instruction, isAnalyzingScene, isOnline, playSpeech, relativeBearing, remainingDistance, route.length, stream, targetBearing, voiceGuidanceEnabled]);
+
+  const dismissScene = useCallback(() => {
+    sceneAbortRef.current?.abort();
+    sceneAbortRef.current = null;
+    setIsAnalyzingScene(false);
+    setSceneDescription("");
+    setSceneError("");
+  }, []);
 
   // The parent requests this only after the five-minute Safe Zone exit countdown expires.
   // getUserMedia may still be blocked by the browser if camera permission has not been granted.
   useEffect(() => {
     if (!autoStart) return;
     onAutoStartAttempted?.();
-    void startCamera();
+    // Defer so the camera's loading state is set outside the effect body.
+    queueMicrotask(() => void startCamera());
   }, [autoStart, onAutoStartAttempted, startCamera]);
 
   return (
-    <div className="absolute inset-0 isolate overflow-hidden bg-[#071116] text-white" aria-label="Камераар бодит орчин дээр маршрут чиглүүлэх">
+    <div
+      ref={rootRef}
+      className="absolute inset-0 isolate overflow-hidden bg-[#071116] text-white"
+      style={AR_LAYOUT_VARIABLES}
+      aria-label="Камераар бодит орчин дээр маршрут чиглүүлэх"
+    >
       {stream ? (
         <video
           ref={videoRef}
@@ -440,153 +877,213 @@ export default function ArNavigationCamera({
           aria-label="Утасны арын камерын дүрс"
         />
       ) : (
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.3),transparent_58%),linear-gradient(160deg,#1b3037,#050a0e)]">
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="flex max-w-[250px] flex-col items-center gap-2 rounded-2xl border border-white/10 bg-black/25 px-5 py-4 text-center text-[#d4e1e5] backdrop-blur-sm">
-              <Camera size={36} strokeWidth={1.4} />
-              <p className="text-sm leading-5">Арын камерыг асаагаад зам дээрх чиглэлийн сумыг хараарай.</p>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.3),transparent_58%),linear-gradient(160deg,#1b3037,#050a0e)]" />
+      )}
+
+      {/* Darken only the top edge so the banner reads well without dimming the street. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-linear-to-b from-black/45 to-transparent" />
+
+      {/* Facing away, a path "ahead" would mislead; the amber banner says to turn around instead. */}
+      {stream && route.length >= 2 && !isNearDestination && !isFacingAway && (
+        <GroundPath bend={pathBend} muted={relativeBearing === null} scale={groundScale} />
+      )}
+
+      {/* Destination sign on a short post, standing in the street toward the destination. */}
+      {stream && (
+        <div
+          className="pointer-events-none absolute z-20 flex -translate-x-1/2 flex-col items-center transition-[left] duration-300 ease-out"
+          style={{
+            top: "max(8rem, calc(var(--ar-horizon) - 7rem))",
+            left: `calc(50% + ${signShift.toFixed(3)} * (50% - 6.5rem))`,
+          }}
+        >
+          <div className={`flex max-w-52 items-center gap-2 rounded-2xl px-3 py-2 shadow-[0_12px_28px_rgba(0,32,96,.35)] ring-1 ring-white/30 transition-colors ${isNearDestination ? "bg-emerald-600" : "bg-[#2a7fff]"}`}>
+            {signEdge === "left" && <ChevronLeft size={20} strokeWidth={3} className="-ml-1 shrink-0" aria-hidden="true" />}
+            {isNearDestination ? <Flag size={24} fill="currentColor" className="shrink-0" aria-hidden="true" /> : <PinMark />}
+            <div className="min-w-0">
+              <p className="text-[21px] font-extrabold leading-6 tracking-tight">{formatDistance(remainingDistance) || "—"}</p>
+              <p className="truncate text-[13px] font-semibold leading-[18px] text-white/95">{destinationName}</p>
+            </div>
+            {signEdge === "right" && <ChevronRight size={20} strokeWidth={3} className="-mr-1 shrink-0" aria-hidden="true" />}
+          </div>
+          <div className="h-5 w-[3px] rounded-b-full bg-linear-to-b from-white to-white/40" />
+          <div className="-mt-0.5 h-1.5 w-6 rounded-[50%] bg-black/35 blur-[2px]" />
+        </div>
+      )}
+
+      {!stream && (
+        <div
+          className="pointer-events-none absolute inset-x-5 z-20 flex items-center justify-center overflow-y-auto"
+          style={{ top: "6.5rem", bottom: "calc(var(--ar-dome) * 0.8 + 3.5rem)" }}
+        >
+          <div className="pointer-events-auto w-full max-w-[18rem] rounded-3xl bg-[#0b1620]/85 p-4 text-center shadow-xl ring-1 ring-white/10 backdrop-blur-md">
+            <p className="text-[16px] font-semibold leading-6">Камераа асаагаад газар дээрх цэнхэр сумыг дагаарай.</p>
+            <button
+              type="button"
+              onClick={() => void startCamera()}
+              disabled={cameraLoading}
+              className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#2a7fff] px-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(42,127,255,.35)] transition hover:bg-[#1c6fee] disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+            >
+              {cameraLoading ? <SafePathLoading variant="button" /> : <Camera size={18} aria-hidden="true" />}
+              {cameraLoading ? "Нээж байна…" : "Камер асаах"}
+            </button>
+            {cameraError && <p role="alert" className="mt-3 text-left text-[14px] leading-5 text-rose-200">{cameraError}</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Top stack: a single instruction banner, then any notices, in normal flow so nothing overlaps. */}
+      <div
+        className="pointer-events-none absolute inset-x-3 top-3 z-40 flex flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-width:none]"
+        style={{ maxHeight: "calc(100% - var(--ar-dome) - 1.5rem)" }}
+      >
+        <div className="pointer-events-auto flex shrink-0 items-start gap-2">
+          <div role="status" aria-live="polite" className={`flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-[20px] px-3 py-2.5 shadow-[0_8px_24px_rgba(0,0,0,.3)] ring-1 backdrop-blur-md transition-colors ${bannerTone}`}>
+            <span className={`grid size-11 shrink-0 place-items-center rounded-2xl ${isNearDestination || isFacingAway ? "bg-white/20" : "bg-[#2a7fff]"}`} aria-hidden="true">
+              {isNearDestination ? (
+                <Flag size={22} fill="currentColor" />
+              ) : relativeBearing !== null ? (
+                <Navigation2 size={24} fill="currentColor" style={{ transform: `rotate(${Math.round(relativeBearing)}deg)` }} />
+              ) : route.length < 2 ? (
+                <SafePathLoading variant="button" />
+              ) : (
+                <Compass size={22} />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-[17px] font-bold leading-[22px]">{bannerTitle}</p>
+              {bannerDetail && <p className="mt-0.5 line-clamp-2 text-[13px] font-medium leading-[18px] text-white/80">{bannerDetail}</p>}
             </div>
           </div>
+          {stream && (
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0b1620]/80 text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md transition hover:bg-[#16293a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+              aria-label="Камерыг унтраах"
+            >
+              <CameraOff size={20} />
+            </button>
+          )}
         </div>
-      )}
 
-      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/25" />
+        {!isOnline && (
+          <p className="pointer-events-auto inline-flex shrink-0 items-center gap-1.5 self-center rounded-full bg-amber-400/95 px-3 py-1.5 text-[13px] font-bold text-amber-950 shadow-lg">
+            <WifiOff size={14} aria-hidden="true" /> Интернетгүй · AI болон дуу түр зогссон
+          </p>
+        )}
 
-      {/* Destination distance card, styled like a navigation app's AR banner. */}
-      <div className="absolute inset-x-3 top-3 z-30 flex items-start gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[18px] border border-white/15 bg-[#1976f8]/95 px-3 py-2.5 shadow-[0_8px_30px_rgba(0,0,0,.3)] backdrop-blur-md">
-          <MapPin size={30} fill="#ff554f" stroke="#ff554f" className="shrink-0 drop-shadow-sm" />
-          <div className="min-w-0 text-left">
-            <p className="text-[22px] font-bold leading-6 tracking-tight">{formatDistance(remainingDistance) || "—"}</p>
-            <p className="mt-0.5 truncate text-[13px] font-semibold text-white/95">{destinationName}</p>
+        {stream && cameraError && (
+          <p role="alert" className="pointer-events-auto shrink-0 rounded-2xl bg-rose-950/95 px-4 py-3 text-[15px] leading-6 text-rose-50 shadow-lg ring-1 ring-rose-200/30">
+            {cameraError}
+          </p>
+        )}
+
+        {visibleSpeechError && (
+          <p role="alert" className="pointer-events-auto shrink-0 rounded-2xl bg-[#0b1620]/90 px-4 py-3 text-[15px] leading-6 text-white shadow-lg ring-1 ring-white/15 backdrop-blur-md">
+            {visibleSpeechError}
+          </p>
+        )}
+
+        {(sceneDescription || visibleSceneError) && (
+          <div className="pointer-events-auto shrink-0 rounded-2xl bg-[#0b1620]/90 px-4 py-3.5 shadow-xl ring-1 ring-cyan-100/20 backdrop-blur-md" aria-live="polite">
+            <div className="flex items-center gap-2 text-[15px] font-bold text-cyan-100">
+              <Sparkles size={15} aria-hidden="true" /> AI орчны тайлбар
+              <button
+                type="button"
+                onClick={dismissScene}
+                className="-my-2 -mr-2 ml-auto grid size-11 place-items-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+                aria-label="AI орчны тайлбарыг хаах"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {sceneDescription && <p className="mt-1 text-[16px] leading-6 text-white">{sceneDescription}</p>}
+            {visibleSceneError && <p role="alert" className="mt-1 text-[15px] leading-5 text-rose-100">{visibleSceneError}</p>}
+            <p className="mt-2 text-[12px] leading-4 text-white/65">GPS заавар үндсэн хэвээр. AI зам хөндлөн гарах аюулгүй эсэхийг баталгаажуулахгүй.</p>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => (stream ? stopCamera() : void startCamera())}
-          disabled={cameraLoading}
-          className="inline-flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[16px] border border-white/20 bg-[#071116]/85 px-3 text-xs font-bold text-white shadow-lg backdrop-blur-md transition hover:bg-[#122730] disabled:cursor-wait disabled:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
-          aria-label={cameraLoading ? "Камер нээж байна" : stream ? "Камерыг унтраах" : "Арын камерыг асаах"}
-        >
-          {stream ? <CameraOff size={18} /> : <Camera size={18} />}
-          <span>{cameraLoading ? "Нээж байна…" : stream ? "Унтраах" : "Камер асаах"}</span>
-        </button>
+        )}
       </div>
 
-      {cameraError && (
-        <p role="alert" className="absolute inset-x-3 top-[82px] z-30 rounded-xl border border-rose-200/30 bg-rose-950/90 px-3 py-2 text-xs leading-5 text-rose-50 shadow-lg">
-          {cameraError}
-        </p>
-      )}
-
-      <div className="absolute inset-x-3 top-[126px] z-30 flex justify-end">
-        <button
-          type="button"
-          onClick={() => void analyzeScene()}
-          disabled={!stream || isAnalyzingScene}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-100/30 bg-[#052b35]/90 px-3 py-2 text-xs font-bold text-cyan-50 shadow-lg backdrop-blur-md transition hover:bg-[#064452] disabled:cursor-not-allowed disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
-          aria-label={isAnalyzingScene ? "Орчныг AI-аар таньж байна" : "Камерын дүрсээс орчныг AI-аар таних"}
+      {/* Two quick actions resting on the dome's rim in the lower corners, clear of the path and the sign. */}
+      <div
+        className="pointer-events-none absolute inset-x-3 z-30 flex items-end justify-between"
+        style={{ bottom: "calc(var(--ar-dome) * 0.8)" }}
+      >
+        <ArControl
+          label="Дуу"
+          active={voiceGuidanceEnabled}
+          disabled={!isOnline && !voiceGuidanceEnabled}
+          onClick={toggleVoiceGuidance}
+          ariaPressed={voiceGuidanceEnabled}
         >
-          {isAnalyzingScene ? <SafePathLoading variant="button" /> : <ScanEye size={17} />}
-          <span>{isAnalyzingScene ? "Таньж байна…" : "Орчныг AI-аар таних"}</span>
-        </button>
+          {speechStatus === "loading"
+            ? <SafePathLoading variant="button" />
+            : voiceGuidanceEnabled
+              ? <Volume2 size={18} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />
+              : <VolumeX size={18} aria-hidden="true" />}
+        </ArControl>
+        {stream && (
+          <ArControl
+            label={isAnalyzingScene ? "Таньж байна…" : "AI тайлбар"}
+            disabled={isAnalyzingScene || !isOnline}
+            onClick={() => void analyzeScene()}
+          >
+            {isAnalyzingScene ? <SafePathLoading variant="button" /> : <ScanEye size={18} aria-hidden="true" />}
+          </ArControl>
+        )}
       </div>
 
-      {(sceneDescription || sceneError) && (
-        <div className="absolute inset-x-3 top-[174px] z-30 mx-auto max-w-lg rounded-2xl border border-cyan-100/25 bg-[#071820]/95 px-3 py-3 shadow-xl backdrop-blur-md" aria-live="polite">
-          <div className="mb-1.5 flex items-center gap-2 text-xs font-bold text-cyan-100">
-            <Sparkles size={15} /> AI орчны тайлбар
-          </div>
-          {sceneDescription && <p className="text-sm leading-5 text-white">{sceneDescription}</p>}
-          {sceneRouteContext && (
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-cyan-100/80">GPS маршрутын заавар</p>
-              <p className="mt-1 text-sm font-semibold leading-5 text-white">{sceneRouteContext.instruction || "GPS заавар хүлээгдэж байна."}</p>
-              <p className="mt-1 text-[11px] leading-4 text-white/70">
-                {sceneRouteContext.destinationName || destinationName}
-                {sceneRouteContext.remainingDistanceMeters !== null
-                  ? ` · ${formatDistance(sceneRouteContext.remainingDistanceMeters)} үлдсэн`
-                  : " · зай тооцоолж байна"}
-              </p>
-              {sceneRouteContext.relativeBearingDegrees !== null && (
-                <p className="mt-1 text-[11px] text-cyan-100/90">
-                  {Math.abs(sceneRouteContext.relativeBearingDegrees) < 18
-                    ? "Луужингийн чиглэл: урагш"
-                    : sceneRouteContext.relativeBearingDegrees > 0
-                      ? "Луужингийн чиглэл: баруун тийш"
-                      : "Луужингийн чиглэл: зүүн тийш"}
-                </p>
+      <p className="sr-only" role="status" aria-live="polite">
+        {speechStatus === "loading" ? "Монгол хэлний дууны заавар бэлдэж байна" : speechStatus === "playing" ? "GPS зааврыг дуугаар уншиж байна" : ""}
+      </p>
+
+      {/* Curved mini-map. The dome is wider than the screen so only its gentle top arc shows. */}
+      <div className="absolute inset-x-0 bottom-0 z-20 h-(--ar-dome)">
+        <div
+          className="absolute inset-y-0 -left-[18%] -right-[18%] isolate overflow-hidden border-4 border-b-0 border-white bg-[#eef1f4] shadow-[0_-10px_30px_rgba(0,0,0,.3)]"
+          style={{ borderRadius: "50% 50% 0 0 / 100% 100% 0 0" }}
+        >
+          {/* Inset back to the visible width so the map centres on the person, not on the off-screen dome. */}
+          <div className="absolute inset-y-0 left-[13.2353%] right-[13.2353%]">
+            <CameraMiniMap
+              location={miniMapLocation}
+              currentRoute={route}
+              destination={routeDestination ?? undefined}
+              variant="companion"
+              routeColor="#2a7fff"
+              className="ar-minimap h-full w-full rounded-none border-0"
+            />
+            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
+              {heading === null ? (
+                <span className="block size-4 rounded-full border-[3px] border-white bg-[#2a7fff] shadow-[0_0_0_6px_rgba(42,127,255,.22)]" />
+              ) : (
+                <svg viewBox="0 0 32 32" className="size-8 drop-shadow-[0_2px_3px_rgba(0,0,0,.35)]" style={{ transform: `rotate(${Math.round(heading)}deg)` }}>
+                  <path d="M16 3 27 27 16 21 5 27Z" fill="#2a7fff" stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round" />
+                </svg>
               )}
             </div>
-          )}
-          {sceneError && <p role="alert" className="text-sm leading-5 text-rose-100">{sceneError}</p>}
-          <p className="mt-2 text-[10px] leading-4 text-white/60">AI зурагт харагдаж буй орчныг тайлбарлана. GPS маршрутын заавар үндсэн хэвээр; зураг дангаараа зам хөндлөн гарах аюулгүй байдлыг батлахгүй.</p>
-        </div>
-      )}
-
-      {/* Floating turn instruction. The arrows below deliberately sit on the camera view, not inside a compass dial. */}
-      <div className="absolute inset-x-4 top-[17%] z-20 flex justify-center">
-        <div className="max-w-full rounded-full border border-white/25 bg-black/50 px-3 py-1.5 text-center text-xs font-semibold text-white shadow-lg backdrop-blur-md">
-          {relativeBearing === null
-            ? <span className="inline-flex items-center gap-1.5"><SafePathLoading variant="button" />{route.length < 2 ? "Зам тооцоолж байна…" : "Луужинг уншиж байна…"}</span>
-            : Math.abs(relativeBearing) < 18
-              ? "Шулуун чигээрээ яваарай"
-              : relativeBearing > 0
-                ? "Баруун тийш чиглээрэй"
-                : "Зүүн тийш чиглээрэй"}
+          </div>
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-[25%] bottom-[29%] z-10 overflow-hidden" aria-label="Замын чиглэлийн сумнууд">
-        <div
-          className="absolute left-1/2 top-[1%] w-[19%] min-w-[56px] max-w-[98px] opacity-55"
-          style={{ transform: `translateX(calc(-50% + ${arrowShift * 0.35}px)) perspective(650px) rotateX(55deg) rotateZ(${turnRotation * 0.55}deg)`, filter: "drop-shadow(0 8px 6px rgba(0,0,0,.5)) blur(.15px)" }}
-        >
-          <RouteChevron />
-        </div>
-        <div
-          className="absolute left-1/2 top-[31%] w-[37%] min-w-[94px] max-w-[180px] opacity-80"
-          style={{ transform: `translateX(calc(-50% + ${arrowShift * 0.65}px)) perspective(650px) rotateX(55deg) rotateZ(${turnRotation * 0.8}deg)`, filter: "drop-shadow(0 10px 7px rgba(0,0,0,.48))" }}
-        >
-          <RouteChevron />
-        </div>
-        <div
-          className="absolute left-1/2 bottom-[-2%] w-[65%] min-w-[150px] max-w-[310px]"
-          style={{ transform: `translateX(calc(-50% + ${arrowShift}px)) perspective(650px) rotateX(55deg) rotateZ(${turnRotation}deg)`, filter: "drop-shadow(0 14px 9px rgba(0,0,0,.55))" }}
-        >
-          <RouteChevron />
-        </div>
-      </div>
-
-      {heading !== null && (
-        <div className="absolute right-3 top-[25%] z-20 flex items-center gap-1.5 rounded-full border border-white/20 bg-black/45 px-2.5 py-1.5 text-[10px] font-medium text-white/90 backdrop-blur-md">
-          <Compass size={13} className="text-cyan-200" /> {Math.round(heading)}°
-        </div>
-      )}
-
-      {/* Real street tiles and the returned route are kept visible in a curved bottom mini-map. */}
-      <div
-        className="absolute inset-x-0 bottom-0 z-20 h-[29%] min-h-[116px] max-h-[178px] overflow-hidden border-t-[3px] border-white/90 bg-[#f4f5f3] shadow-[0_-14px_34px_rgba(0,0,0,.24)]"
-        style={{ clipPath: "ellipse(122% 100% at 50% 100%)" }}
-      >
-        <CameraMiniMap
-          location={miniMapLocation}
-          currentRoute={route}
-          destination={routeDestination ?? undefined}
-          variant="companion"
-          className="h-full w-full rounded-none border-0"
-        />
-      </div>
-
-      <div className="absolute inset-x-3 bottom-[29%] z-30 flex justify-center pb-2">
-        <div className="max-w-full rounded-[14px] border border-white/20 bg-[#08141c]/90 px-3 py-2 text-center shadow-[0_5px_22px_rgba(0,0,0,.4)] backdrop-blur-md">
-          <p className="line-clamp-2 text-xs font-semibold leading-4 text-white">{instruction || "Аюулгүй бүс рүү буцах замыг тооцоолж байна…"}</p>
-          <p className="mt-1 text-[10px] font-medium text-cyan-100/90">
-            {remainingDistance === null ? "Зай хүлээгдэж байна" : `${formatDistance(remainingDistance)} үлдсэн`}
-            {heading === null ? ` · ${compassNote}` : ` · Луужин ${Math.round(heading)}°`}
-          </p>
-        </div>
-      </div>
+      <audio
+        ref={speechAudioRef}
+        className="sr-only"
+        preload="none"
+        onPlaying={() => setSpeechStatus("playing")}
+        onEnded={() => {
+          setSpeechStatus("idle");
+          if (speechObjectUrlRef.current) {
+            URL.revokeObjectURL(speechObjectUrlRef.current);
+            speechObjectUrlRef.current = null;
+          }
+        }}
+        onError={() => {
+          setSpeechStatus("error");
+          setSpeechError("Дууг тоглуулж чадсангүй. Дахин оролдоно уу.");
+        }}
+      />
 
     </div>
   );

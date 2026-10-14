@@ -29,6 +29,8 @@ export function useGeolocation() {
   const [status, setStatus] = useState<GeolocationStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const watchId = useRef<number | null>(null);
+  const hasRealLocation = useRef(false);
+  const usingDemoLocation = useRef(false);
 
   const stopWatching = useCallback(() => {
     if (watchId.current !== null && "geolocation" in navigator) {
@@ -37,17 +39,20 @@ export function useGeolocation() {
     }
   }, []);
 
-  useEffect(() => {
+  const startWatching = useCallback(() => {
+    if (usingDemoLocation.current) return;
+    stopWatching();
+
     if (!("geolocation" in navigator)) {
-      queueMicrotask(() => {
-        setStatus("error");
-        setError("Энэ төхөөрөмж байршил тодорхойлох боломжгүй байна.");
-      });
+      setStatus("error");
+      setError("Энэ төхөөрөмж байршил тодорхойлох боломжгүй байна.");
       return;
     }
 
+    if (!hasRealLocation.current) setStatus("loading");
     watchId.current = navigator.geolocation.watchPosition(
       (position) => {
+        hasRealLocation.current = true;
         setLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -67,11 +72,39 @@ export function useGeolocation() {
         timeout: 15_000,
       },
     );
-
-    return stopWatching;
   }, [stopWatching]);
 
+  useEffect(() => {
+    startWatching();
+    let wasHidden = document.visibilityState === "hidden";
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+        return;
+      }
+      if (!wasHidden) return;
+      wasHidden = false;
+      // Restart the browser/WebView GPS watcher after returning from background so it
+      // requests a fresh fix instead of leaving the UI stuck on an old location.
+      startWatching();
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) startWatching();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+      stopWatching();
+    };
+  }, [startWatching, stopWatching]);
+
   const useDemoLocation = useCallback(() => {
+    usingDemoLocation.current = true;
     stopWatching();
     setLocation({ ...DEMO_LOCATION, lastUpdated: Date.now() });
     setStatus("demo");

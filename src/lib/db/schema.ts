@@ -25,7 +25,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           passwordHash: { bsonType: "string" },
           name: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
           childName: { bsonType: "string", minLength: 1, maxLength: NAME_MAX_LENGTH },
-          childPhone: { bsonType: "string" },
+          childPhone: { bsonType: ["string", "null"] },
           phone: { bsonType: ["string", "null"] },
           locationPaused: { bsonType: "bool" },
           createdAt: { bsonType: "date" },

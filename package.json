@@ -7,11 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:setup": "bun scripts/setup-db.ts",
+    "db:setup": "npx --yes tsx scripts/setup-db.ts",
     "android:add": "cap add android",
     "android:sync": "cap sync android",
     "android:open": "cap open android",
-    "android:run": "cap run android"
+    "android:run": "cap run android",
+    "typecheck": "tsc --noEmit",
+    "qa": "bun run typecheck && bun run lint",
+    "release:preflight": "node scripts/release-preflight.mjs",
+    "android:debug:apk": "cd android && ./gradlew assembleDebug",
+    "android:release:aab": "cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
