@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import { AppShell, CompanionMark } from "@/components/safe-path";
@@ -30,6 +30,8 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 // are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
+// Holding the logo this long toggles Demo Mode, kept out of sight of children and older users.
+const DEMO_TOGGLE_HOLD_MS = 1_200;
 
 type RouteResult = {
   destination: {
@@ -55,6 +57,7 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
+  const demoHoldTimer = useRef<number | null>(null);
   const [guiding, setGuiding] = useState(false);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
@@ -260,8 +263,8 @@ export default function TrackerPage() {
       : undefined;
 
 
-  // Outside a configured Safe Zone, the screen turns into camera guidance; back inside, it returns
-  // to the map. Both switches wait a moment to ride out GPS jitter at the boundary.
+  // Outside a configured Safe Zone, the screen turns into camera guidance with the companion on
+  // top; back inside, it returns to the calm map. Both switches wait a moment to ride out GPS jitter.
   const isOutsideSafeZone = Boolean(safetyState && targetZone && !safetyState.isInsideSafeZone);
   useEffect(() => {
     if (isOutsideSafeZone === guiding) return;
@@ -271,6 +274,14 @@ export default function TrackerPage() {
     );
     return () => window.clearTimeout(timer);
   }, [guiding, isOutsideSafeZone]);
+
+  const startDemoHold = () => {
+    demoHoldTimer.current = window.setTimeout(() => setDemoMode((value) => !value), DEMO_TOGGLE_HOLD_MS);
+  };
+  const cancelDemoHold = () => {
+    if (demoHoldTimer.current) window.clearTimeout(demoHoldTimer.current);
+    demoHoldTimer.current = null;
+  };
 
   useEffect(() => {
     if (currentLatitude === undefined || currentLongitude === undefined) {
@@ -873,295 +884,178 @@ export default function TrackerPage() {
   }, []);
 
 
+  const companionName = settings.name || "Мило";
+  const companionMessage = assistantMessage || (safetyState
+    ? isOutsideSafeZone && targetZone
+      ? getGuidanceFallback(targetZone.name)
+      : getSafetyFallback(safetyState.riskLevel, profile.userName)
+    : zonesLoadError || (zonesLoaded && !demoMode && savedZones.length === 0
+      ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй."
+      : "Байршил болон аюулгүй бүс ачаалж байна…"));
+  const companionState = safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING"
+    ? "warning"
+    : speechStatus === "playing"
+      ? "speaking"
+      : "idle";
+
   return (
     <AppShell>
-      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
+      <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
         <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
-        {!isOnline && (
-          <div role="status" aria-live="polite" className="relative z-20 mb-3 rounded-xl border border-amber-300/35 bg-amber-950/70 px-3 py-2 text-sm leading-5 text-amber-100">
-            Интернет тасарсан байна. GPS-ийн хамгийн сүүлийн байршил төхөөрөмж дээр харагдаж болох ч маршрут, серверийн AI, мэдэгдэл шинэчлэгдэхгүй байж болно.
-          </div>
-        )}
-        <div className="relative z-10 flex justify-center pb-3">
-          <button
-            type="button"
-            onClick={() =>
-              setDemoMode(
-                (value) => !value,
-              )
-            }
-            className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
-              demoMode
-                ? "border-[#67e8f9] bg-[#0e7490] text-white"
-                : "border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5]"
-            }`}
+
+        <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
+          {/* Holding the logo toggles Demo Mode for presentations; a plain tap does nothing. */}
+          <div
+            onPointerDown={startDemoHold}
+            onPointerUp={cancelDemoHold}
+            onPointerLeave={cancelDemoHold}
+            onPointerCancel={cancelDemoHold}
+            onContextMenu={(event) => event.preventDefault()}
+            className="inline-flex select-none items-center gap-2 text-[17px] font-bold tracking-[-0.02em]"
           >
-            {demoMode
-              ? "🟢 Demo Mode ON"
-              : "Demo Mode OFF"}
-          </button>
-        </div>
-
-    
-
-        {demoMode && (
-          <div className="relative z-10 mb-4 flex flex-col items-center gap-2">
-
-            <button
-              type="button"
-              onClick={() =>
-                moveDemoLocation(
-                  "up",
-                )
-              }
-              className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
-              aria-label="Demo move up"
-            >
-              ↑
-            </button>
-
-            <div className="flex gap-2">
-
-              <button
-                type="button"
-                onClick={() =>
-                  moveDemoLocation(
-                    "left",
-                  )
-                }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
-                aria-label="Demo move left"
-              >
-                ←
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  moveDemoLocation(
-                    "down",
-                  )
-                }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
-                aria-label="Demo move down"
-              >
-                ↓
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  moveDemoLocation(
-                    "right",
-                  )
-                }
-                className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5] text-xl active:scale-95"
-                aria-label="Demo move right"
-              >
-                →
-              </button>
-
-            </div>
-
-            <p className="text-xs text-[#b7c7cc]">
-              1 алхам ≈ 110м ·{" "}
-              {demoLocation.latitude.toFixed(
-                6,
-              )}
-              ,{" "}
-              {demoLocation.longitude.toFixed(
-                6,
-              )}
-            </p>
-
-            {safetyState && (
-              <div className="rounded-full border border-[#67e8f9]/20 bg-[#0d2028] px-4 py-2 text-xs font-medium text-[#d4e1e5]">
-                Status:{" "}
-                {safetyState.riskLevel}
-              </div>
-            )}
+            <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
+            SafePath
+            {demoMode && <span className="rounded-full bg-[#0e7490] px-2 py-0.5 text-[11px] font-bold">DEMO</span>}
           </div>
-        )}
-
-        <header className="relative z-10 flex min-h-16 items-center">
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center gap-2 text-[17px] font-bold tracking-[-0.02em] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
-          ><span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>SafePath
-          </Link>
+          <div className="flex items-center gap-2">
+            {!isOnline && (
+              <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[12px] font-bold text-amber-950">
+                <WifiOff size={13} aria-hidden="true" /> Интернетгүй
+              </span>
+            )}
+            <Link
+              href="/tracker/code"
+              aria-label="Тохиргоо"
+              className="grid size-11 place-items-center rounded-full text-[#b7c7cc] transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            >
+              <Settings size={20} />
+            </Link>
+          </div>
         </header>
 
-
-        <section
-          className="relative z-10 flex flex-1 flex-col items-center pb-5 text-center"
-          aria-label="Милотой ярилцах"
-        >
-          <div className="relative mt-2 flex h-[clamp(360px,57dvh,560px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
-            {guiding && currentLocation ? (
-              <ArNavigationCamera
-                location={currentLocation}
-                route={route?.route ?? []}
-                instruction={navigationInstruction ?? route?.nextInstruction ?? "Аюулгүй бүс рүү буцах зам тооцоолж байна…"}
-                destinationName={targetZone?.name ?? "Аюулгүй бүс"}
-                distanceMeters={route?.distanceMeters ?? null}
-                autoStart
-                voice={profile.voice}
-                speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
-              />
-            ) : currentLocation ? (
-              <>
-                <CompanionMap
-                  location={currentLocation}
-                  destination={targetZone ?? undefined}
-                  currentRoute={route?.route ?? []}
-                  variant="companion"
-                />
-                <CompanionMark
-                  state={
-                    safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING"
-                      ? "warning"
-                      : speechStatus === "playing"
-                        ? "speaking"
-                        : "idle"
-                  }
-                  avatar={settings.avatar}
-                  name={settings.name || "Мило"}
-                  className="companion-avatar--compact relative z-10"
-                />
-              </>
-            ) : (
-              <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
-                {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
-              </div>
-            )}
+        {demoMode && (
+          <div className="relative z-10 mb-2 flex items-center justify-center gap-2" aria-label="Demo байршил хөдөлгөх">
+            {([["left", "←"], ["up", "↑"], ["down", "↓"], ["right", "→"]] as const).map(([direction, arrow]) => (
+              <button
+                key={direction}
+                type="button"
+                onClick={() => moveDemoLocation(direction)}
+                className="size-11 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-xl text-[#d4e1e5] active:scale-95"
+                aria-label={`Demo: ${direction}`}
+              >
+                {arrow}
+              </button>
+            ))}
+            {safetyState && <span className="ml-1 text-[11px] font-semibold text-[#b7c7cc]">{safetyState.riskLevel}</span>}
           </div>
-          {!demoMode && !zonesLoaded && <SafePathLoading className="mt-3 justify-start px-0" label="Аюулгүй бүсүүдийг ачаалж байна…" />}
-          {!demoMode && zonesLoadError && (
-            <p role="alert" className="mt-3 text-sm text-[#fda4af]">
-              {zonesLoadError}
-            </p>
-          )}
-          {!demoMode && zonesLoaded && !zonesLoadError && savedZones.length === 0 && (
-            <p role="status" className="mt-3 max-w-[320px] text-sm leading-6 text-[#fbbf24]">
-              Танд аюулгүй бүс тохируулаагүй байна. Асран хамгаалагчаасаа бүс нэмүүлээрэй.
-            </p>
-          )}
-          {routeStatus === "loading" && targetZone && <SafePathLoading className="mt-3 justify-start px-0" label={`${targetZone.name} руу буцах замыг тооцоолж байна…`} />}
-          {routeStatus === "error" && targetZone && (
-            <p role="status" className="mt-3 text-sm text-[#fda4af]">
-              Буцах замыг тооцоолж чадсангүй. Байршлаа шалгаад дахин оролдоно уу.
-            </p>
-          )}
-          <p className="text-[16px] font-semibold text-[#67e8f9]">{settings.name || "Мило"}</p>
-          <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#f1f7f8]">
-            {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : zonesLoadError || (zonesLoaded && !demoMode && savedZones.length === 0 ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй." : "Байршил болон аюулгүй бүс ачаалж байна…"))}
-          </p>
-          {assistantLoading && <SafePathLoading className="mt-3 justify-center" label="Мило бодож байна…" />}
-          {speechStatus === "loading" && <SafePathLoading className="mt-2 justify-center" label="Дуу бэлдэж байна…" />}
-          {speechStatus === "playing" && <span className="mt-2 text-sm text-[#67e8f9]">Мило ярьж байна…</span>}
-          {speechError && <span role="status" className="mt-2 text-sm text-[#fda4af]">{speechError}</span>}
+        )}
 
-          {navigationInstruction && (
-            <div className="mt-7 flex w-full items-center gap-4 rounded-2xl border border-[#67e8f9]/20 bg-[#0d2028]/90 px-5 py-4 text-left text-white shadow-[0_12px_28px_rgba(0,0,0,.18)]">
-              <span className="text-3xl text-[#67e8f9]" aria-hidden="true">➜</span>
-              <div className="min-w-0">
-                <p className="font-semibold">{navigationInstruction}</p>
-                {route?.distanceMeters != null && <p className="mt-1 text-sm text-[#b7c7cc]">{targetZone?.name ?? "Аюулгүй бүс"} хүртэл ойролцоогоор {formatDistance(route.distanceMeters)}</p>}
-              </div>
+        {/* The companion stays on screen in every state and speaks its own messages. */}
+        <section aria-label={`${companionName} AI туслах`} className="relative z-10 flex items-center gap-3">
+          <CompanionMark
+            state={companionState}
+            avatar={settings.avatar}
+            name={companionName}
+            className="companion-avatar--compact companion-avatar--mini shrink-0"
+          />
+          <p
+            aria-live="polite"
+            aria-busy={assistantLoading}
+            className="line-clamp-4 min-w-0 flex-1 rounded-2xl rounded-tl-md bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15"
+          >
+            {companionMessage}
+          </p>
+          <button
+            type="button"
+            disabled={!safetyState || assistantLoading || speechStatus === "loading"}
+            onClick={() => void speakMessage(assistantMessage)}
+            aria-label={`${companionName}-г дахин сонсох`}
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+          >
+            {assistantLoading || speechStatus === "loading"
+              ? <SafePathLoading variant="button" />
+              : speechError
+                ? <VolumeX size={22} aria-hidden="true" />
+                : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
+          </button>
+        </section>
+
+        {/* Calm map inside the Safe Zone; camera guidance takes over by itself once outside. */}
+        <div className="relative z-10 mt-3 min-h-[360px] flex-1 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)]">
+          {guiding && currentLocation ? (
+            <ArNavigationCamera
+              location={currentLocation}
+              route={route?.route ?? []}
+              instruction={navigationInstruction ?? route?.nextInstruction ?? "Аюулгүй бүс рүү буцах зам тооцоолж байна…"}
+              destinationName={targetZone?.name ?? "Аюулгүй бүс"}
+              distanceMeters={route?.distanceMeters ?? null}
+              autoStart
+              voice={profile.voice}
+              speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
+            />
+          ) : currentLocation ? (
+            <>
+              <CompanionMap
+                location={currentLocation}
+                destination={targetZone ?? undefined}
+                currentRoute={route?.route ?? []}
+                variant="companion"
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 block size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+            </>
+          ) : (
+            <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur">
+              {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
             </div>
           )}
-        </section>
+        </div>
 
         <LocationSharingStatus />
 
-        <section className="mt-3 rounded-2xl border border-rose-500/35 bg-rose-500/5 p-4" aria-label="Яаралтай тусламж">
-          <p className="text-sm leading-6 text-[#f4c7c7]">Аюултай санагдвал холбогдсон асран хамгаалагчдаа SOS дохио илгээнэ.</p>
-          <button
-            type="button"
-            disabled={demoMode || sosStatus === "sending"}
-            onClick={() => {
-              setSosConfirm(true);
-              setSosStatus("idle");
-              setSosMessage("");
-            }}
-            className="mt-3 min-h-14 w-full rounded-2xl border border-rose-400/60 bg-rose-600 px-4 text-base font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.18)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
-          >
-            🆘 Яаралтай тусламж — SOS
-          </button>
-          {demoMode && <p className="mt-2 text-xs leading-5 text-[#b7c7cc]">Demo Mode үед бодит SOS илгээхгүй.</p>}
-          {sosConfirm && !demoMode && (
-            <div className="mt-3 rounded-xl border border-rose-400/35 bg-[#140d12] p-3">
-              <p className="text-sm font-semibold text-white">Асран хамгаалагчдаа SOS дохио илгээх үү?</p>
-              <p className="mt-1 text-xs leading-5 text-[#d9b4b9]">Тэд SafePath-ийн мэдэгдэл дээр яаралтай тусламж хүссэнийг харна. Хэрэв шууд аюул тулгарвал яаралтай тусламж руу залгаарай.</p>
+        <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
+          {sosConfirm && !demoMode ? (
+            <div className="rounded-2xl border border-rose-400/40 bg-[#140d12] p-3">
+              <p className="text-center text-[16px] font-bold text-white">Асран хамгаалагчдаа SOS илгээх үү?</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setSosConfirm(false)} className="min-h-11 rounded-xl border border-white/15 px-3 text-sm font-medium text-white">Болих</button>
-                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-sm font-bold text-white disabled:opacity-50">{sosStatus === "sending" && <SafePathLoading variant="button" />}{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}</button>
+                <button type="button" onClick={() => setSosConfirm(false)} className="min-h-12 rounded-xl border border-white/15 px-3 text-[15px] font-semibold text-white">Болих</button>
+                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[15px] font-bold text-white disabled:opacity-50">
+                  {sosStatus === "sending" && <SafePathLoading variant="button" />}{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}
+                </button>
               </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              disabled={demoMode || sosStatus === "sending"}
+              onClick={() => {
+                setSosConfirm(true);
+                setSosStatus("idle");
+                setSosMessage("");
+              }}
+              className="min-h-14 w-full rounded-2xl bg-rose-600 px-4 text-[17px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+            >
+              🆘 SOS — Тусламж дуудах
+            </button>
           )}
-          {sosMessage && <p role={sosStatus === "error" ? "alert" : "status"} className={`mt-3 rounded-xl px-3 py-2 text-sm leading-5 ${sosStatus === "error" ? "bg-rose-500/10 text-rose-200" : sosStatus === "sent" ? "bg-emerald-500/10 text-emerald-200" : "text-[#d4e1e5]"}`}>{sosMessage}</p>}
+          {sosMessage && <p role={sosStatus === "error" ? "alert" : "status"} className={`mt-2 rounded-xl px-3 py-2 text-center text-sm leading-5 ${sosStatus === "error" ? "bg-rose-500/10 text-rose-200" : sosStatus === "sent" ? "bg-emerald-500/10 text-emerald-200" : "text-[#d4e1e5]"}`}>{sosMessage}</p>}
         </section>
 
-        <div className="pt-2">
-          <button
-            type="button"
-            disabled={
-              !safetyState ||
-              assistantLoading ||
-              speechStatus ===
-                "loading"
-            }
-            onClick={() =>
-              void speakMessage(
-                assistantMessage,
-              )
-            }
-            aria-label="Милогийн зөвлөгөөг сонсох"
-            className="w-full min-h-14 rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
-          >
-            {assistantLoading
-              ? <span className="inline-flex items-center gap-2"><SafePathLoading variant="button" />Мило бодож байна…</span>
-              : speechStatus ===
-                  "loading"
-                ? <span className="inline-flex items-center gap-2"><SafePathLoading variant="button" />Дуу бэлдэж байна…</span>
-                : speechStatus ===
-                    "playing"
-                  ? "Ярьж байна…"
-                  : "Ярих"}
-          </button>
-        </div>
-
-        <nav aria-label="Тусламж болон холбох код" className="relative z-10 mt-2 flex items-center justify-center gap-2">
-          <a href="tel:+97600000000" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тусламж хэрэгтэй</a>
-          <Link href="/tracker/code" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тохиргоо</Link>
-        </nav>
         <audio
           ref={audioElement}
           className="sr-only"
           preload="none"
-          onPlaying={() =>
-            setSpeechStatus(
-              "playing",
-            )
-          }
-          onEnded={() =>
-            setSpeechStatus("idle")
-          }
+          onPlaying={() => setSpeechStatus("playing")}
+          onEnded={() => setSpeechStatus("idle")}
           onError={() => {
-            setSpeechStatus(
-              "error",
-            );
-            setSpeechError(
-              "Дуу тоглуулах боломжгүй байна.",
-            );
+            setSpeechStatus("error");
+            setSpeechError("Дуу тоглуулах боломжгүй байна.");
           }}
         />
       </main>
     </AppShell>
   );
 }
-
 
 function isSafeZoneList(value: unknown): value is SafeZone[] {
   return Array.isArray(value) && value.every((item) => {
@@ -1176,21 +1070,6 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
       zone.radiusMeters >= 50 && zone.radiusMeters <= 2000
     );
   });
-}
-
-function formatDistance(
-  meters: number,
-) {
-  if (meters < 1000) {
-    return `${Math.max(
-      10,
-      Math.round(meters),
-    )} м`;
-  }
-
-  return `${(
-    meters / 1000
-  ).toFixed(1)} км`;
 }
 
 function getGuidanceFallback(zoneName: string) {
