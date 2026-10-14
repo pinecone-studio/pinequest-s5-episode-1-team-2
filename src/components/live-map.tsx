@@ -6,8 +6,20 @@ import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMa
 import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { SafeZone, SafetyLocation } from "@/types/safety";
 
+/** A tracked person drawn as a named pin; `fresh` is false once their last report is old. */
+export type MapPerson = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  fresh: boolean;
+  selected?: boolean;
+};
+
 type LiveMapProps = {
   location: SafetyLocation;
+  /** When given, these named pins replace the plain dot at `location` (guardian variant). */
+  people?: MapPerson[];
   safeZones?: SafeZone[];
   currentRoute?: [number, number][];
   destination?: Pick<SafetyLocation, "latitude" | "longitude">;
@@ -19,7 +31,7 @@ type LiveMapProps = {
   className?: string;
 };
 
-export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
+export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -70,11 +82,21 @@ export default function LiveMap({ location, safeZones = SAFE_ZONES, currentRoute
           radius={8}
           pathOptions={{ color: "#ffffff", fillColor: "#2e7d4f", fillOpacity: 1, weight: 3 }}
         />}
-        {!companion && <CircleMarker
+        {!companion && people.length === 0 && <CircleMarker
           center={center}
           radius={9}
           pathOptions={{ color: "#ffffff", fillColor: "#111111", fillOpacity: 1, weight: 4 }}
         />}
+        {!companion && people.map((person) => (
+          <CircleMarker
+            key={person.id}
+            center={[person.latitude, person.longitude]}
+            radius={person.selected ? 11 : 8}
+            pathOptions={{ color: "#ffffff", fillColor: person.fresh ? "#2a7fff" : "#9ca3af", fillOpacity: 1, weight: 3 }}
+          >
+            <Tooltip direction="top" offset={[0, -10]} permanent>{person.name}</Tooltip>
+          </CircleMarker>
+        ))}
         {companion ? <FollowLocation location={location} /> : <FitMap location={location} safeZones={safeZones} />}
       </MapContainer>
 
