@@ -8,11 +8,17 @@ import { SAFETY_NOTIFICATION_CHANNEL_ID, SOS_NOTIFICATION_CHANNEL_ID } from "@/l
 const TOKEN_STORAGE_KEY = "safepath:push-token";
 type ListenerHandle = { remove: () => Promise<void> };
 type PushPlugin = typeof import("@capacitor/push-notifications").PushNotifications;
-type PushStatus = "idle" | "requesting" | "enabled" | "server-not-configured" | "denied" | "error";
+type PushStatus = "idle" | "requesting" | "enabled" | "server-not-configured" | "denied" | "error" | "unavailable";
+
+// PushNotifications.register() kills the whole Android app (a native IllegalStateException that
+// JavaScript cannot catch) when the APK was built without google-services.json. Only register once
+// a Firebase-enabled build is out and this flag is set.
+const ANDROID_PUSH_ENABLED = process.env.NEXT_PUBLIC_ANDROID_PUSH_ENABLED === "true";
 
 export default function PushNotificationSetup() {
   const [nativeAndroid, setNativeAndroid] = useState(false);
-  const [status, setStatus] = useState<PushStatus>("idle");
+  const [pushStatus, setStatus] = useState<PushStatus>("idle");
+  const status: PushStatus = ANDROID_PUSH_ENABLED ? pushStatus : "unavailable";
   const handlesRef = useRef<ListenerHandle[]>([]);
   const listenersReadyRef = useRef(false);
   const mountedRef = useRef(false);
@@ -89,6 +95,9 @@ export default function PushNotificationSetup() {
       return () => { mountedRef.current = false; };
     }
     setNativeAndroid(true);
+    if (!ANDROID_PUSH_ENABLED) {
+      return () => { mountedRef.current = false; };
+    }
 
     let disposed = false;
     const initialize = async () => {
@@ -124,6 +133,7 @@ export default function PushNotificationSetup() {
   }, [addListeners, prepareChannels, removeListeners]);
 
   const enableNotifications = async () => {
+    if (!ANDROID_PUSH_ENABLED) return;
     setStatus("requesting");
     try {
       const plugin = pluginRef.current ?? (await import("@capacitor/push-notifications")).PushNotifications;
@@ -142,7 +152,8 @@ export default function PushNotificationSetup() {
     }
   };
 
-  if (!nativeAndroid) return null;
+  // Nothing to offer until push is set up, so keep the screen free of a dead-end card.
+  if (!nativeAndroid || status === "unavailable") return null;
 
   return (
     <section
