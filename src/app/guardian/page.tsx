@@ -248,7 +248,6 @@ export default function GuardianPage() {
               Интернет тасарсан байна. Хүүхдийн сүүлийн мэдээлэл харагдаж болох ч шинэ байршил, Safe Zone дохио серверээс шинэчлэгдэхгүй байж болно.
             </div>
           )}
-          <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
           <header className="flex min-h-16 items-center justify-between gap-3 border-b border-(--sp-line) px-5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0">
               <Link
