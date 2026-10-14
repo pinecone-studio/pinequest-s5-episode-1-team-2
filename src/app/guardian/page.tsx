@@ -2,8 +2,10 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
+import { BackButton } from "@/components/back-button";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
@@ -249,16 +251,21 @@ export default function GuardianPage() {
             </div>
           )}
           <header className="flex min-h-16 items-center justify-between gap-3 border-b border-(--sp-line) px-5 pt-[env(safe-area-inset-top)]">
-            <div className="min-w-0">
-              <Link
-                href="/"
-                className="text-[17px] font-semibold tracking-tight"
-              >
-                SafePath
-              </Link>
-              <p className="mt-0.5 truncate text-sm text-(--sp-muted)">
-                {childName}
-              </p>
+            <div className="flex min-w-0 items-center gap-1">
+              <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full transition hover:bg-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2">
+                <ChevronLeft size={24} aria-hidden="true" />
+              </BackButton>
+              <div className="min-w-0">
+                <Link
+                  href="/"
+                  className="text-[17px] font-semibold tracking-tight"
+                >
+                  SafePath
+                </Link>
+                <p className="mt-0.5 truncate text-sm text-(--sp-muted)">
+                  {childName}
+                </p>
+              </div>
             </div>
             <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
           </header>
