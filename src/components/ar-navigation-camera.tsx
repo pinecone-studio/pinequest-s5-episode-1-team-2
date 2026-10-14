@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { Camera, CameraOff, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
+import { TiltedPlane } from "@/components/tilted-plane";
 
 type Coordinate = {
   latitude: number;
@@ -1046,14 +1047,18 @@ export default function ArNavigationCamera({
         >
           {/* Inset back to the visible width so the map centres on the person, not on the off-screen dome. */}
           <div className="absolute inset-y-0 left-[13.2353%] right-[13.2353%]">
-            <CameraMiniMap
-              location={miniMapLocation}
-              currentRoute={route}
-              destination={routeDestination ?? undefined}
-              variant="companion"
-              routeColor="#2a7fff"
-              className="ar-minimap h-full w-full rounded-none border-0"
-            />
+            {/* Seen from a slant like the ground ahead, matching the camera view above it. */}
+            <TiltedPlane tilt={45} centerPercent={50} fadeColor="#eef1f4">
+              <CameraMiniMap
+                location={miniMapLocation}
+                currentRoute={route}
+                destination={routeDestination ?? undefined}
+                variant="companion"
+                routeColor="#2a7fff"
+                showCredit={false}
+                className="ar-minimap h-full w-full rounded-none border-0"
+              />
+            </TiltedPlane>
             <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
               {heading === null ? (
                 <span className="block size-4 rounded-full border-[3px] border-white bg-[#2a7fff] shadow-[0_0_0_6px_rgba(42,127,255,.22)]" />
