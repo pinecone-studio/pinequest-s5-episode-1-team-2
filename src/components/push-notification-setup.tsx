@@ -152,7 +152,8 @@ export default function PushNotificationSetup() {
     }
   };
 
-  if (!nativeAndroid) return null;
+  // Nothing to offer until push is set up, so keep the screen free of a dead-end card.
+  if (!nativeAndroid || status === "unavailable") return null;
 
   return (
     <section
@@ -168,10 +169,9 @@ export default function PushNotificationSetup() {
           {status === "requesting" && "Мэдэгдлийн зөвшөөрөл болон төхөөрөмжийн бүртгэлийг шалгаж байна…"}
           {status === "denied" && "Мэдэгдлийн зөвшөөрөл хаалттай байна. Android Settings → Apps → SafePath → Notifications хэсгээс асаагаарай."}
           {status === "error" && "Push тохируулга амжилтгүй. Сүлжээ, Firebase болон google-services.json тохиргоог шалгана уу."}
-          {status === "unavailable" && "Энэ хувилбарт push мэдэгдэл хараахан тохируулагдаагүй байна. Апп-ын бусад хэсэг хэвийн ажиллана."}
         </p>
       </div>
-      {status !== "enabled" && status !== "unavailable" && (
+      {status !== "enabled" && (
         <button
           type="button"
           onClick={enableNotifications}
