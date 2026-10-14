@@ -30,8 +30,6 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 // are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
-// Holding the logo this long toggles Demo Mode, kept out of sight of children and older users.
-const DEMO_TOGGLE_HOLD_MS = 1_200;
 
 type RouteResult = {
   destination: {
@@ -57,7 +55,6 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
-  const demoHoldTimer = useRef<number | null>(null);
   const [guiding, setGuiding] = useState(false);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
@@ -274,14 +271,6 @@ export default function TrackerPage() {
     );
     return () => window.clearTimeout(timer);
   }, [guiding, isOutsideSafeZone]);
-
-  const startDemoHold = () => {
-    demoHoldTimer.current = window.setTimeout(() => setDemoMode((value) => !value), DEMO_TOGGLE_HOLD_MS);
-  };
-  const cancelDemoHold = () => {
-    if (demoHoldTimer.current) window.clearTimeout(demoHoldTimer.current);
-    demoHoldTimer.current = null;
-  };
 
   useEffect(() => {
     if (currentLatitude === undefined || currentLongitude === undefined) {
@@ -905,18 +894,9 @@ export default function TrackerPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
 
         <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
-          {/* Holding the logo toggles Demo Mode for presentations; a plain tap does nothing. */}
-          <div
-            onPointerDown={startDemoHold}
-            onPointerUp={cancelDemoHold}
-            onPointerLeave={cancelDemoHold}
-            onPointerCancel={cancelDemoHold}
-            onContextMenu={(event) => event.preventDefault()}
-            className="inline-flex select-none items-center gap-2 text-[17px] font-bold tracking-[-0.02em]"
-          >
+          <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
             <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
             SafePath
-            {demoMode && <span className="rounded-full bg-[#0e7490] px-2 py-0.5 text-[11px] font-bold">DEMO</span>}
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
@@ -933,6 +913,16 @@ export default function TrackerPage() {
             </Link>
           </div>
         </header>
+
+        <div className="relative z-10 flex justify-center pb-2">
+          <button
+            type="button"
+            onClick={() => setDemoMode((value) => !value)}
+            className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${demoMode ? "border-[#67e8f9] bg-[#0e7490] text-white" : "border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5]"}`}
+          >
+            {demoMode ? "🟢 Demo Mode ON" : "Demo Mode OFF"}
+          </button>
+        </div>
 
         {demoMode && (
           <div className="relative z-10 mb-2 flex items-center justify-center gap-2" aria-label="Demo байршил хөдөлгөх">
