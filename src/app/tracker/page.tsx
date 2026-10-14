@@ -910,6 +910,15 @@ export default function TrackerPage() {
                 <WifiOff size={13} aria-hidden="true" /> Интернетгүй
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => setDemoMode((value) => !value)}
+              aria-pressed={demoMode}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition ${demoMode ? "border-[#67e8f9] bg-[#0e7490] text-white" : "border-[#67e8f9]/25 bg-[#101c22] text-[#b7c7cc]"}`}
+            >
+              <span className={`size-2 rounded-full ${demoMode ? "bg-[#4ade80]" : "bg-[#60747b]"}`} aria-hidden="true" />
+              Demo
+            </button>
             <Link
               href="/tracker/code"
               aria-label="Тохиргоо"
@@ -919,35 +928,6 @@ export default function TrackerPage() {
             </Link>
           </div>
         </header>
-
-        <div className="relative z-10 flex justify-center pb-2">
-          <button
-            type="button"
-            onClick={() => setDemoMode((value) => !value)}
-            className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${demoMode ? "border-[#67e8f9] bg-[#0e7490] text-white" : "border-[#67e8f9]/25 bg-[#101c22] text-[#d4e1e5]"}`}
-          >
-            {demoMode ? "🟢 Demo Mode ON" : "Demo Mode OFF"}
-          </button>
-        </div>
-
-        {demoMode && (
-          <div className="relative z-10 mb-3 flex flex-col items-center gap-2" aria-label="Demo байршил хөдөлгөх">
-            <DemoArrow direction="up" onMove={moveDemoLocation} />
-            <div className="flex gap-2">
-              <DemoArrow direction="left" onMove={moveDemoLocation} />
-              <DemoArrow direction="down" onMove={moveDemoLocation} />
-              <DemoArrow direction="right" onMove={moveDemoLocation} />
-            </div>
-            <p className="text-xs text-[#b7c7cc]">
-              1 алхам ≈ 110м · {demoLocation.latitude.toFixed(6)}, {demoLocation.longitude.toFixed(6)}
-            </p>
-            {safetyState && (
-              <div className="rounded-full border border-[#67e8f9]/20 bg-[#0d2028] px-4 py-2 text-xs font-medium text-[#d4e1e5]">
-                Status: {safetyState.riskLevel}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* The companion stays on screen in every state and speaks its own messages: large in the
             middle while calm, a small strip above the camera while guiding. */}
@@ -1025,6 +1005,7 @@ export default function TrackerPage() {
               {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
             </div>
           )}
+          {demoMode && <DemoPad riskLevel={safetyState?.riskLevel ?? null} onMove={moveDemoLocation} />}
         </div>
 
         <LocationSharingStatus />
@@ -1092,17 +1073,41 @@ function getGuidanceFallback(zoneName: string) {
   return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
 }
 
-const DEMO_ARROWS = { up: "↑", down: "↓", left: "←", right: "→" } as const;
 
-function DemoArrow({ direction, onMove }: { direction: keyof typeof DEMO_ARROWS; onMove: (direction: keyof typeof DEMO_ARROWS) => void }) {
-  return (
+type DemoDirection = "up" | "down" | "left" | "right";
+
+const DEMO_STATUS_COLORS: Record<SafetyState["riskLevel"], string> = {
+  SAFE: "bg-[#4ade80]",
+  WARNING: "bg-[#fbbf24]",
+  HIGH_RISK: "bg-[#f43f5e]",
+};
+
+/** Small glass D-pad laid over the map that walks the demo location ~110 m per tap. */
+function DemoPad({ riskLevel, onMove }: { riskLevel: SafetyState["riskLevel"] | null; onMove: (direction: DemoDirection) => void }) {
+  const arrow = (direction: DemoDirection, label: string, glyph: string, area: string) => (
     <button
       type="button"
       onClick={() => onMove(direction)}
-      className="h-12 w-12 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-xl text-[#d4e1e5] active:scale-95"
-      aria-label={`Demo move ${direction}`}
+      aria-label={label}
+      className={`grid size-9 place-items-center rounded-xl bg-white/10 text-[17px] text-white transition active:scale-90 active:bg-white/25 ${area}`}
     >
-      {DEMO_ARROWS[direction]}
+      {glyph}
     </button>
+  );
+  return (
+    <div
+      aria-label="Demo байршил хөдөлгөх"
+      className="absolute left-3 top-1/2 z-[410] grid -translate-y-1/2 grid-cols-3 grid-rows-3 gap-1 rounded-2xl bg-[#071116]/70 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
+    >
+      {arrow("up", "Demo: хойд зүг рүү", "↑", "col-start-2")}
+      {arrow("left", "Demo: баруун зүг рүү", "←", "col-start-1 row-start-2")}
+      <span
+        role="status"
+        aria-label={`Demo төлөв: ${riskLevel ?? "тодорхойгүй"}`}
+        className={`col-start-2 row-start-2 m-auto size-3 rounded-full ${riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"}`}
+      />
+      {arrow("right", "Demo: зүүн зүг рүү", "→", "col-start-3 row-start-2")}
+      {arrow("down", "Demo: урд зүг рүү", "↓", "col-start-2 row-start-3")}
+    </div>
   );
 }
