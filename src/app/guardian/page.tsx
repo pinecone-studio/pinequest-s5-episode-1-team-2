@@ -2,8 +2,10 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
+import { BackButton } from "@/components/back-button";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
@@ -11,6 +13,7 @@ import { useChildLocations } from "@/hooks/use-child-locations";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
 import { SafePathLoading } from "@/components/safepath-loading";
+import type { MapPerson } from "@/components/live-map";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -112,7 +115,8 @@ function useNow(intervalMs = 10_000) {
   return now;
 }
 export default function GuardianPage() {
-  const { location, status: locationStatus, error } = useGeolocation();
+  // The guardian's own position, only for "how far is my child from me".
+  const { location } = useGeolocation();
   const isOnline = useNetworkStatus();
   const { settings } = useAssistantSettings();
   const { children: linkedChildren, failed: childrenLoadFailed } = useChildLocations();
@@ -124,16 +128,7 @@ export default function GuardianPage() {
   const urgentSos = visibleAlerts.find((alert) => alert.type === "SOS" && !alert.read) ?? null;
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
-  const [tabNavigationReady, setTabNavigationReady] = useState(false);
-  const [showLocationPermissionNotice, setShowLocationPermissionNotice] = useState(false);
-
-  useEffect(() => {
-    if (!tabNavigationReady || activeTab !== "map") {
-      setShowLocationPermissionNotice(false);
-      return;
-    }
-    if (error?.includes("зөвшөөрөл хаалттай")) setShowLocationPermissionNotice(true);
-  }, [activeTab, error, tabNavigationReady]);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
 
   useEffect(() => {
     const openNotificationsFromHash = () => {
@@ -142,7 +137,6 @@ export default function GuardianPage() {
       window.setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 0);
     };
     openNotificationsFromHash();
-    setTabNavigationReady(true);
     window.addEventListener("hashchange", openNotificationsFromHash);
     return () => window.removeEventListener("hashchange", openNotificationsFromHash);
   }, []);
@@ -155,12 +149,16 @@ export default function GuardianPage() {
     }
   };
 
-  const childName = settings.userName || "Тэмүүлэн";
   const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
 
   // The guardian dashboard must assess the linked child's reported position,
   // not the guardian's own phone GPS. Use the child's configured zones when available.
-  const monitoredChild = linkedChildren?.find((child) => child.position) ?? null;
+  // The guardian can pick which child the map follows; by default it is the first one with a position.
+  const monitoredChild =
+    linkedChildren?.find((child) => child.childId === selectedChildId && child.position) ??
+    linkedChildren?.find((child) => child.position) ??
+    null;
+  const childName = monitoredChild?.name ?? linkedChildren?.[0]?.name ?? settings.userName ?? "Хүүхэд";
   const monitoredLocation = monitoredChild?.position
     ? {
         latitude: monitoredChild.position.latitude,
@@ -172,14 +170,23 @@ export default function GuardianPage() {
   const monitoredZones = monitoredChild?.zones?.length
     ? monitoredChild.zones
     : SAFE_ZONES;
-  const displayLocation = monitoredLocation ?? location;
+  // Never stand the guardian's own GPS in for the child: without a child report the map waits.
+  const displayLocation = monitoredLocation;
+  const mapPeople: MapPerson[] = (linkedChildren ?? []).flatMap((child) =>
+    child.position && !child.paused
+      ? [{
+          id: child.childId,
+          name: child.name,
+          latitude: child.position.latitude,
+          longitude: child.position.longitude,
+          fresh: now - new Date(child.position.updatedAt).getTime() < 120_000,
+          selected: child.childId === monitoredChild?.childId,
+        }]
+      : [],
+  );
   const lastUpdate = monitoredLocation
     ? monitoredLocation.lastUpdated
     : null;
-  const loc = displayLocation as
-    | (typeof displayLocation & { timestamp?: number; accuracy?: number })
-    | null;
-
   const safetyState = useMemo(
     () =>
       monitoredLocation
@@ -202,7 +209,7 @@ export default function GuardianPage() {
         : "Аюулгүй бүсээс гадуур";
 
   const subline = !zone
-    ? (error?.includes("зөвшөөрөл хаалттай") ? "Байршлын мэдээлэл хүлээгдэж байна" : error ?? "Түр хүлээнэ үү")
+    ? (linkedChildren === null ? "Түр хүлээнэ үү" : "Хүүхдийн байршил хүлээгдэж байна")
     : inside
       ? zone.name
       : `Хамгийн ойр: ${zone.name} · ${
@@ -229,15 +236,6 @@ export default function GuardianPage() {
         style={TOKENS}
         className="min-h-dvh bg-[linear-gradient(180deg,var(--sp-bg-top)_0%,var(--sp-bg-bottom)_45%,var(--sp-bg-bottom)_100%)] text-(--sp-ink)"
       >
-        {showLocationPermissionNotice && (
-          <div onClick={() => setShowLocationPermissionNotice(false)} className="fixed inset-0 z-[1000] grid place-items-center bg-black/70 px-5 py-8 backdrop-blur-sm" role="presentation">
-            <section onClick={(event) => event.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="location-permission-title" className="w-full max-w-sm rounded-3xl border border-(--sp-line) bg-[#0c171b] p-6 text-(--sp-ink) shadow-2xl">
-              <h2 id="location-permission-title" className="text-lg font-bold">Байршлын зөвшөөрөл хэрэгтэй</h2>
-              <p className="mt-3 text-sm leading-6 text-(--sp-muted)">Байршлыг харахын тулд төхөөрөмжийн тохиргооноос SafePath-д байршлын зөвшөөрөл өгнө үү.</p>
-              <button type="button" autoFocus onClick={() => setShowLocationPermissionNotice(false)} className="mt-5 min-h-11 w-full rounded-xl bg-[#4F8FA8] px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Ойлголоо</button>
-            </section>
-          </div>
-        )}
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
@@ -248,18 +246,22 @@ export default function GuardianPage() {
               Интернет тасарсан байна. Хүүхдийн сүүлийн мэдээлэл харагдаж болох ч шинэ байршил, Safe Zone дохио серверээс шинэчлэгдэхгүй байж болно.
             </div>
           )}
-          <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
           <header className="flex min-h-16 items-center justify-between gap-3 border-b border-(--sp-line) px-5 pt-[env(safe-area-inset-top)]">
-            <div className="min-w-0">
-              <Link
-                href="/"
-                className="text-[17px] font-semibold tracking-tight"
-              >
-                SafePath
-              </Link>
-              <p className="mt-0.5 truncate text-sm text-(--sp-muted)">
-                {childName}
-              </p>
+            <div className="flex min-w-0 items-center gap-1">
+              <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full transition hover:bg-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2">
+                <ChevronLeft size={24} aria-hidden="true" />
+              </BackButton>
+              <div className="min-w-0">
+                <Link
+                  href="/"
+                  className="text-[17px] font-semibold tracking-tight"
+                >
+                  SafePath
+                </Link>
+                <p className="mt-0.5 truncate text-sm text-(--sp-muted)">
+                  {childName}
+                </p>
+              </div>
             </div>
             <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
           </header>
@@ -320,8 +322,23 @@ export default function GuardianPage() {
                   const meters = location && point ? distanceMeters(location, point) : null;
                   const age = point ? Math.max(0, (now - new Date(point.updatedAt).getTime()) / 1000) : null;
                   const fresh = age !== null && age < 120;
+                  const shownOnMap = child.childId === monitoredChild?.childId;
                   return (
-                    <div key={child.childId} className="rounded-xl border border-(--sp-line) p-3">
+                    // Tapping a child with a position points the map at them.
+                    <div
+                      key={child.childId}
+                      role={point ? "button" : undefined}
+                      tabIndex={point ? 0 : undefined}
+                      aria-pressed={point ? shownOnMap : undefined}
+                      onClick={point ? () => { setSelectedChildId(child.childId); setMapKey((k) => k + 1); } : undefined}
+                      onKeyDown={point ? (event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
+                        setSelectedChildId(child.childId);
+                        setMapKey((k) => k + 1);
+                      } : undefined}
+                      className={`rounded-xl border p-3 transition ${shownOnMap ? "border-[#2a7fff]/70 bg-[#2a7fff]/10" : "border-(--sp-line)"} ${point ? "cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]" : ""}`}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{child.name}</p>
@@ -353,6 +370,7 @@ export default function GuardianPage() {
                   <LiveMap
                     key={mapKey}
                     location={displayLocation}
+                    people={mapPeople}
                     safeZones={monitoredZones}
                     currentRoute={currentRoute}
                     familiarRoute={familiarRoute}
@@ -387,7 +405,7 @@ export default function GuardianPage() {
                     aria-label="Газрын зургийн тэмдэглэгээ"
                     className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
                   >
-                    <Legend dot="bg-[var(--sp-primary)]" label="Байршил" />
+                    <Legend dot="bg-[#2a7fff]" label="Хүүхэд" />
                     <Legend dot="bg-(--sp-secondary)" label="Одоогийн зам" />
                     <span className="inline-flex items-center gap-1.5">
                       <i className="h-0 w-4 border-t border-dashed border-(--sp-muted)" />
@@ -397,11 +415,11 @@ export default function GuardianPage() {
                 </>
               ) : (
                 <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-(--sp-muted)">
-                  {linkedChildren && linkedChildren.length > 0 && !monitoredLocation
-                    ? "Хүүхдийн байршлын мэдээлэл хараахан ирээгүй байна"
-                    : locationStatus === "loading"
-                      ? <SafePathLoading className="flex-col gap-1" label="Одоогийн байршлыг тогтоож байна…" />
-                      : error?.includes("зөвшөөрөл хаалттай") ? "Байршлын мэдээлэл хүлээгдэж байна" : error || "Байршил хараахан олдсонгүй"}
+                  {linkedChildren === null
+                    ? <SafePathLoading className="flex-col gap-1" label="Хүүхдийн байршлыг ачаалж байна…" />
+                    : linkedChildren.length === 0
+                      ? "Хүүхэд холбогдоогүй байна. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана."
+                      : "Хүүхдийн байршил хараахан ирээгүй байна. Хүүхдийн утсан дээр SafePath нээлттэй, байршлын зөвшөөрөл өгсөн эсэхийг шалгаарай."}
                 </div>
               )}
             </div>

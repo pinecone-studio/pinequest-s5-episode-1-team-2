@@ -1,5 +1,12 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
+// To try local changes on a USB-connected phone without deploying:
+//   adb reverse tcp:3001 tcp:3001
+//   CAP_SERVER_URL=http://localhost:3001 npx cap sync android   (then build the APK)
+// localhost counts as a secure origin, so camera and location still work over plain http.
+const serverUrl = process.env.CAP_SERVER_URL ?? "https://safepath-indol.vercel.app";
+const localServer = serverUrl.startsWith("http://localhost");
+
 const config: CapacitorConfig = {
   appId: "io.safepath.app",
   appName: "SafePath",
@@ -7,9 +14,9 @@ const config: CapacitorConfig = {
   server: {
     // Temporary live Vercel hostname. Switch this to https://safepath.app once
     // the custom domain's DNS records have been applied and verified.
-    url: "https://safepath-indol.vercel.app",
-    cleartext: false,
-    allowNavigation: ["safepath-indol.vercel.app", "safepath.app", "*.safepath.app"],
+    url: serverUrl,
+    cleartext: localServer,
+    allowNavigation: ["safepath-indol.vercel.app", "safepath.app", "*.safepath.app", ...(localServer ? ["localhost"] : [])],
   },
   android: {
     // Required by the background-geolocation plugin: otherwise location updates stop after

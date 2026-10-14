@@ -3,12 +3,15 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
+import { ChevronLeft, MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
+import { BackButton } from "@/components/back-button";
+import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
+import { useCompassHeading } from "@/hooks/use-compass-heading";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { toCompanionProfile } from "@/lib/assistant-settings";
@@ -30,8 +33,8 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 // are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
-// Holding the logo this long toggles Demo Mode, kept out of sight of children and older users.
-const DEMO_TOGGLE_HOLD_MS = 1_200;
+// Where the person sits on the slanted calm map, as a share of its height.
+const CALM_MAP_CENTER_PERCENT = 64;
 
 type RouteResult = {
   destination: {
@@ -57,8 +60,9 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
-  const demoHoldTimer = useRef<number | null>(null);
   const [guiding, setGuiding] = useState(false);
+  // The calm map turns with the compass; while guiding, the camera view reads its own.
+  const { heading: calmHeading } = useCompassHeading(!guiding);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [zonesLoadError, setZonesLoadError] = useState("");
@@ -274,14 +278,6 @@ export default function TrackerPage() {
     );
     return () => window.clearTimeout(timer);
   }, [guiding, isOutsideSafeZone]);
-
-  const startDemoHold = () => {
-    demoHoldTimer.current = window.setTimeout(() => setDemoMode((value) => !value), DEMO_TOGGLE_HOLD_MS);
-  };
-  const cancelDemoHold = () => {
-    if (demoHoldTimer.current) window.clearTimeout(demoHoldTimer.current);
-    demoHoldTimer.current = null;
-  };
 
   useEffect(() => {
     if (currentLatitude === undefined || currentLongitude === undefined) {
@@ -905,18 +901,14 @@ export default function TrackerPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
 
         <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
-          {/* Holding the logo toggles Demo Mode for presentations; a plain tap does nothing. */}
-          <div
-            onPointerDown={startDemoHold}
-            onPointerUp={cancelDemoHold}
-            onPointerLeave={cancelDemoHold}
-            onPointerCancel={cancelDemoHold}
-            onContextMenu={(event) => event.preventDefault()}
-            className="inline-flex select-none items-center gap-2 text-[17px] font-bold tracking-[-0.02em]"
-          >
-            <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
-            SafePath
-            {demoMode && <span className="rounded-full bg-[#0e7490] px-2 py-0.5 text-[11px] font-bold">DEMO</span>}
+          <div className="flex min-w-0 items-center gap-1">
+            <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-[#d4e1e5] transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
+              <ChevronLeft size={24} aria-hidden="true" />
+            </BackButton>
+            <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
+              <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
+              SafePath
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
@@ -924,6 +916,15 @@ export default function TrackerPage() {
                 <WifiOff size={13} aria-hidden="true" /> Интернетгүй
               </span>
             )}
+            <button
+              type="button"
+              onClick={() => setDemoMode((value) => !value)}
+              aria-pressed={demoMode}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition ${demoMode ? "border-[#67e8f9] bg-[#0e7490] text-white" : "border-[#67e8f9]/25 bg-[#101c22] text-[#b7c7cc]"}`}
+            >
+              <span className={`size-2 rounded-full ${demoMode ? "bg-[#4ade80]" : "bg-[#60747b]"}`} aria-hidden="true" />
+              Demo
+            </button>
             <Link
               href="/tracker/code"
               aria-label="Тохиргоо"
@@ -934,55 +935,44 @@ export default function TrackerPage() {
           </div>
         </header>
 
-        {demoMode && (
-          <div className="relative z-10 mb-2 flex items-center justify-center gap-2" aria-label="Demo байршил хөдөлгөх">
-            {([["left", "←"], ["up", "↑"], ["down", "↓"], ["right", "→"]] as const).map(([direction, arrow]) => (
-              <button
-                key={direction}
-                type="button"
-                onClick={() => moveDemoLocation(direction)}
-                className="size-11 rounded-xl border border-[#67e8f9]/25 bg-[#101c22] text-xl text-[#d4e1e5] active:scale-95"
-                aria-label={`Demo: ${direction}`}
-              >
-                {arrow}
-              </button>
-            ))}
-            {safetyState && <span className="ml-1 text-[11px] font-semibold text-[#b7c7cc]">{safetyState.riskLevel}</span>}
-          </div>
-        )}
-
-        {/* The companion stays on screen in every state and speaks its own messages. */}
-        <section aria-label={`${companionName} AI туслах`} className="relative z-10 flex items-center gap-3">
+        {/* The companion stays on screen in every state and speaks its own messages: large in the
+            middle while calm, a small strip above the camera while guiding. */}
+        <section
+          aria-label={`${companionName} AI туслах`}
+          className={`relative z-10 flex gap-3 ${guiding ? "items-center" : "flex-1 flex-col items-center justify-center"}`}
+        >
           <CompanionMark
             state={companionState}
             avatar={settings.avatar}
             name={companionName}
-            className="companion-avatar--compact companion-avatar--mini shrink-0"
+            className={`companion-avatar--compact shrink-0 ${guiding ? "companion-avatar--mini" : ""}`}
           />
-          <p
-            aria-live="polite"
-            aria-busy={assistantLoading}
-            className="line-clamp-4 min-w-0 flex-1 rounded-2xl rounded-tl-md bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15"
-          >
-            {companionMessage}
-          </p>
-          <button
-            type="button"
-            disabled={!safetyState || assistantLoading || speechStatus === "loading"}
-            onClick={() => void speakMessage(assistantMessage)}
-            aria-label={`${companionName}-г дахин сонсох`}
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
-          >
-            {assistantLoading || speechStatus === "loading"
-              ? <SafePathLoading variant="button" />
-              : speechError
-                ? <VolumeX size={22} aria-hidden="true" />
-                : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
-          </button>
+          <div className={`flex min-w-0 items-center gap-3 ${guiding ? "flex-1" : "w-full"}`}>
+            <p
+              aria-live="polite"
+              aria-busy={assistantLoading}
+              className={`line-clamp-4 min-w-0 flex-1 rounded-2xl bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${guiding ? "rounded-tl-md" : "text-center"}`}
+            >
+              {companionMessage}
+            </p>
+            <button
+              type="button"
+              disabled={!safetyState || assistantLoading || speechStatus === "loading"}
+              onClick={() => void speakMessage(assistantMessage)}
+              aria-label={`${companionName}-г дахин сонсох`}
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            >
+              {assistantLoading || speechStatus === "loading"
+                ? <SafePathLoading variant="button" />
+                : speechError
+                  ? <VolumeX size={22} aria-hidden="true" />
+                  : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
+            </button>
+          </div>
         </section>
 
-        {/* Calm map inside the Safe Zone; camera guidance takes over by itself once outside. */}
-        <div className="relative z-10 mt-3 min-h-[360px] flex-1 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)]">
+        {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
+        <div className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${guiding ? "min-h-[360px] flex-1" : "h-[230px] shrink-0"}`}>
           {guiding && currentLocation ? (
             <ArNavigationCamera
               location={currentLocation}
@@ -996,19 +986,32 @@ export default function TrackerPage() {
             />
           ) : currentLocation ? (
             <>
-              <CompanionMap
-                location={currentLocation}
-                destination={targetZone ?? undefined}
-                currentRoute={route?.route ?? []}
-                variant="companion"
-              />
-              <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 block size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+              {/* Turns with the compass so the way the person faces is always up. */}
+              <TiltedPlane centerPercent={CALM_MAP_CENTER_PERCENT} heading={calmHeading}>
+                <CompanionMap
+                  location={currentLocation}
+                  destination={targetZone ?? undefined}
+                  currentRoute={route?.route ?? []}
+                  variant="companion"
+                  showCredit={false}
+                />
+              </TiltedPlane>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 z-[403] -translate-x-1/2 -translate-y-1/2"
+                style={{ top: `${CALM_MAP_CENTER_PERCENT}%` }}
+              >
+                {calmHeading === null
+                  ? <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+                  : <HeadingArrow />}
+              </span>
             </>
           ) : (
             <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur">
               {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
             </div>
           )}
+          {demoMode && <DemoPad riskLevel={safetyState?.riskLevel ?? null} onMove={moveDemoLocation} />}
         </div>
 
         <LocationSharingStatus />
@@ -1074,4 +1077,43 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
 
 function getGuidanceFallback(zoneName: string) {
   return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
+}
+
+
+type DemoDirection = "up" | "down" | "left" | "right";
+
+const DEMO_STATUS_COLORS: Record<SafetyState["riskLevel"], string> = {
+  SAFE: "bg-[#4ade80]",
+  WARNING: "bg-[#fbbf24]",
+  HIGH_RISK: "bg-[#f43f5e]",
+};
+
+/** Small glass D-pad laid over the map that walks the demo location ~110 m per tap. */
+function DemoPad({ riskLevel, onMove }: { riskLevel: SafetyState["riskLevel"] | null; onMove: (direction: DemoDirection) => void }) {
+  const arrow = (direction: DemoDirection, label: string, glyph: string, area: string) => (
+    <button
+      type="button"
+      onClick={() => onMove(direction)}
+      aria-label={label}
+      className={`grid size-9 place-items-center rounded-xl bg-white/10 text-[17px] text-white transition active:scale-90 active:bg-white/25 ${area}`}
+    >
+      {glyph}
+    </button>
+  );
+  return (
+    <div
+      aria-label="Demo байршил хөдөлгөх"
+      className="absolute left-3 top-1/2 z-[410] grid -translate-y-1/2 grid-cols-3 grid-rows-3 gap-1 rounded-2xl bg-[#071116]/70 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
+    >
+      {arrow("up", "Demo: хойд зүг рүү", "↑", "col-start-2")}
+      {arrow("left", "Demo: баруун зүг рүү", "←", "col-start-1 row-start-2")}
+      <span
+        role="status"
+        aria-label={`Demo төлөв: ${riskLevel ?? "тодорхойгүй"}`}
+        className={`col-start-2 row-start-2 m-auto size-3 rounded-full ${riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"}`}
+      />
+      {arrow("right", "Demo: зүүн зүг рүү", "→", "col-start-3 row-start-2")}
+      {arrow("down", "Demo: урд зүг рүү", "↓", "col-start-2 row-start-3")}
+    </div>
+  );
 }

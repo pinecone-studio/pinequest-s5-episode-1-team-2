@@ -73,12 +73,6 @@ select {
   opacity: 1;
 }
 
-/* The dome's curved top hides the map's top corners, so the credit moves to the bottom. */
-.ar-minimap .safepath-map__credit {
-  top: auto;
-  bottom: .5rem;
-}
-
 .safepath-map .leaflet-tooltip {
   border: 1px solid var(--border);
   border-radius: 12px;

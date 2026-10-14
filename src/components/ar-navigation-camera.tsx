@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import { useCompassHeading } from "@/hooks/use-compass-heading";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { Camera, CameraOff, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
+import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
 
 type Coordinate = {
   latitude: number;
@@ -23,10 +25,6 @@ type ArNavigationCameraProps = {
   onAutoStartAttempted?: () => void;
   voice?: "female" | "male";
   speechSpeed?: "normal" | "slow";
-};
-
-type DeviceOrientationWithCompass = DeviceOrientationEvent & {
-  webkitCompassHeading?: number;
 };
 
 type DeviceOrientationPermissionApi = typeof DeviceOrientationEvent & {
@@ -128,36 +126,8 @@ function formatDistance(distance: number | null): string {
   return `${(distance / 1000).toFixed(1)} км`;
 }
 
-// Exponential smoothing factor for the compass; lower is steadier but slower to react.
-const HEADING_SMOOTHING = 0.18;
-
 const OFFLINE_SCENE_ERROR = "Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу.";
 const OFFLINE_SPEECH_ERROR = "Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү.";
-
-function readOrientation(event: DeviceOrientationWithCompass): number | null {
-  if (typeof event.webkitCompassHeading === "number" && Number.isFinite(event.webkitCompassHeading)) {
-    return (event.webkitCompassHeading + 360) % 360;
-  }
-
-  const { alpha, beta, gamma } = event;
-  if (typeof alpha !== "number" || !Number.isFinite(alpha)) return null;
-
-  if (typeof beta === "number" && Number.isFinite(beta) && typeof gamma === "number" && Number.isFinite(gamma)) {
-    // Project the rear camera's direction (device -Z) onto the horizontal plane so the heading
-    // matches where the camera points while the phone is held upright, regardless of screen rotation.
-    const radians = (degrees: number) => (degrees * Math.PI) / 180;
-    const [a, b, g] = [radians(alpha), radians(beta), radians(gamma)];
-    const east = -Math.cos(a) * Math.sin(g) - Math.sin(a) * Math.sin(b) * Math.cos(g);
-    const north = Math.cos(a) * Math.sin(b) * Math.cos(g) - Math.sin(a) * Math.sin(g);
-    if (Math.hypot(east, north) > 0.35) {
-      return ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
-    }
-  }
-
-  // Phone is close to flat: fall back to the top edge's heading, accounting for screen rotation.
-  const screenAngle = typeof window !== "undefined" ? (window.screen.orientation?.angle ?? 0) : 0;
-  return ((360 - alpha + screenAngle) % 360 + 360) % 360;
-}
 
 const CHEVRON_PATHS = [16, 74, 132].map((top) => {
   const y = (value: number) => Math.round(value * CHEVRON_STRETCH);
@@ -298,9 +268,10 @@ export default function ArNavigationCamera({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState("");
-  const [heading, setHeading] = useState<number | null>(null);
   const [compassEnabled, setCompassEnabled] = useState(false);
-  const [compassNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
+  const [permissionNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
+  const { heading, problem: compassProblem } = useCompassHeading(compassEnabled);
+  const compassNote = compassProblem || permissionNote;
   const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
   const [sceneError, setSceneError] = useState("");
@@ -345,55 +316,6 @@ export default function ArNavigationCamera({
       if (video.srcObject === stream) video.srcObject = null;
     };
   }, [stream]);
-
-  useEffect(() => {
-    if (!compassEnabled) return;
-
-    // Android Chrome's plain `deviceorientation` alpha is relative to an arbitrary start, so listening
-    // to both events would make the heading jump. Use the absolute event alone when it exists.
-    const supportsAbsolute = "ondeviceorientationabsolute" in window;
-    const eventName = supportsAbsolute ? "deviceorientationabsolute" : "deviceorientation";
-    let smoothed: { x: number; y: number } | null = null;
-    let lastPublished: number | null = null;
-    let frame = 0;
-
-    const publish = () => {
-      frame = 0;
-      if (!smoothed) return;
-      const next = ((Math.atan2(smoothed.x, smoothed.y) * 180) / Math.PI + 360) % 360;
-      if (lastPublished !== null && Math.abs(((next - lastPublished + 540) % 360) - 180) < 1) return;
-      lastPublished = next;
-      setHeading(next);
-    };
-
-    const handleOrientation = (rawEvent: Event) => {
-      const event = rawEvent as DeviceOrientationWithCompass;
-      const isAbsolute = supportsAbsolute || event.absolute || typeof event.webkitCompassHeading === "number";
-      const rawHeading = isAbsolute ? readOrientation(event) : null;
-      if (rawHeading === null) {
-        setCompassNote(isAbsolute
-          ? "Луужинг уншиж чадсангүй. Утсаа 8 хэлбэрээр хөдөлгөж үзнэ үү."
-          : "Энэ browser хойд зүгийг тодорхойлж чадахгүй байна. Газрын зургийн маршрутыг дагаарай.");
-        return;
-      }
-
-      // Smooth on the unit circle so 359° → 1° does not swing through 180°.
-      const radians = (rawHeading * Math.PI) / 180;
-      const x = Math.sin(radians);
-      const y = Math.cos(radians);
-      smoothed = smoothed
-        ? { x: smoothed.x + (x - smoothed.x) * HEADING_SMOOTHING, y: smoothed.y + (y - smoothed.y) * HEADING_SMOOTHING }
-        : { x, y };
-      setCompassNote("");
-      if (!frame) frame = requestAnimationFrame(publish);
-    };
-
-    window.addEventListener(eventName, handleOrientation);
-    return () => {
-      window.removeEventListener(eventName, handleOrientation);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [compassEnabled]);
 
   // Keep the screen awake while the camera guides the person; released automatically when hidden.
   useEffect(() => {
@@ -664,7 +586,6 @@ export default function ArNavigationCamera({
     setStream(null);
     setCameraLoading(false);
     setCompassEnabled(false);
-    setHeading(null);
     setCompassNote("Утсаа хөдөлгөж луужинг тохируулна уу.");
     setCameraError("");
     setSceneError("");
@@ -1046,21 +967,24 @@ export default function ArNavigationCamera({
         >
           {/* Inset back to the visible width so the map centres on the person, not on the off-screen dome. */}
           <div className="absolute inset-y-0 left-[13.2353%] right-[13.2353%]">
-            <CameraMiniMap
-              location={miniMapLocation}
-              currentRoute={route}
-              destination={routeDestination ?? undefined}
-              variant="companion"
-              routeColor="#2a7fff"
-              className="ar-minimap h-full w-full rounded-none border-0"
-            />
-            <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
+            {/* Seen from a slant and turned with the compass, so it matches the camera view above it. */}
+            <TiltedPlane tilt={45} centerPercent={50} heading={heading} fadeColor="#eef1f4">
+              <CameraMiniMap
+                location={miniMapLocation}
+                currentRoute={route}
+                destination={routeDestination ?? undefined}
+                variant="companion"
+                routeColor="#2a7fff"
+                showCredit={false}
+                className="ar-minimap h-full w-full rounded-none border-0"
+              />
+            </TiltedPlane>
+            <div className="pointer-events-none absolute left-1/2 top-1/2 z-[403] -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
               {heading === null ? (
                 <span className="block size-4 rounded-full border-[3px] border-white bg-[#2a7fff] shadow-[0_0_0_6px_rgba(42,127,255,.22)]" />
               ) : (
-                <svg viewBox="0 0 32 32" className="size-8 drop-shadow-[0_2px_3px_rgba(0,0,0,.35)]" style={{ transform: `rotate(${Math.round(heading)}deg)` }}>
-                  <path d="M16 3 27 27 16 21 5 27Z" fill="#2a7fff" stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round" />
-                </svg>
+                // The map turns with the compass, so the person always faces straight up.
+                <HeadingArrow />
               )}
             </div>
           </div>
