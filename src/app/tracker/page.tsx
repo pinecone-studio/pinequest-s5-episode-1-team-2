@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, Map as MapIcon, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import { AppShell, CompanionMark } from "@/components/safe-path";
@@ -26,8 +26,10 @@ const CompanionMap = dynamic(() => import("@/components/live-map"), {
 
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
-const CAMERA_AUTO_OPEN_DELAY_MS = 5 * 60 * 1000;
-const CAMERA_AUTO_OPEN_STORAGE_KEY = "safepath:camera-auto-open-at:v1";
+// Guidance starts by itself once the person has clearly left the Safe Zone, and ends once they
+// are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
+const GUIDANCE_START_DELAY_MS = 5_000;
+const GUIDANCE_STOP_DELAY_MS = 15_000;
 
 type RouteResult = {
   destination: {
@@ -53,12 +55,7 @@ export default function TrackerPage() {
   
 
   const [demoMode, setDemoMode] = useState(false);
-  const [navigationView, setNavigationView] = useState<"map" | "camera">("map");
-  const [cameraAutoOpenAt, setCameraAutoOpenAt] = useState<number | null>(null);
-  const [cameraAutoCountdownSeconds, setCameraAutoCountdownSeconds] = useState<number | null>(null);
-  const [autoOpenCamera, setAutoOpenCamera] = useState(false);
-  const previousInsideSafeZoneRef = useRef<boolean | null>(null);
-  const autoOpenedBySafetyTimerRef = useRef(false);
+  const [guiding, setGuiding] = useState(false);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [zonesLoadError, setZonesLoadError] = useState("");
@@ -263,83 +260,17 @@ export default function TrackerPage() {
       : undefined;
 
 
-  // Arm the five-minute camera countdown only on a real inside -> outside transition.
-  // Persist the deadline so a temporary refresh/background suspension does not reset it.
+  // Outside a configured Safe Zone, the screen turns into camera guidance; back inside, it returns
+  // to the map. Both switches wait a moment to ride out GPS jitter at the boundary.
+  const isOutsideSafeZone = Boolean(safetyState && targetZone && !safetyState.isInsideSafeZone);
   useEffect(() => {
-    if (!safetyState || !targetZone) return;
-
-    const inside = safetyState.isInsideSafeZone;
-    const previousInside = previousInsideSafeZoneRef.current;
-
-    if (inside) {
-      previousInsideSafeZoneRef.current = true;
-      try {
-        window.localStorage.removeItem(CAMERA_AUTO_OPEN_STORAGE_KEY);
-      } catch {
-        // The feature still works for the current page if storage is unavailable.
-      }
-      setCameraAutoOpenAt(null);
-      setCameraAutoCountdownSeconds(null);
-      setAutoOpenCamera(false);
-      if (autoOpenedBySafetyTimerRef.current) {
-        autoOpenedBySafetyTimerRef.current = false;
-        setNavigationView("map");
-      }
-      return;
-    }
-
-    previousInsideSafeZoneRef.current = false;
-    if (previousInside === true) {
-      const deadline = Date.now() + CAMERA_AUTO_OPEN_DELAY_MS;
-      setCameraAutoOpenAt(deadline);
-      try {
-        window.localStorage.setItem(CAMERA_AUTO_OPEN_STORAGE_KEY, String(deadline));
-      } catch {
-        // Keep the in-memory countdown even if persistent storage is disabled.
-      }
-      return;
-    }
-
-    // On reload, resume an already-started countdown only. Do not treat a first-ever
-    // location fix outside all zones as if an exit transition had just happened.
-    if (previousInside === null) {
-      try {
-        const storedDeadline = Number(window.localStorage.getItem(CAMERA_AUTO_OPEN_STORAGE_KEY));
-        if (Number.isFinite(storedDeadline) && storedDeadline > 0) {
-          setCameraAutoOpenAt(storedDeadline);
-        }
-      } catch {
-        // Storage is optional; no prior countdown means nothing to resume.
-      }
-    }
-  }, [safetyState?.isInsideSafeZone, targetZone?.id]);
-
-  useEffect(() => {
-    if (cameraAutoOpenAt === null) {
-      setCameraAutoCountdownSeconds(null);
-      return;
-    }
-
-    const updateCountdown = () => {
-      const remainingMs = cameraAutoOpenAt - Date.now();
-      setCameraAutoCountdownSeconds(Math.max(0, Math.ceil(remainingMs / 1000)));
-      if (remainingMs <= 0) {
-        try {
-          window.localStorage.removeItem(CAMERA_AUTO_OPEN_STORAGE_KEY);
-        } catch {
-          // Ignore storage failures; the countdown is already expiring.
-        }
-        setCameraAutoOpenAt(null);
-        autoOpenedBySafetyTimerRef.current = true;
-        setNavigationView("camera");
-        setAutoOpenCamera(true);
-      }
-    };
-
-    updateCountdown();
-    const intervalId = window.setInterval(updateCountdown, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [cameraAutoOpenAt]);
+    if (isOutsideSafeZone === guiding) return;
+    const timer = window.setTimeout(
+      () => setGuiding(isOutsideSafeZone),
+      isOutsideSafeZone ? GUIDANCE_START_DELAY_MS : GUIDANCE_STOP_DELAY_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [guiding, isOutsideSafeZone]);
 
   useEffect(() => {
     if (currentLatitude === undefined || currentLongitude === undefined) {
@@ -1066,42 +997,15 @@ export default function TrackerPage() {
           className="relative z-10 flex flex-1 flex-col items-center pb-5 text-center"
           aria-label="Милотой ярилцах"
         >
-          <div className="mt-3 grid w-full grid-cols-2 gap-2" aria-label="Навигацийн харагдац">
-            <button
-              type="button"
-              onClick={() => setNavigationView("map")}
-              aria-pressed={navigationView === "map"}
-              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${navigationView === "map" ? "border-[#67e8f9]/70 bg-[#0e7490] text-white" : "border-[#67e8f9]/20 bg-[#101c22] text-[#b7c7cc]"}`}
-            >
-              <MapIcon size={17} /> Газрын зураг
-            </button>
-            <button
-              type="button"
-              onClick={() => setNavigationView("camera")}
-              aria-pressed={navigationView === "camera"}
-              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition ${navigationView === "camera" ? "border-[#67e8f9]/70 bg-[#0e7490] text-white" : "border-[#67e8f9]/20 bg-[#101c22] text-[#b7c7cc]"}`}
-            >
-              <Camera size={17} /> Камераар чиглүүлэх
-            </button>
-          </div>
-
-          {cameraAutoCountdownSeconds !== null && (
-            <div role="status" aria-live="polite" className="mt-2 w-full rounded-xl border border-amber-300/30 bg-amber-950/45 px-3 py-2 text-left text-sm leading-5 text-amber-100">
-              <span className="font-semibold">Аюулгүй бүсээс гарсан байна.</span>{" "}
-              Камер {Math.floor(cameraAutoCountdownSeconds / 60)}:{String(cameraAutoCountdownSeconds % 60).padStart(2, "0")} дараа автоматаар нээгдэнэ. Энэ хугацаанд аюулгүй бүсэд буцаж орвол тоолол цуцлагдана.
-            </div>
-          )}
-
           <div className="relative mt-2 flex h-[clamp(360px,57dvh,560px)] w-full shrink-0 items-center justify-center overflow-hidden rounded-[28px] border border-[#67e8f9]/25 bg-[#101c22] shadow-[0_18px_45px_rgba(0,0,0,.28)]">
-            {navigationView === "camera" && currentLocation ? (
+            {guiding && currentLocation ? (
               <ArNavigationCamera
                 location={currentLocation}
                 route={route?.route ?? []}
                 instruction={navigationInstruction ?? route?.nextInstruction ?? "Аюулгүй бүс рүү буцах зам тооцоолж байна…"}
                 destinationName={targetZone?.name ?? "Аюулгүй бүс"}
                 distanceMeters={route?.distanceMeters ?? null}
-                autoStart={autoOpenCamera}
-                onAutoStartAttempted={() => setAutoOpenCamera(false)}
+                autoStart
                 voice={profile.voice}
                 speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
               />
