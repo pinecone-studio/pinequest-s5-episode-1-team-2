@@ -9,6 +9,8 @@ import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
+import { DemoNotificationButton } from "@/components/demo-notification-button";
+import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 
@@ -118,10 +120,32 @@ export default function GuardianPage() {
   const { settings } = useAssistantSettings();
   const { children: linkedChildren, failed: childrenLoadFailed } = useChildLocations();
   const { alerts, failed: alertsLoadFailed, markRead: markSafetyAlertRead } = useSafetyAlerts();
+  const [demoAlert, setDemoAlert] = useState<GuardianSafetyAlert | null>(null);
   const now = useNow();
-  const unreadAlertCount = alerts.filter((alert) => !alert.read).length;
+  const visibleAlerts = demoAlert ? [demoAlert, ...alerts] : alerts;
+  const unreadAlertCount = visibleAlerts.filter((alert) => !alert.read).length;
+  const urgentSos = visibleAlerts.find((alert) => alert.type === "SOS" && !alert.read) ?? null;
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
+
+  useEffect(() => {
+    const openNotificationsFromHash = () => {
+      if (window.location.hash !== "#events") return;
+      setActiveTab("alerts");
+      window.setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 0);
+    };
+    openNotificationsFromHash();
+    window.addEventListener("hashchange", openNotificationsFromHash);
+    return () => window.removeEventListener("hashchange", openNotificationsFromHash);
+  }, []);
+
+  const selectTab = (tab: TabId) => {
+    setActiveTab(tab);
+    if (tab === "alerts" || tab === "map") {
+      const target = tab === "alerts" ? "events" : "location";
+      window.setTimeout(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth" }), 0);
+    }
+  };
 
   const childName = settings.userName || "Тэмүүлэн";
   const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
@@ -225,7 +249,7 @@ export default function GuardianPage() {
           <section
             role={tone === "risk" ? "alert" : "status"}
             aria-live="polite"
-            className={`mx-4 mb-3 rounded-2xl px-4 py-3 ${TONE[tone].bg}`}
+            className={`mx-4 mb-3 rounded-2xl px-4 py-3 ${TONE[tone].bg} ${activeTab === "alerts" ? "hidden" : ""}`}
           >
             <div className="flex items-center gap-2">
               <span
@@ -242,7 +266,25 @@ export default function GuardianPage() {
             </p>
           </section>
 
-          <section className="mx-4 mb-4 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label="Холбогдсон хүүхдүүд">
+          {activeTab !== "alerts" && urgentSos && (
+            <section role="alert" aria-live="assertive" className="mx-4 mb-5 overflow-hidden rounded-[24px] border-2 border-rose-500 bg-[linear-gradient(145deg,rgba(127,29,29,0.62),rgba(30,8,12,0.96))] p-5 shadow-[0_12px_36px_rgba(244,63,94,0.22)] sm:p-6">
+              <div className="flex items-center gap-3">
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-500/20 text-2xl" aria-hidden="true">🆘</span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-200">Яаралтай мэдэгдэл</p>
+                  <h2 className="mt-0.5 text-xl font-extrabold leading-tight text-rose-100 sm:text-2xl">Хүүхэд тусламж хүссэн</h2>
+                </div>
+              </div>
+              <p className="mt-4 text-base font-semibold text-white">{urgentSos.childName} · {formatRelative(new Date(urgentSos.createdAt).getTime(), now)}</p>
+              <p className="mt-2 text-sm leading-6 text-rose-50/90">{urgentSos.message}</p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => selectTab("alerts")} className="min-h-12 rounded-xl bg-rose-500 px-3 text-sm font-bold text-white transition hover:bg-rose-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Мэдэгдэл харах</button>
+                <button type="button" onClick={() => selectTab("map")} className="min-h-12 rounded-xl border border-rose-200/40 bg-black/20 px-3 text-sm font-semibold text-rose-50 transition hover:bg-black/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Байршил шалгах</button>
+              </div>
+            </section>
+          )}
+
+          <section className={`mx-4 mb-4 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4 ${activeTab === "alerts" ? "hidden" : ""}`} aria-label="Холбогдсон хүүхдүүд">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold">Холбогдсон хүүхдүүд</h2>
               <span className="text-xs text-(--sp-muted)">5 сек тутам шинэчилнэ</span>
@@ -286,7 +328,7 @@ export default function GuardianPage() {
             )}
           </section>
 
-          <div id="location" className="px-4">
+          <div id="location" className={`px-4 ${activeTab === "alerts" ? "hidden" : ""}`}>
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
               {displayLocation ? (
                 <>
@@ -347,7 +389,7 @@ export default function GuardianPage() {
             </div>
           </div>
 
-          <section className="px-5 pt-4" aria-label="Одоогийн мэдээлэл">
+          <section className={`px-5 pt-4 ${activeTab === "alerts" ? "hidden" : ""}`} aria-label="Одоогийн мэдээлэл">
             <dl className="grid grid-cols-2 gap-x-5 gap-y-3 border-y border-(--sp-line) py-3">
               <Info
                 label="Байршил"
@@ -391,27 +433,40 @@ export default function GuardianPage() {
             </dl>
           </section>
 
-          <section id="events" className="px-5 pt-5" aria-labelledby="safety-alerts-heading">
-            <div className="flex items-center justify-between gap-3">
-              <h2 id="safety-alerts-heading" className="text-[16px] font-semibold">Аюулгүй байдлын мэдэгдэл</h2>
-              {unreadAlertCount > 0 && (
-                <span className="rounded-full bg-(--sp-risk-bg) px-2.5 py-1 text-xs font-semibold text-(--sp-risk)">
-                  {unreadAlertCount} шинэ
-                </span>
-              )}
+          <section id="events" className={`px-5 pt-5 ${activeTab === "alerts" ? "" : "hidden"}`} aria-labelledby="safety-alerts-heading">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="safety-alerts-heading" className="text-[20px] font-semibold">Мэдэгдэл</h2>
+              <div className="flex items-center gap-2">
+                {unreadAlertCount > 0 && (
+                  <span className="rounded-full bg-(--sp-risk-bg) px-2.5 py-1 text-xs font-semibold text-(--sp-risk)">
+                    {unreadAlertCount} шинэ
+                  </span>
+                )}
+                <DemoNotificationButton onSent={() => setDemoAlert({
+                  id: `demo-${Date.now()}`,
+                  childId: monitoredChild?.childId ?? "demo-child",
+                  childName: monitoredChild?.name ?? "Хүүхэд",
+                  type: "SOS",
+                  zoneName: null,
+                  message: "Энэ бол туршилтын мэдэгдэл. Бодит SOS дохио биш.",
+                  createdAt: new Date().toISOString(),
+                  read: false,
+                })} />
+              </div>
             </div>
+            <p className="mt-1 text-sm leading-6 text-(--sp-muted)">SOS болон аюулгүй бүсийн мэдэгдлүүд энд харагдана.</p>
             {alertsLoadFailed ? (
               <p className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
                 Мэдэгдлийг авч чадсангүй. Сүлжээ болон нэвтрэлтийн төлөвөө шалгана уу.
               </p>
-            ) : alerts.length === 0 ? (
-              <div className="mt-3 rounded-xl border border-(--sp-line) bg-(--sp-surface) p-3 text-sm leading-6 text-(--sp-muted)">
-                Одоогоор аюулгүй бүсийн мэдэгдэл алга. Автомат мэдэгдэл ажиллахын тулд хүүхдэдээ аюулгүй бүс тохируулж, байршил хуваалцахыг асаана уу.
-                <Link href="/guardian/zones" className="mt-2 inline-block font-medium text-(--sp-primary)">Аюулгүй бүс тохируулах →</Link>
+            ) : visibleAlerts.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-(--sp-line) bg-(--sp-surface) px-4 py-8 text-center text-sm leading-6 text-(--sp-muted)">
+                Одоогоор шинэ мэдэгдэл алга.
+                <Link href="/guardian/zones" className="mt-2 block font-medium text-(--sp-primary)">Аюулгүй бүс тохируулах →</Link>
               </div>
             ) : (
               <ol className="mt-3 space-y-2.5">
-                {alerts.map((alert) => {
+                {visibleAlerts.map((alert) => {
                   const alertTime = new Date(alert.createdAt).getTime();
                   const isUrgent = alert.type !== "ZONE_ENTER";
                   const label = alert.type === "SOS"
@@ -429,7 +484,7 @@ export default function GuardianPage() {
                           <p className="mt-1 text-xs text-(--sp-muted)">{alert.childName} · {formatRelative(alertTime, now)}</p>
                         </div>
                         {!alert.read && (
-                          <button type="button" onClick={() => { void markSafetyAlertRead(alert.id); }} className="shrink-0 rounded-lg border border-(--sp-line) px-2.5 py-1.5 text-xs font-medium text-(--sp-ink) hover:bg-white/5">
+                          <button type="button" onClick={() => { if (demoAlert && alert.id === demoAlert.id) setDemoAlert({ ...demoAlert, read: true }); else void markSafetyAlertRead(alert.id); }} className="shrink-0 rounded-lg border border-(--sp-line) px-2.5 py-1.5 text-xs font-medium text-(--sp-ink) hover:bg-white/5">
                             Уншсан
                           </button>
                         )}
@@ -446,8 +501,8 @@ export default function GuardianPage() {
 
         <TabBar
           active={activeTab}
-          onSelect={setActiveTab}
-          alert={tone === "risk" || unreadAlertCount > 0}
+          onSelect={selectTab}
+          unreadCount={unreadAlertCount}
         />
 
         <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
@@ -510,11 +565,11 @@ const TABS: {
 function TabBar({
   active,
   onSelect,
-  alert,
+  unreadCount,
 }: {
   active: TabId;
   onSelect: (id: TabId) => void;
-  alert?: boolean;
+  unreadCount: number;
 }) {
   return (
     <nav
@@ -540,8 +595,10 @@ function TabBar({
                   }`}
                 >
                   {tab.icon(isActive)}
-                  {tab.id === "alerts" && alert && (
-                    <span className="absolute right-3 top-1 size-2 rounded-full bg-(--sp-risk) ring-2 ring-black" />
+                  {tab.id === "alerts" && unreadCount > 0 && (
+                    <span aria-label={`${unreadCount} уншаагүй мэдэгдэл`} className="absolute -right-0.5 -top-0.5 grid min-h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-black">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   )}
                 </span>
                 <span

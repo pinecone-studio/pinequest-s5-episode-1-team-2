@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { SAFETY_NOTIFICATION_CHANNEL_ID, SOS_NOTIFICATION_CHANNEL_ID } from "@/lib/push/channels";
 
 const TOKEN_STORAGE_KEY = "safepath:push-token";
 type ListenerHandle = { remove: () => Promise<void> };
@@ -52,9 +53,33 @@ export default function PushNotificationSetup() {
     handlesRef.current.push(await plugin.addListener("pushNotificationActionPerformed", (action) => {
       const data = action.notification.data as Record<string, unknown> | undefined;
       if (data?.type === "SAFETY_ALERT" && data.target === "guardian") {
-        window.location.assign("/guardian");
+        window.location.assign("/guardian#events");
       }
     }));
+  }, []);
+
+  const prepareChannels = useCallback(async (plugin: PushPlugin) => {
+    await Promise.all([
+      plugin.createChannel({
+        id: SOS_NOTIFICATION_CHANNEL_ID,
+        name: "Яаралтай тусламж — SOS",
+        description: "Хүүхдээс ирсэн SOS дохио",
+        importance: 5,
+        sound: "sos_alert.wav",
+        visibility: 1,
+        vibration: true,
+        lights: true,
+        lightColor: "#F43F5E",
+      }),
+      plugin.createChannel({
+        id: SAFETY_NOTIFICATION_CHANNEL_ID,
+        name: "SafePath аюулгүй байдлын мэдэгдэл",
+        description: "Safe Zone-д орсон эсвэл гарсан тухай",
+        importance: 4,
+        visibility: 1,
+        vibration: true,
+      }),
+    ]);
   }, []);
 
   useEffect(() => {
@@ -70,6 +95,7 @@ export default function PushNotificationSetup() {
         const { PushNotifications } = await import("@capacitor/push-notifications");
         if (disposed) return;
         pluginRef.current = PushNotifications;
+        await prepareChannels(PushNotifications);
         await addListeners(PushNotifications);
         if (disposed) {
           await removeListeners();
@@ -94,13 +120,14 @@ export default function PushNotificationSetup() {
       mountedRef.current = false;
       void removeListeners();
     };
-  }, [addListeners, removeListeners]);
+  }, [addListeners, prepareChannels, removeListeners]);
 
   const enableNotifications = async () => {
     setStatus("requesting");
     try {
       const plugin = pluginRef.current ?? (await import("@capacitor/push-notifications")).PushNotifications;
       pluginRef.current = plugin;
+      await prepareChannels(plugin);
       await addListeners(plugin);
       const current = await plugin.checkPermissions();
       const permission = current.receive === "granted" ? current : await plugin.requestPermissions();

@@ -82,6 +82,11 @@ export async function signup(
 
   await createSession(id, role);
   redirect(homeFor(role));
+  // The guardian and child sides of a new account are already linked, with no code.
+  await linkToSelf(id);
+  // The role is picked per device on the home page, not stored on the account.
+  await createSession(id);
+  redirect("/role");
 }
 
 export async function login(
@@ -150,6 +155,10 @@ export async function logout(formData: FormData) {
 }
 
 /** Persists a role for a legacy account that has not chosen one yet. */
+/**
+ * Picks the role for this device only, so one account can be the guardian on one phone and
+ * the child on another. Nothing about the role is stored on the account.
+ */
 export async function setRole(formData: FormData) {
   const userId = await getSessionUserId();
 
@@ -177,6 +186,8 @@ export async function setRole(formData: FormData) {
     redirect(homeFor(existing?.role ?? null), "replace");
   }
 
+  // Every account is both, so its guardian side always sees its own child side (idempotent).
+  await linkToSelf(userId);
   await createSession(userId, role);
 
   redirect(homeFor(role), "replace");
