@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
+import { TiltedPlane } from "@/components/tilted-plane";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
@@ -30,6 +31,8 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 // are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
+// Where the person sits on the slanted calm map, as a share of its height.
+const CALM_MAP_CENTER_PERCENT = 64;
 
 type RouteResult = {
   destination: {
@@ -943,38 +946,44 @@ export default function TrackerPage() {
           </div>
         )}
 
-        {/* The companion stays on screen in every state and speaks its own messages. */}
-        <section aria-label={`${companionName} AI туслах`} className="relative z-10 flex items-center gap-3">
+        {/* The companion stays on screen in every state and speaks its own messages: large in the
+            middle while calm, a small strip above the camera while guiding. */}
+        <section
+          aria-label={`${companionName} AI туслах`}
+          className={`relative z-10 flex gap-3 ${guiding ? "items-center" : "flex-1 flex-col items-center justify-center"}`}
+        >
           <CompanionMark
             state={companionState}
             avatar={settings.avatar}
             name={companionName}
-            className="companion-avatar--compact companion-avatar--mini shrink-0"
+            className={`companion-avatar--compact shrink-0 ${guiding ? "companion-avatar--mini" : ""}`}
           />
-          <p
-            aria-live="polite"
-            aria-busy={assistantLoading}
-            className="line-clamp-4 min-w-0 flex-1 rounded-2xl rounded-tl-md bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15"
-          >
-            {companionMessage}
-          </p>
-          <button
-            type="button"
-            disabled={!safetyState || assistantLoading || speechStatus === "loading"}
-            onClick={() => void speakMessage(assistantMessage)}
-            aria-label={`${companionName}-г дахин сонсох`}
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
-          >
-            {assistantLoading || speechStatus === "loading"
-              ? <SafePathLoading variant="button" />
-              : speechError
-                ? <VolumeX size={22} aria-hidden="true" />
-                : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
-          </button>
+          <div className={`flex min-w-0 items-center gap-3 ${guiding ? "flex-1" : "w-full"}`}>
+            <p
+              aria-live="polite"
+              aria-busy={assistantLoading}
+              className={`line-clamp-4 min-w-0 flex-1 rounded-2xl bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${guiding ? "rounded-tl-md" : "text-center"}`}
+            >
+              {companionMessage}
+            </p>
+            <button
+              type="button"
+              disabled={!safetyState || assistantLoading || speechStatus === "loading"}
+              onClick={() => void speakMessage(assistantMessage)}
+              aria-label={`${companionName}-г дахин сонсох`}
+              className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            >
+              {assistantLoading || speechStatus === "loading"
+                ? <SafePathLoading variant="button" />
+                : speechError
+                  ? <VolumeX size={22} aria-hidden="true" />
+                  : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
+            </button>
+          </div>
         </section>
 
-        {/* Calm map inside the Safe Zone; camera guidance takes over by itself once outside. */}
-        <div className="relative z-10 mt-3 min-h-[360px] flex-1 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)]">
+        {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
+        <div className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${guiding ? "min-h-[360px] flex-1" : "h-[230px] shrink-0"}`}>
           {guiding && currentLocation ? (
             <ArNavigationCamera
               location={currentLocation}
@@ -988,13 +997,20 @@ export default function TrackerPage() {
             />
           ) : currentLocation ? (
             <>
-              <CompanionMap
-                location={currentLocation}
-                destination={targetZone ?? undefined}
-                currentRoute={route?.route ?? []}
-                variant="companion"
+              <TiltedPlane centerPercent={CALM_MAP_CENTER_PERCENT}>
+                <CompanionMap
+                  location={currentLocation}
+                  destination={targetZone ?? undefined}
+                  currentRoute={route?.route ?? []}
+                  variant="companion"
+                  showCredit={false}
+                />
+              </TiltedPlane>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 z-[402] block size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]"
+                style={{ top: `${CALM_MAP_CENTER_PERCENT}%` }}
               />
-              <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 z-10 block size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
             </>
           ) : (
             <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur">
