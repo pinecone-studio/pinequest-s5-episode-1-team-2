@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
+import { SafePathLoading } from "@/components/safepath-loading";
 import { generatePairingCode, redeemCode } from "@/app/actions/auth";
 import { PAIRING_CODE_LENGTH, PAIRING_CODE_TTL_MINUTES } from "@/lib/auth/schemas";
 
-const button = "min-h-[52px] rounded-2xl bg-[#111111] px-5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]";
+const button = "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#111111] px-5 text-[15px] font-medium text-white disabled:cursor-not-allowed disabled:bg-[#c8c8c4] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]";
 
 /** Child side: ask for a code and show it. */
 export function CodeGenerator() {
@@ -17,7 +18,7 @@ export function CodeGenerator() {
           <p className="mt-2 text-sm text-[#737373]">{PAIRING_CODE_TTL_MINUTES} минутын дотор ашиглана уу.</p>
         </div>
       )}
-      <button type="submit" disabled={pending} className={button}>{pending ? "Түр хүлээнэ үү…" : state?.code ? "Шинэ код авах" : "Код авах"}</button>
+      <button type="submit" disabled={pending} className={button}>{pending && <SafePathLoading variant="button" />}{pending ? "Түр хүлээнэ үү…" : state?.code ? "Шинэ код авах" : "Код авах"}</button>
     </form>
   );
 }
@@ -41,7 +42,7 @@ export function CodeEntry() {
       </div>
       {state?.message && <p role="alert" className="text-sm text-[#c64242]">{state.message}</p>}
       {state?.success && <p role="status" className="text-sm text-[#2e7d4f]">{state.success}</p>}
-      <button type="submit" disabled={pending} className={button}>{pending ? "Түр хүлээнэ үү…" : "Холбох"}</button>
+      <button type="submit" disabled={pending} className={button}>{pending && <SafePathLoading variant="button" />}{pending ? "Түр хүлээнэ үү…" : "Холбох"}</button>
     </form>
   );
 }

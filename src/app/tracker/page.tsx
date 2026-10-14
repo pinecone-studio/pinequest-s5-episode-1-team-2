@@ -7,6 +7,7 @@ import { Camera, Map as MapIcon, MapPin } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import { AppShell, CompanionMark } from "@/components/safe-path";
+import { SafePathLoading } from "@/components/safepath-loading";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
@@ -19,7 +20,7 @@ import type { SafeZone, SafetyAssistantRequest, SafetyState } from "@/types/safe
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => <p className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85 px-3 py-2 text-xs text-[#d4e1e5]">Газрын зураг ачаалж байна…</p>,
+  loading: () => <SafePathLoading className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85" label="Газрын зураг ачаалж байна…" />,
 });
 
 
@@ -1122,16 +1123,12 @@ export default function TrackerPage() {
                 />
               </>
             ) : (
-              <p role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
-                {locationStatus === "loading" ? "Байршил тогтоож байна…" : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
-              </p>
+              <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-xs leading-5 text-[#d4e1e5] backdrop-blur">
+                {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
+              </div>
             )}
           </div>
-          {!demoMode && !zonesLoaded && (
-            <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
-              Аюулгүй бүсүүдийг ачаалж байна…
-            </p>
-          )}
+          {!demoMode && !zonesLoaded && <SafePathLoading className="mt-3 justify-start px-0" label="Аюулгүй бүсүүдийг ачаалж байна…" />}
           {!demoMode && zonesLoadError && (
             <p role="alert" className="mt-3 text-sm text-[#fda4af]">
               {zonesLoadError}
@@ -1142,11 +1139,7 @@ export default function TrackerPage() {
               Танд аюулгүй бүс тохируулаагүй байна. Асран хамгаалагчаасаа бүс нэмүүлээрэй.
             </p>
           )}
-          {routeStatus === "loading" && targetZone && (
-            <p role="status" className="mt-3 text-sm text-[#b7c7cc]">
-              {targetZone.name} руу буцах замыг тооцоолж байна…
-            </p>
-          )}
+          {routeStatus === "loading" && targetZone && <SafePathLoading className="mt-3 justify-start px-0" label={`${targetZone.name} руу буцах замыг тооцоолж байна…`} />}
           {routeStatus === "error" && targetZone && (
             <p role="status" className="mt-3 text-sm text-[#fda4af]">
               Буцах замыг тооцоолж чадсангүй. Байршлаа шалгаад дахин оролдоно уу.
@@ -1156,8 +1149,8 @@ export default function TrackerPage() {
           <p aria-live="polite" aria-busy={assistantLoading} className="mx-auto mt-3 max-w-[320px] text-[17px] leading-7 tracking-[-0.01em] text-[#f1f7f8]">
             {assistantMessage || (safetyState ? getSafetyFallback(safetyState.riskLevel, profile.userName) : zonesLoadError || (zonesLoaded && !demoMode && savedZones.length === 0 ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй." : "Байршил болон аюулгүй бүс ачаалж байна…"))}
           </p>
-          {assistantLoading && <span className="mt-3 text-sm text-[#b7c7cc]">Мило бодож байна…</span>}
-          {speechStatus === "loading" && <span className="mt-2 text-sm text-[#b7c7cc]">Дуу бэлдэж байна…</span>}
+          {assistantLoading && <SafePathLoading className="mt-3 justify-center" label="Мило бодож байна…" />}
+          {speechStatus === "loading" && <SafePathLoading className="mt-2 justify-center" label="Дуу бэлдэж байна…" />}
           {speechStatus === "playing" && <span className="mt-2 text-sm text-[#67e8f9]">Мило ярьж байна…</span>}
           {speechError && <span role="status" className="mt-2 text-sm text-[#fda4af]">{speechError}</span>}
 
@@ -1195,7 +1188,7 @@ export default function TrackerPage() {
               <p className="mt-1 text-xs leading-5 text-[#d9b4b9]">Тэд SafePath-ийн мэдэгдэл дээр яаралтай тусламж хүссэнийг харна. Хэрэв шууд аюул тулгарвал яаралтай тусламж руу залгаарай.</p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setSosConfirm(false)} className="min-h-11 rounded-xl border border-white/15 px-3 text-sm font-medium text-white">Болих</button>
-                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="min-h-11 rounded-xl bg-rose-600 px-3 text-sm font-bold text-white disabled:opacity-50">{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}</button>
+                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-sm font-bold text-white disabled:opacity-50">{sosStatus === "sending" && <SafePathLoading variant="button" />}{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}</button>
               </div>
             </div>
           )}
@@ -1220,10 +1213,10 @@ export default function TrackerPage() {
             className="w-full min-h-14 rounded-2xl bg-[#0e7490] px-4 text-[15px] font-bold text-white shadow-[0_10px_28px_rgba(6,182,212,.24)] transition-colors hover:bg-[#0c819d] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
           >
             {assistantLoading
-              ? "Мило бодож байна…"
+              ? <span className="inline-flex items-center gap-2"><SafePathLoading variant="button" />Мило бодож байна…</span>
               : speechStatus ===
                   "loading"
-                ? "Дуу бэлдэж байна…"
+                ? <span className="inline-flex items-center gap-2"><SafePathLoading variant="button" />Дуу бэлдэж байна…</span>
                 : speechStatus ===
                     "playing"
                   ? "Ярьж байна…"
@@ -1232,8 +1225,8 @@ export default function TrackerPage() {
         </div>
 
         <nav aria-label="Тусламж болон холбох код" className="relative z-10 mt-2 flex items-center justify-center gap-2">
-          <a href="tel:+97600000000" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#b7c7cc] underline decoration-[#49636c] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Тусламж хэрэгтэй</a>
-          <Link href="/tracker/code" className="inline-flex min-h-11 items-center px-3 text-[14px] font-medium text-[#67e8f9] underline decoration-[#1d7080] underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">Холбох код</Link>
+          <a href="tel:+97600000000" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тусламж хэрэгтэй</a>
+          <Link href="/tracker/code" className="inline-flex items-center rounded-full border border-cyan-200 px-3 py-1.5 text-sm text-cyan-200">Тохиргоо</Link>
         </nav>
         <audio
           ref={audioElement}

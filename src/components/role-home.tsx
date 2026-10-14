@@ -1,6 +1,6 @@
 import { ArrowUpRight, MapPin, ShieldCheck, UserRound } from "lucide-react";
-import { setRole } from "@/app/actions/auth";
 import { InstallAppPrompt } from "@/components/install-app-prompt";
+import { RoleForm } from "@/components/role-form";
 import { AppShell } from "@/components/safe-path";
 
 export function RoleHome() {
@@ -46,8 +46,7 @@ export function RoleHome() {
             role="group"
             aria-label="Хэрэглэгчийн горим сонгох"
           >
-            <form action={setRole}>
-              <input type="hidden" name="role" value="guardian" />
+            <RoleForm role="guardian">
               <button
                 type="submit"
                 className="group relative flex min-h-[150px] w-full flex-col items-start gap-4 rounded-[22px] border border-[#22d3ee]/70 bg-[#0e7490] p-3.5 text-left shadow-[0_14px_32px_rgba(6,182,212,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#0c819d] hover:shadow-[0_16px_36px_rgba(6,182,212,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[200px] sm:p-4"
@@ -67,10 +66,9 @@ export function RoleHome() {
                   <ArrowUpRight size={17} />
                 </span>
               </button>
-            </form>
+            </RoleForm>
 
-            <form action={setRole}>
-              <input type="hidden" name="role" value="child" />
+            <RoleForm role="child">
               <button
                 type="submit"
                 className="group relative flex min-h-[150px] w-full flex-col items-start gap-4 rounded-[22px] border border-[#22d3ee]/45 bg-[#155e75] p-3.5 text-left shadow-[0_14px_32px_rgba(8,145,178,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#176b83] hover:shadow-[0_16px_36px_rgba(8,145,178,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[200px] sm:p-4"
@@ -90,7 +88,7 @@ export function RoleHome() {
                   <ArrowUpRight size={17} />
                 </span>
               </button>
-            </form>
+            </RoleForm>
           </div>
         </section>
         <p className="relative z-10 mx-auto mt-auto flex w-full max-w-[390px] items-center justify-center gap-2 pt-5 text-[12px] text-[#c2d0d5]">

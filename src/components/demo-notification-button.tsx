@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SafePathLoading } from "@/components/safepath-loading";
 import { Capacitor } from "@capacitor/core";
 import { SOS_NOTIFICATION_CHANNEL_ID } from "@/lib/push/channels";
 
@@ -80,9 +81,9 @@ export function DemoNotificationButton({ onSent }: { onSent: () => void }) {
         type="button"
         onClick={() => void sendDemoNotification()}
         disabled={sending}
-        className="min-h-10 shrink-0 rounded-xl border border-(--sp-line) bg-(--sp-surface) px-3 text-xs font-semibold text-(--sp-primary) transition hover:border-(--sp-primary) disabled:opacity-60"
+        className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-(--sp-line) bg-(--sp-surface) px-3 text-xs font-semibold text-(--sp-primary) transition hover:border-(--sp-primary) disabled:opacity-60"
       >
-        {sending ? "Илгээж байна…" : "Demo мэдэгдэл"}
+        {sending && <SafePathLoading variant="button" />}{sending ? "Илгээж байна…" : "Demo мэдэгдэл"}
       </button>
       {status && <p role="status" className="max-w-44 text-right text-[10px] leading-4 text-(--sp-muted)">{status}</p>}
     </div>

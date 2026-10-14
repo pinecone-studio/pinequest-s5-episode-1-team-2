@@ -10,17 +10,14 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useChildLocations } from "@/hooks/use-child-locations";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
+import { SafePathLoading } from "@/components/safepath-loading";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 
 const LiveMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => (
-    <div className="grid h-full min-h-80 place-items-center text-sm text-(--sp-muted)">
-      Газрын зураг ачаалж байна…
-    </div>
-  ),
+  loading: () => <SafePathLoading className="h-full min-h-80" label="Газрын зураг ачаалж байна…" />,
 });
 
 const TOKENS = {
@@ -127,6 +124,16 @@ export default function GuardianPage() {
   const urgentSos = visibleAlerts.find((alert) => alert.type === "SOS" && !alert.read) ?? null;
   const [mapKey, setMapKey] = useState(0);
   const [activeTab, setActiveTab] = useState<TabId>("map");
+  const [tabNavigationReady, setTabNavigationReady] = useState(false);
+  const [showLocationPermissionNotice, setShowLocationPermissionNotice] = useState(false);
+
+  useEffect(() => {
+    if (!tabNavigationReady || activeTab !== "map") {
+      setShowLocationPermissionNotice(false);
+      return;
+    }
+    if (error?.includes("зөвшөөрөл хаалттай")) setShowLocationPermissionNotice(true);
+  }, [activeTab, error, tabNavigationReady]);
 
   useEffect(() => {
     const openNotificationsFromHash = () => {
@@ -135,6 +142,7 @@ export default function GuardianPage() {
       window.setTimeout(() => document.getElementById("events")?.scrollIntoView({ behavior: "smooth" }), 0);
     };
     openNotificationsFromHash();
+    setTabNavigationReady(true);
     window.addEventListener("hashchange", openNotificationsFromHash);
     return () => window.removeEventListener("hashchange", openNotificationsFromHash);
   }, []);
@@ -194,7 +202,7 @@ export default function GuardianPage() {
         : "Аюулгүй бүсээс гадуур";
 
   const subline = !zone
-    ? (error ?? "Түр хүлээнэ үү")
+    ? (error?.includes("зөвшөөрөл хаалттай") ? "Байршлын мэдээлэл хүлээгдэж байна" : error ?? "Түр хүлээнэ үү")
     : inside
       ? zone.name
       : `Хамгийн ойр: ${zone.name} · ${
@@ -221,6 +229,15 @@ export default function GuardianPage() {
         style={TOKENS}
         className="min-h-dvh bg-[linear-gradient(180deg,var(--sp-bg-top)_0%,var(--sp-bg-bottom)_45%,var(--sp-bg-bottom)_100%)] text-(--sp-ink)"
       >
+        {showLocationPermissionNotice && (
+          <div onClick={() => setShowLocationPermissionNotice(false)} className="fixed inset-0 z-[1000] grid place-items-center bg-black/70 px-5 py-8 backdrop-blur-sm" role="presentation">
+            <section onClick={(event) => event.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="location-permission-title" className="w-full max-w-sm rounded-3xl border border-(--sp-line) bg-[#0c171b] p-6 text-(--sp-ink) shadow-2xl">
+              <h2 id="location-permission-title" className="text-lg font-bold">Байршлын зөвшөөрөл хэрэгтэй</h2>
+              <p className="mt-3 text-sm leading-6 text-(--sp-muted)">Байршлыг харахын тулд төхөөрөмжийн тохиргооноос SafePath-д байршлын зөвшөөрөл өгнө үү.</p>
+              <button type="button" autoFocus onClick={() => setShowLocationPermissionNotice(false)} className="mt-5 min-h-11 w-full rounded-xl bg-[#4F8FA8] px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Ойлголоо</button>
+            </section>
+          </div>
+        )}
         <div
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
@@ -232,6 +249,7 @@ export default function GuardianPage() {
             </div>
           )}
           <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
+          <header className="flex min-h-16 items-center justify-between gap-3 border-b border-(--sp-line) px-5 pt-[env(safe-area-inset-top)]">
             <div className="min-w-0">
               <Link
                 href="/"
@@ -292,7 +310,7 @@ export default function GuardianPage() {
             {childrenLoadFailed ? (
               <p className="text-sm text-(--sp-muted)">Байршлын мэдээлэл авч чадсангүй. Нэвтэрсэн эрх болон холболтоо шалгана уу.</p>
             ) : linkedChildren === null ? (
-              <p className="text-sm text-(--sp-muted)">Хүүхдийн мэдээлэл ачаалж байна…</p>
+              <SafePathLoading className="justify-start px-0 py-1" label="Хүүхдийн мэдээлэл ачаалж байна…" />
             ) : linkedChildren.length === 0 ? (
               <p className="text-sm text-(--sp-muted)">Одоогоор холбогдсон хүүхэд алга. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана.</p>
             ) : (
@@ -382,8 +400,8 @@ export default function GuardianPage() {
                   {linkedChildren && linkedChildren.length > 0 && !monitoredLocation
                     ? "Хүүхдийн байршлын мэдээлэл хараахан ирээгүй байна"
                     : locationStatus === "loading"
-                      ? "Одоогийн байршлыг тогтоож байна…"
-                      : error || "Байршил хараахан олдсонгүй"}
+                      ? <SafePathLoading className="flex-col gap-1" label="Одоогийн байршлыг тогтоож байна…" />
+                      : error?.includes("зөвшөөрөл хаалттай") ? "Байршлын мэдээлэл хүлээгдэж байна" : error || "Байршил хараахан олдсонгүй"}
                 </div>
               )}
             </div>
