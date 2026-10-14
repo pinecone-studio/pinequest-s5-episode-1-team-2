@@ -14,8 +14,9 @@ export function DemoNotificationButton({ onSent }: { onSent: () => void }) {
     setStatus("");
     try {
       if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
-        const { PushNotifications } = await import("@capacitor/push-notifications");
-        await PushNotifications.createChannel({
+        // Local notifications create the channel themselves, so the demo works without Firebase.
+        const { LocalNotifications } = await import("@capacitor/local-notifications");
+        await LocalNotifications.createChannel({
           id: SOS_NOTIFICATION_CHANNEL_ID,
           name: "Яаралтай тусламж — SOS",
           description: "Хүүхдээс ирсэн SOS дохио",
@@ -27,7 +28,6 @@ export function DemoNotificationButton({ onSent }: { onSent: () => void }) {
           lightColor: "#F43F5E",
         });
 
-        const { LocalNotifications } = await import("@capacitor/local-notifications");
         let permission = await LocalNotifications.checkPermissions();
         if (permission.display !== "granted") permission = await LocalNotifications.requestPermissions();
         if (permission.display !== "granted") {
