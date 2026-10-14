@@ -6,10 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
-import { TiltedPlane } from "@/components/tilted-plane";
+import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
+import { useCompassHeading } from "@/hooks/use-compass-heading";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { toCompanionProfile } from "@/lib/assistant-settings";
@@ -59,6 +60,8 @@ export default function TrackerPage() {
 
   const [demoMode, setDemoMode] = useState(false);
   const [guiding, setGuiding] = useState(false);
+  // The calm map turns with the compass; while guiding, the camera view reads its own.
+  const { heading: calmHeading } = useCompassHeading(!guiding);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [zonesLoadError, setZonesLoadError] = useState("");
@@ -997,7 +1000,8 @@ export default function TrackerPage() {
             />
           ) : currentLocation ? (
             <>
-              <TiltedPlane centerPercent={CALM_MAP_CENTER_PERCENT}>
+              {/* Turns with the compass so the way the person faces is always up. */}
+              <TiltedPlane centerPercent={CALM_MAP_CENTER_PERCENT} heading={calmHeading}>
                 <CompanionMap
                   location={currentLocation}
                   destination={targetZone ?? undefined}
@@ -1008,9 +1012,13 @@ export default function TrackerPage() {
               </TiltedPlane>
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 z-[402] block size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]"
+                className="pointer-events-none absolute left-1/2 z-[403] -translate-x-1/2 -translate-y-1/2"
                 style={{ top: `${CALM_MAP_CENTER_PERCENT}%` }}
-              />
+              >
+                {calmHeading === null
+                  ? <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+                  : <HeadingArrow />}
+              </span>
             </>
           ) : (
             <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur">

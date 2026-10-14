@@ -3,31 +3,38 @@ import type { ReactNode } from "react";
 /**
  * Lays its child (a map) down as ground seen from a low, slanted angle, like a navigation app's
  * 3D view. The child's centre appears at `centerPercent` of the frame's height, so overlays placed
- * there still line up with the map's centre.
+ * there still line up with the map's centre. With a `heading` (degrees from north), the ground
+ * turns so the direction the person faces always points up the screen.
  */
 export function TiltedPlane({
   children,
   tilt = 58,
   centerPercent = 62,
+  heading = null,
   fadeColor = "#101c22",
 }: {
   children: ReactNode;
   tilt?: number;
   centerPercent?: number;
+  heading?: number | null;
   fadeColor?: string;
 }) {
-  // The plane is taller and wider than the frame so its tilted edges never show.
-  const halfHeight = 220;
+  // A square plane big enough to cover the frame out to the horizon at any rotation: half its side
+  // is the larger of 2.2× the frame's height (the far reach once tilted) and its full width.
+  const halfSide = "max(220cqh, 100cqw)";
   return (
-    <div className="absolute inset-0 overflow-hidden" style={{ perspective: "520px", perspectiveOrigin: `50% ${centerPercent}%` }}>
+    <div
+      className="absolute inset-0 overflow-hidden"
+      style={{ containerType: "size", perspective: "520px", perspectiveOrigin: `50% ${centerPercent}%` }}
+    >
       <div
         className="absolute"
         style={{
-          left: "-45%",
-          right: "-45%",
-          top: `${centerPercent - halfHeight}%`,
-          bottom: `${100 - centerPercent - halfHeight}%`,
-          transform: `rotateX(${tilt}deg)`,
+          width: `calc(2 * ${halfSide})`,
+          height: `calc(2 * ${halfSide})`,
+          left: `calc(50cqw - ${halfSide})`,
+          top: `calc(${centerPercent}cqh - ${halfSide})`,
+          transform: `rotateX(${tilt}deg) rotateZ(${heading === null ? 0 : (-heading).toFixed(1)}deg)`,
           transformOrigin: "50% 50%",
         }}
       >
@@ -48,5 +55,14 @@ export function TiltedPlane({
         © OpenStreetMap
       </a>
     </div>
+  );
+}
+
+/** "You are here, facing up" marker for maps that turn with the compass. */
+export function HeadingArrow() {
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className="size-8 drop-shadow-[0_2px_3px_rgba(0,0,0,.35)]">
+      <path d="M16 3 27 27 16 21 5 27Z" fill="#2a7fff" stroke="#ffffff" strokeWidth="2.5" strokeLinejoin="round" />
+    </svg>
   );
 }
