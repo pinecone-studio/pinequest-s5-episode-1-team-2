@@ -3,9 +3,10 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
+import { ChevronLeft, MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
 import { LocationSharingStatus } from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
+import { BackButton } from "@/components/back-button";
 import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { SafePathLoading } from "@/components/safepath-loading";
@@ -900,9 +901,14 @@ export default function TrackerPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
 
         <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
-            <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
-            SafePath
+          <div className="flex min-w-0 items-center gap-1">
+            <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-[#d4e1e5] transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
+              <ChevronLeft size={24} aria-hidden="true" />
+            </BackButton>
+            <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
+              <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
+              SafePath
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
