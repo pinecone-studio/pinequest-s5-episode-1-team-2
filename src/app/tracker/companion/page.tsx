@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ChevronLeft, Check } from "lucide-react";
+import { ChevronLeft, Check, Lock, Palette, Target, Trophy } from "lucide-react";
+import { AccessoryIcon } from "@/components/app-icons";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useCheckpoints } from "@/hooks/use-checkpoints";
@@ -45,7 +46,7 @@ export default function CompanionPage() {
           <h1 className="text-[20px] font-extrabold tracking-tight">Миний AI найз</h1>
           {isChild && (
             <span className="ml-auto rounded-full bg-white/10 px-3 py-1 text-[13px] font-semibold text-[#e9e3ff]" aria-label={`${REWARD_IDS.length}-аас ${earned} шагнал цуглуулсан`}>
-              🏆 {earned}/{REWARD_IDS.length}
+              <Trophy size={13} className="mr-1 inline align-[-2px]" aria-hidden="true" />{earned}/{REWARD_IDS.length}
             </span>
           )}
         </header>
@@ -75,7 +76,7 @@ export default function CompanionPage() {
           <div className="mt-7 grid grid-cols-2 gap-1 rounded-2xl bg-white/5 p-1" role="tablist" aria-label="Найз хийх арга">
             {[
               { id: false, label: "Бэлэн найз" },
-              { id: true, label: "🎨 Өөрөө зохиох" },
+              { id: true, label: "Өөрөө зохиох" },
             ].map((tab) => (
               <button
                 key={tab.label}
@@ -85,7 +86,7 @@ export default function CompanionPage() {
                 onClick={() => update("avatar", tab.id ? CUSTOM_AVATAR : "Мило")}
                 className={`min-h-11 rounded-xl text-[15px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${building === tab.id ? "bg-[#a78bfa] text-[#1e1035]" : "text-[#d4cdf0] hover:bg-white/10"}`}
               >
-                {tab.label}
+                {tab.id && <Palette size={15} className="mr-1.5 inline align-[-2px]" aria-hidden="true" />}{tab.label}
               </button>
             ))}
           </div>
@@ -111,7 +112,7 @@ export default function CompanionPage() {
                     className={`relative flex flex-col items-center gap-1.5 rounded-2xl p-2 transition disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${selected ? "bg-white/12 ring-2 ring-[#c4b5fd]" : "bg-white/5 enabled:hover:bg-white/10"}`}
                   >
                     <span className={`companion-picker__art companion-picker__art--${companion.toLowerCase()} ${isLocked ? "opacity-30 grayscale" : ""}`} aria-hidden="true" />
-                    {isLocked && <span className="absolute top-6 text-xl" aria-hidden="true">🔒</span>}
+                    {isLocked && <span className="absolute top-7 grid size-7 place-items-center rounded-full bg-black/60 text-white" aria-hidden="true"><Lock size={14} /></span>}
                     {selected && (
                       <span className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-[#c4b5fd] text-[#1e1035]" aria-hidden="true">
                         <Check size={13} strokeWidth={3} />
@@ -154,7 +155,7 @@ export default function CompanionPage() {
                     onClick={() => update("accessory", item.id)}
                     className={`flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-2xl transition disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${selected ? "bg-white/12 ring-2 ring-[#c4b5fd]" : "bg-white/5 enabled:hover:bg-white/10"}`}
                   >
-                    <span className={`text-[30px] leading-none ${isLocked ? "opacity-40 grayscale" : ""}`} aria-hidden="true">{isLocked ? "🔒" : item.icon}</span>
+                    <span className={`grid size-9 place-items-center rounded-full ${isLocked ? "bg-white/10 text-white/50" : "bg-white"}`} aria-hidden="true">{isLocked ? <Lock size={18} /> : <AccessoryIcon id={item.id} size={20} />}</span>
                     <span className={`text-[12px] ${selected ? "font-bold text-white" : "text-[#d4cdf0]"}`}>{item.label}</span>
                   </button>
                 );
@@ -164,7 +165,7 @@ export default function CompanionPage() {
 
           {isChild && earned < REWARD_IDS.length && (
             <p className="mt-6 rounded-2xl bg-[#7c3aed]/20 px-4 py-3 text-[14px] leading-5 text-[#e9e3ff] ring-1 ring-[#c4b5fd]/25">
-              🎯 🔒 тэмдэгтэй найз, чимэглэлийг ээж, аавын өгсөн шалгах цэгт хүрч очоод нээгээрэй!
+              <Target size={14} className="mr-1 inline align-[-2px]" aria-hidden="true" /><Lock size={13} className="mr-1 inline align-[-2px]" aria-hidden="true" />тэмдэгтэй найз, чимэглэлийг ээж, аавын өгсөн шалгах цэгт хүрч очоод нээгээрэй!
             </p>
           )}
 

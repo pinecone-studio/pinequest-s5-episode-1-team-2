@@ -7,7 +7,8 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { Camera, CameraOff, MapPin, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
-import { SCENE_LANDMARK_ICONS, type SceneLandmark, type SceneLandmarkSide } from "@/types/vision";
+import { SCENE_LANDMARK_KINDS, type SceneLandmark, type SceneLandmarkSide } from "@/types/vision";
+import { LandmarkIcon } from "@/components/app-icons";
 import { bearingDegrees, distanceMeters, pickLookAheadPoint, relativeBearing as turnFrom, type Coordinate, type RoutePoint } from "@/lib/route-guidance";
 
 type ArNavigationCameraProps = {
@@ -107,7 +108,6 @@ type SceneSnapshot = {
 // High-contrast colours shared by each landmark's outline, number badge and list row.
 const LANDMARK_COLORS = ["#facc15", "#f472b6", "#4ade80", "#fb923c"];
 
-const LANDMARK_ICONS = SCENE_LANDMARK_ICONS;
 
 const LANDMARK_SIDE_TEXT: Record<SceneLandmarkSide, string> = {
   left: "Зүүн талд",
@@ -122,7 +122,7 @@ function readSceneLandmarks(value: unknown): SceneLandmark[] {
     && typeof entry === "object"
     && typeof entry.label === "string"
     && typeof entry.detail === "string"
-    && entry.kind in LANDMARK_ICONS
+    && (SCENE_LANDMARK_KINDS as readonly string[]).includes(entry.kind)
     && entry.side in LANDMARK_SIDE_TEXT
     && typeof entry.notable === "boolean"
     && (entry.box === null || (Array.isArray(entry.box) && entry.box.length === 4 && entry.box.every((n: unknown) => typeof n === "number"))),
@@ -196,7 +196,7 @@ function LandmarkMarkers({ landmarks, snapshot, width, height }: {
           >
             {index + 1}
           </span>
-          <span className="text-[18px] leading-none">{LANDMARK_ICONS[landmark.kind]}</span>
+          <LandmarkIcon kind={landmark.kind} size={17} className="shrink-0 text-[#0b1620]" />
           <span className="line-clamp-2 text-[16px] font-extrabold leading-5">{landmark.label}</span>
         </div>
       ))}
@@ -999,17 +999,17 @@ export default function ArNavigationCamera({
         const result: unknown = await response.json().catch(() => null);
         const reason = result && typeof result === "object" && "reason" in result ? result.reason : null;
         if (response.ok && result && typeof result === "object" && "saved" in result && result.saved === true) {
-          setSharedNotice("📷 Орчны зураг ээж, аавд илгээгдлээ");
+          setSharedNotice("Орчны зураг ээж, аавд илгээгдлээ");
         } else if (reason === "paused") {
-          setSharedNotice("📷 Байршил хуваалцах түр зогссон тул зураг илгээгдсэнгүй");
+          setSharedNotice("Байршил хуваалцах түр зогссон тул зураг илгээгдсэнгүй");
         } else if (reason === "no-guardian") {
-          setSharedNotice("📷 Холбогдсон ээж, аав байхгүй тул зураг илгээгдсэнгүй");
+          setSharedNotice("Холбогдсон ээж, аав байхгүй тул зураг илгээгдсэнгүй");
         } else if (!controller.signal.aborted) {
-          setSharedNotice("📷 Зургийг илгээж чадсангүй");
+          setSharedNotice("Зургийг илгээж чадсангүй");
         }
       } catch {
         // The photo is a help for guardians, never a reason to interrupt the camera.
-        if (!controller.signal.aborted) setSharedNotice("📷 Зургийг илгээж чадсангүй");
+        if (!controller.signal.aborted) setSharedNotice("Зургийг илгээж чадсангүй");
       }
     };
 
@@ -1074,7 +1074,7 @@ export default function ArNavigationCamera({
               </span>
               <div className="min-w-0">
                 <p className="text-[17px] font-extrabold leading-6">
-                  <span aria-hidden="true">{LANDMARK_ICONS[landmark.kind]} </span>{landmark.label}
+                  <LandmarkIcon kind={landmark.kind} size={16} className="mr-1 inline align-[-2px] text-cyan-100" />{landmark.label}
                 </p>
                 <p className="text-[15px] leading-5 text-white/85">
                   <span className="font-bold text-cyan-100">{LANDMARK_SIDE_TEXT[landmark.side]}</span>

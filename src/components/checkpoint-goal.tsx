@@ -1,5 +1,6 @@
 "use client";
 
+import { PartyPopper, Sparkles, Star, Target } from "lucide-react";
 import { RewardBadge } from "@/components/reward-badge";
 import { describeReward } from "@/types/rewards";
 import type { Checkpoint } from "@/types/location";
@@ -30,7 +31,7 @@ export function CheckpointGoal({ goal, location, compact = false }: { goal: Chec
     >
       <RewardBadge reward={goal.reward} size="sm" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-bold leading-5 text-white">🎯 {goal.name}</p>
+        <p className="flex items-center gap-1.5 truncate text-[15px] font-bold leading-5 text-white"><Target size={15} className="shrink-0" aria-hidden="true" />{goal.name}</p>
         <p className="truncate text-[13px] leading-5 text-[#e9e3ff]">
           Хүрвэл <b>{reward.label}</b> {reward.companion ? "найз" : "чимэглэл"} чинийх болно!
         </p>
@@ -56,8 +57,15 @@ export function RewardCelebration({ checkpoint, userName, onUse, onClose }: {
     <div role="dialog" aria-modal="true" aria-labelledby="reward-title" className="fixed inset-0 z-[1000] grid place-items-center bg-black/70 px-5 backdrop-blur-sm">
       <div className="reward-celebration relative w-full max-w-[340px] overflow-hidden rounded-[32px] bg-linear-to-b from-[#2e1065] to-[#0b1620] px-6 pb-6 pt-8 text-center text-white shadow-[0_24px_60px_rgba(0,0,0,.5)] ring-1 ring-[#c4b5fd]/30">
         <div className="reward-celebration__confetti" aria-hidden="true">
-          {["🎉", "⭐", "✨", "🎊", "🌟", "🎈"].map((piece, index) => (
-            <span key={piece} style={{ left: `${8 + index * 16}%`, animationDelay: `${index * 120}ms` }}>{piece}</span>
+          {[
+            { Icon: PartyPopper, color: "#f472b6" },
+            { Icon: Star, color: "#facc15" },
+            { Icon: Sparkles, color: "#a78bfa" },
+            { Icon: PartyPopper, color: "#4ade80" },
+            { Icon: Star, color: "#fb923c" },
+            { Icon: Sparkles, color: "#67e8f9" },
+          ].map(({ Icon, color }, index) => (
+            <span key={index} style={{ left: `${8 + index * 16}%`, animationDelay: `${index * 120}ms` }}><Icon size={20} color={color} /></span>
           ))}
         </div>
         <div className="reward-celebration__prize mx-auto grid place-items-center">

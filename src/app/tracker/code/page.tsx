@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {ChevronLeft, LogOut, MapPin, Shield, UserX} from "lucide-react";
+import {ChevronLeft, LogOut, MapPin, Shield, Sparkles, UserX} from "lucide-react";
 import {logout, unlink} from "@/app/actions/auth";
 import {CodeGenerator} from "@/components/auth/pairing";
 import {AppShell} from "@/components/safe-path";
@@ -151,7 +151,7 @@ export default async function TrackerCodePage() {
               href="/tracker/companion"
               className="mt-5 flex min-h-[64px] items-center gap-3 rounded-2xl border border-[#c4b5fd]/30 bg-[#7c3aed]/15 px-4 text-left transition hover:bg-[#7c3aed]/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
             >
-              <span className="grid size-10 place-items-center rounded-xl bg-[#7c3aed]/30 text-xl" aria-hidden="true">✨</span>
+              <span className="grid size-10 place-items-center rounded-xl bg-[#7c3aed]/30 text-[#c4b5fd]" aria-hidden="true"><Sparkles size={19} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-semibold text-white">Миний AI найз</span>
                 <span className="block text-[13px] text-[#c9bff0]">Дүр, чимэглэл, нэрээ солих</span>

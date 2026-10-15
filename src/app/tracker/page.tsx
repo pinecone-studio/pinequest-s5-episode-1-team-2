@@ -6,6 +6,8 @@ import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
   ChevronLeft,
   Gamepad2,
+  Pencil,
+  Siren,
   Settings,
   Volume2,
   VolumeX,
@@ -1027,7 +1029,7 @@ export default function TrackerPage() {
                 aria-hidden="true"
                 className="absolute bottom-1 right-1 z-[3] grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
               >
-                ✏️
+                <Pencil size={15} aria-hidden="true" />
               </span>
             )}
           </Link>
@@ -1205,7 +1207,7 @@ export default function TrackerPage() {
               }}
               className="min-h-12 w-full rounded-2xl bg-rose-600 px-4 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
             >
-              🆘 SOS — Тусламж дуудах
+              <Siren size={18} aria-hidden="true" /> SOS — Тусламж дуудах
             </button>
           )}
           {sosMessage && (
