@@ -23,14 +23,16 @@ const DEFAULT_CENTER: Point = { latitude: 47.9186, longitude: 106.9176 };
 const field = "mt-2 h-12 w-full rounded-xl border border-[#e7e7e5] bg-white px-4 text-[16px] outline-none transition focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/10";
 
 /** Lets a guardian give a child a place to reach and choose what they win for reaching it. */
-export function CheckpointEditor({ childId, childName, zones, checkpoints, childPosition }: {
+export function CheckpointEditor({ childId, childName, zones, checkpoints, childPosition, initialPoint = null }: {
   childId: string;
   childName: string;
   zones: SafeZone[];
   checkpoints: Checkpoint[];
   childPosition: Point | null;
+  /** A point tapped on the guardian's home map, already selected. */
+  initialPoint?: Point | null;
 }) {
-  const [point, setPoint] = useState<Point | null>(null);
+  const [point, setPoint] = useState<Point | null>(initialPoint);
   const [radius, setRadius] = useState(50);
   const [reward, setReward] = useState<RewardId>(REWARD_COMPANIONS[0]);
   const [state, action, pending] = useActionState(async (previous: FormState, formData: FormData) => {

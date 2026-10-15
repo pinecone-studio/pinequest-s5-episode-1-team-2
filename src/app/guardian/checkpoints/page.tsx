@@ -5,10 +5,20 @@ import { requireRole } from "@/lib/auth/dal";
 import { listCheckpoints } from "@/lib/checkpoints";
 import { listChildLocations } from "@/lib/location-sharing";
 
-export default async function CheckpointsPage({ searchParams }: { searchParams: Promise<{ child?: string | string[] }> }) {
+/** A point passed in the address (from a tap on the guardian's home map), if it is a real coordinate. */
+function pointFrom(lat?: string | string[], lng?: string | string[]) {
+  const latitude = Number(Array.isArray(lat) ? lat[0] : lat);
+  const longitude = Number(Array.isArray(lng) ? lng[0] : lng);
+  if (!lat || !lng || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+
+export default async function CheckpointsPage({ searchParams }: { searchParams: Promise<{ child?: string | string[]; lat?: string | string[]; lng?: string | string[] }> }) {
   const guardian = await requireRole("guardian");
   const children = await listChildLocations(guardian.id);
-  const { child: wanted } = await searchParams;
+  const { child: wanted, lat, lng } = await searchParams;
+  const initialPoint = pointFrom(lat, lng);
   const selected = children.find((child) => child.childId === wanted) ?? children[0];
   const checkpoints = selected ? await listCheckpoints(selected.childId) : [];
 
@@ -49,6 +59,7 @@ export default async function CheckpointsPage({ searchParams }: { searchParams: 
                   childName={selected.name}
                   zones={selected.zones}
                   checkpoints={checkpoints}
+                  initialPoint={initialPoint}
                   childPosition={selected.position && { latitude: selected.position.latitude, longitude: selected.position.longitude }}
                 />
               </>

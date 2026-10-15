@@ -20,8 +20,8 @@ const DEFAULT_CENTER: Point = { latitude: 47.9186, longitude: 106.9176 };
 const field = "mt-2 h-12 w-full rounded-xl border border-[#e7e7e5] bg-white px-4 text-[16px] outline-none transition focus:border-[#111111] focus:ring-2 focus:ring-[#111111]/10";
 
 /** Lets a guardian place, name and delete a child's safe zones. */
-export function ZoneEditor({ childId, zones, childPosition }: { childId: string; zones: SafeZone[]; childPosition: Point | null }) {
-  const [point, setPoint] = useState<Point | null>(null);
+export function ZoneEditor({ childId, zones, childPosition, initialPoint = null }: { childId: string; zones: SafeZone[]; childPosition: Point | null; initialPoint?: Point | null }) {
+  const [point, setPoint] = useState<Point | null>(initialPoint);
   const [radius, setRadius] = useState(200);
   const [locating, setLocating] = useState(false);
   const [state, action, pending] = useActionState(async (previous: FormState, formData: FormData) => {
