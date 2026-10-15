@@ -114,13 +114,22 @@ function formatRelative(ts: number | null, now: number) {
 const ROUGH_ACCURACY_METERS = 100;
 
 /** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
-function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, updated, landmarks, address, addressFailed }: {
+// The child's phone reports every ~10 s while sharing; this long without one means it may be off or offline.
+const SILENT_MINUTES = 10;
+
+function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, updated, silentMinutes, batteryLevel, charging, photo, landmarks, address, addressFailed }: {
   childId: string;
   name: string;
   latitude: number;
   longitude: number;
   accuracy: number;
   updated: string;
+  /** Minutes since the last report. */
+  silentMinutes: number;
+  batteryLevel: number | null;
+  charging: boolean | null;
+  /** The newest surroundings photo from the child's camera, with how long ago it was taken. */
+  photo: { id: string; takenAt: string; taken: string } | null;
   /** The newest notable places the child's camera saw, with how long ago. */
   landmarks: (SeenLandmark & { seen: string })[];
   address: PlaceDescription | null;
@@ -131,6 +140,9 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
     : address?.street ?? (addressFailed ? "Хаягийг тодорхойлж чадсангүй" : address ? "Нэргүй газар" : "Хаягийг тодорхойлж байна…");
   const details = [address?.place ? address.street : null, address?.area].filter(Boolean).join(", ");
   const rough = accuracy > ROUGH_ACCURACY_METERS;
+  const silent = silentMinutes >= SILENT_MINUTES;
+  const batteryPercent = batteryLevel === null ? null : Math.round(batteryLevel * 100);
+  const batteryLow = batteryPercent !== null && batteryPercent <= 15 && charging !== true;
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude.toFixed(6)},${longitude.toFixed(6)}&travelmode=walking`;
 
   return (
@@ -140,12 +152,24 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
           <MapPin size={20} />
         </span>
         <div className="min-w-0">
-          <p className="text-xs text-(--sp-muted)">{name} одоо энд байна</p>
+          <p className={`text-xs ${silent ? "font-semibold text-(--sp-caution)" : "text-(--sp-muted)"}`}>
+            {silent ? `📵 Утастай холбоо тасарсан · сүүлийн мэдээлэл ${updated}` : `${name} одоо энд байна`}
+          </p>
           <p className="mt-0.5 text-[17px] font-semibold leading-6">{headline}</p>
           {details && <p className="mt-0.5 text-sm leading-5 text-(--sp-muted)">{details}</p>}
           <p className={`mt-1.5 text-xs ${rough ? "text-(--sp-caution)" : "text-(--sp-muted)"}`}>
             ±{Math.round(accuracy)} м нарийвчлалтай · {updated}
+            {batteryPercent !== null && (
+              <span className={batteryLow ? "font-semibold text-(--sp-risk)" : ""}>
+                {" "}· {charging ? "🔌" : "🔋"} {batteryPercent}%
+              </span>
+            )}
           </p>
+          {silent && (
+            <p className="mt-1 text-xs leading-5 text-(--sp-caution)">
+              Утас унтарсан эсвэл сүлжээгүй байж магадгүй. Доорх нь хамгийн сүүлд илгээсэн байршил{batteryPercent !== null ? `, тэр үед цэнэг ${batteryPercent}% байсан` : ""}.
+            </p>
+          )}
           {rough && (
             <p className="mt-1 text-xs leading-5 text-(--sp-caution)">
               Байршил тойм байна. Хүүхдийн утсанд GPS асаалттай, гадаа байгаа эсэхийг шалгаарай.
@@ -153,6 +177,25 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
           )}
         </div>
       </div>
+      {photo && (
+        <div className="mt-3 border-t border-(--sp-line) pt-3">
+          <p className="text-xs text-(--sp-muted)">📷 Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
+          <a
+            href={`/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 block overflow-hidden rounded-xl border border-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-guardian image route; next/image would cache it publicly. */}
+            <img
+              src={`/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`}
+              alt={`${name} камераа нээх үед харж байсан орчин`}
+              className="max-h-64 w-full object-cover"
+              loading="lazy"
+            />
+          </a>
+        </div>
+      )}
       {landmarks.length > 0 && (
         <div className="mt-3 border-t border-(--sp-line) pt-3">
           <p className="text-xs text-(--sp-muted)">Замдаа харсан тод газрууд</p>
@@ -532,6 +575,10 @@ export default function GuardianPage() {
                 longitude={displayLocation.longitude}
                 accuracy={displayLocation.accuracy}
                 updated={formatRelative(displayLocation.lastUpdated, now)}
+                silentMinutes={Math.max(0, Math.floor((now - displayLocation.lastUpdated) / 60_000))}
+                batteryLevel={monitoredChild.position?.batteryLevel ?? null}
+                photo={monitoredChild.photo ? { ...monitoredChild.photo, taken: formatRelative(new Date(monitoredChild.photo.takenAt).getTime(), now) } : null}
+                charging={monitoredChild.position?.charging ?? null}
                 landmarks={(monitoredChild.landmarks ?? []).slice(0, 3).map((landmark) => ({
                   ...landmark,
                   seen: formatRelative(new Date(landmark.seenAt).getTime(), now),
@@ -624,6 +671,8 @@ export default function GuardianPage() {
                   const isUrgent = alert.type !== "ZONE_ENTER";
                   const label = alert.type === "SOS"
                     ? "🆘 ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
+                    : alert.type === "LOW_BATTERY"
+                      ? "🪫 Утасны цэнэг дуусах гэж байна"
                     : alert.type === "ZONE_EXIT"
                       ? "Аюулгүй бүсээс гарсан"
                       : alert.type === "ZONE_ENTER"
