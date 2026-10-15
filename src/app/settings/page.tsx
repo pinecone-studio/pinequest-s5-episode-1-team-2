@@ -2,13 +2,14 @@
 
 import {useRouter} from "next/navigation";
 import {useEffect, useState} from "react";
-import {ChevronLeft, LogOut, MapPin, UserRound, Sparkles} from "lucide-react";
+import {Ban, ChevronLeft, Lock, LogOut, MapPin, UserRound, Sparkles} from "lucide-react";
 import {logout} from "@/app/actions/auth";
 import {AppShell} from "@/components/safe-path";
 import {ProfileForm} from "@/components/auth/profile-form";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
 import {useCheckpoints} from "@/hooks/use-checkpoints";
-import {ACCESSORIES, isRewardLocked} from "@/types/rewards";
+import {ACCESSORIES, isRewardLocked, type AccessoryId} from "@/types/rewards";
+import {AccessoryIcon} from "@/components/app-icons";
 import type {AssistantSettings} from "@/types/safety";
 
 const avatars: AssistantSettings["avatar"][] = [
@@ -220,7 +221,7 @@ export default function SettingsPage() {
                               className="absolute top-4 text-lg"
                               aria-hidden="true"
                             >
-                              🔒
+                              <Lock size={18} className="text-white" />
                             </span>
                           )}
                           <span
@@ -244,7 +245,7 @@ export default function SettingsPage() {
                     role="group"
                     aria-label="Туслахын чимэглэл"
                   >
-                    {[{id: null, label: "Байхгүй", icon: "✖️"}, ...ACCESSORIES].map((accessory) => {
+                    {[{id: null as AccessoryId | null, label: "Байхгүй"}, ...ACCESSORIES].map((accessory) => {
                       const locked = accessory.id !== null && isLocked(accessory.id);
                       const selected = settings.accessory === accessory.id && !locked;
                       return (
@@ -260,7 +261,7 @@ export default function SettingsPage() {
                           }`}
                         >
                           <span className={`text-2xl ${locked ? "opacity-35 grayscale" : ""}`} aria-hidden="true">
-                            {locked ? "🔒" : accessory.icon}
+                            {locked ? <Lock size={22} /> : accessory.id ? <AccessoryIcon id={accessory.id} size={24} /> : <Ban size={22} />}
                           </span>
                           <span className={`text-[11px] ${selected ? "font-semibold text-white" : "text-[#c2d0d5]"}`}>
                             {accessory.label}
@@ -271,7 +272,7 @@ export default function SettingsPage() {
                   </div>
                   {isChild && (
                     <p className="mt-3 text-xs leading-5 text-[#9fb3b9]">
-                      🔒 тэмдэгтэйг ээж, аавын өгсөн шалгах цэгт хүрч очоод нээгээрэй!
+                      <Lock size={12} className="inline align-[-1px]" /> тэмдэгтэйг ээж, аавын өгсөн шалгах цэгт хүрч очоод нээгээрэй!
                     </p>
                   )}
                 </SettingsSection>

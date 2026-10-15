@@ -38,7 +38,7 @@ export function DemoNotificationButton({ onSent }: { onSent: () => void }) {
         await LocalNotifications.schedule({
           notifications: [{
             id: Date.now() % 2_000_000_000,
-            title: "🆘 SafePath — SOS (туршилт)",
+            title: "SafePath — SOS (туршилт)",
             body: "Энэ бол туршилтын мэдэгдэл. Бодит SOS дохио биш.",
             channelId: SOS_NOTIFICATION_CHANNEL_ID,
             schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
@@ -52,7 +52,7 @@ export function DemoNotificationButton({ onSent }: { onSent: () => void }) {
           setStatus("Хөтчийн мэдэгдлийн зөвшөөрлийг асаана уу.");
           return;
         }
-        const notification = new Notification("🆘 SafePath — SOS (туршилт)", {
+        const notification = new Notification("SafePath — SOS (туршилт)", {
           body: "Энэ бол туршилтын мэдэгдэл. Бодит SOS дохио биш.",
           tag: "safepath-demo-sos",
         });

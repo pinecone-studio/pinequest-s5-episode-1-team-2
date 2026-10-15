@@ -46,7 +46,7 @@ export function CheckpointEditor({ childId, childName, zones, checkpoints, child
   // Shown on the map like zones, so the guardian sees the goals already set.
   const openAsZones: SafeZone[] = checkpoints
     .filter((checkpoint) => !checkpoint.reachedAt)
-    .map((checkpoint) => ({ id: checkpoint.id, name: `🎯 ${checkpoint.name}`, latitude: checkpoint.latitude, longitude: checkpoint.longitude, radiusMeters: checkpoint.radiusMeters }));
+    .map((checkpoint) => ({ id: checkpoint.id, name: checkpoint.name, latitude: checkpoint.latitude, longitude: checkpoint.longitude, radiusMeters: checkpoint.radiusMeters }));
 
   return (
     <div className="grid gap-4">
@@ -142,7 +142,7 @@ export function CheckpointEditor({ childId, childName, zones, checkpoints, child
                     <span className="block truncate text-sm font-semibold">{checkpoint.name}</span>
                     <span className={`mt-0.5 block text-xs ${checkpoint.reachedAt ? "text-(--sp-safe)" : "text-(--sp-muted)"}`}>
                       {checkpoint.reachedAt
-                        ? `✅ Хүрсэн · ${new Date(checkpoint.reachedAt).toLocaleString("mn-MN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`
+                        ? `Хүрсэн · ${new Date(checkpoint.reachedAt).toLocaleString("mn-MN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}`
                         : `Хүлээж байна · ${describeReward(checkpoint.reward).label} шагналтай`}
                     </span>
                   </span>

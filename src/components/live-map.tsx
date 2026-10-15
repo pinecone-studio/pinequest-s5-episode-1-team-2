@@ -6,7 +6,8 @@ import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMa
 import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { SafeZone, SafetyLocation } from "@/types/safety";
 import type { SeenLandmark } from "@/types/location";
-import { SCENE_LANDMARK_ICONS } from "@/types/vision";
+import { Target } from "lucide-react";
+import { LandmarkIcon } from "@/components/app-icons";
 
 // Only the newest few seen places keep their name on the map; older ones show it on tap.
 const LABELLED_LANDMARKS = 3;
@@ -108,7 +109,7 @@ export default function LiveMap({ location, people = [], landmarks = [], checkpo
             radius={checkpoint.radiusMeters}
             pathOptions={{ color: "#a78bfa", fillColor: "#a78bfa", fillOpacity: 0.15, weight: 2, dashArray: "3 5" }}
           >
-            <Tooltip direction="top" permanent>🎯 {checkpoint.name}</Tooltip>
+            <Tooltip direction="top" permanent><span className="inline-flex items-center gap-1"><Target size={12} aria-hidden="true" />{checkpoint.name}</span></Tooltip>
           </Circle>
         ))}
         {!companion && onPick && <PickOnClick onPick={onPick} />}
@@ -125,7 +126,7 @@ export default function LiveMap({ location, people = [], landmarks = [], checkpo
             pathOptions={{ color: "#ffffff", fillColor: "#f59e0b", fillOpacity: index < LABELLED_LANDMARKS ? 1 : 0.7, weight: 2 }}
           >
             <Tooltip direction="top" offset={[0, -6]} permanent={index < LABELLED_LANDMARKS}>
-              {SCENE_LANDMARK_ICONS[landmark.kind]} {landmark.label}
+              <span className="inline-flex items-center gap-1"><LandmarkIcon kind={landmark.kind} size={12} />{landmark.label}</span>
             </Tooltip>
           </CircleMarker>
         ))}

@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ChevronLeft, MapPin, Navigation } from "lucide-react";
+import { Battery, BatteryLow, Camera, ChevronLeft, MapPin, Navigation, PhoneOff, PlugZap, Shield, Siren, Target, X } from "lucide-react";
+import { LandmarkIcon } from "@/components/app-icons";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { BackButton } from "@/components/back-button";
@@ -18,7 +19,6 @@ import { GUARDIAN_THEME } from "@/components/guardian-screen";
 import type { MapPerson } from "@/components/live-map";
 import type { PlaceDescription } from "@/lib/reverse-geocode";
 import type { SeenLandmark } from "@/types/location";
-import { SCENE_LANDMARK_ICONS } from "@/types/vision";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -102,7 +102,7 @@ function ScenePhoto({ childId, name, photo }: { childId: string; name: string; p
   const src = `/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`;
   return (
     <>
-      <p className="text-xs text-(--sp-muted)">📷 Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
+      <p className="inline-flex items-center gap-1.5 text-xs text-(--sp-muted)"><Camera size={13} aria-hidden="true" /> Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
       <a
         href={src}
         target="_blank"
@@ -155,7 +155,7 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
         </span>
         <div className="min-w-0">
           <p className={`text-xs ${silent ? "font-semibold text-(--sp-caution)" : "text-(--sp-muted)"}`}>
-            {silent ? `📵 Утастай холбоо тасарсан · сүүлийн мэдээлэл ${updated}` : `${name} одоо энд байна`}
+            {silent ? <span className="inline-flex items-center gap-1.5"><PhoneOff size={13} aria-hidden="true" /> Утастай холбоо тасарсан · сүүлийн мэдээлэл {updated}</span> : `${name} одоо энд байна`}
           </p>
           <p className="mt-0.5 text-[17px] font-semibold leading-6">{headline}</p>
           {details && <p className="mt-0.5 text-sm leading-5 text-(--sp-muted)">{details}</p>}
@@ -163,7 +163,7 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
             ±{Math.round(accuracy)} м нарийвчлалтай · {updated}
             {batteryPercent !== null && (
               <span className={batteryLow ? "font-semibold text-(--sp-risk)" : ""}>
-                {" "}· {charging ? "🔌" : "🔋"} {batteryPercent}%
+                {" "}· {charging ? <PlugZap size={12} className="inline align-[-1px]" aria-hidden="true" /> : batteryLow ? <BatteryLow size={13} className="inline align-[-2px]" aria-hidden="true" /> : <Battery size={13} className="inline align-[-2px]" aria-hidden="true" />} {batteryPercent}%
               </span>
             )}
           </p>
@@ -190,7 +190,7 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
           <ul className="mt-2 space-y-2">
             {landmarks.map((landmark) => (
               <li key={landmark.id} className="flex items-start gap-2.5">
-                <span className="text-lg leading-6" aria-hidden="true">{SCENE_LANDMARK_ICONS[landmark.kind]}</span>
+                <span className="grid size-6 shrink-0 place-items-center text-(--sp-muted)"><LandmarkIcon kind={landmark.kind} size={16} /></span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold leading-6">{landmark.label}</p>
                   {landmark.detail && <p className="text-xs leading-5 text-(--sp-muted)">{landmark.detail}</p>}
@@ -213,7 +213,7 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
         href={`/guardian/checkpoints?child=${childId}`}
         className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#7c3aed]/50 px-4 text-sm font-semibold text-[#c4b5fd] transition hover:bg-[#7c3aed]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c3aed]"
       >
-        <span aria-hidden="true">🎯</span> Шалгах цэг, шагнал өгөх
+        <Target size={16} aria-hidden="true" /> Шалгах цэг, шагнал өгөх
       </Link>
     </section>
   );
@@ -445,7 +445,7 @@ export default function GuardianPage() {
           {activeTab !== "alerts" && urgentSos && (
             <section role="alert" aria-live="assertive" className="mx-4 mb-5 overflow-hidden rounded-[24px] border-2 border-rose-500 bg-[linear-gradient(145deg,rgba(127,29,29,0.62),rgba(30,8,12,0.96))] p-5 shadow-[0_12px_36px_rgba(244,63,94,0.22)] sm:p-6">
               <div className="flex items-center gap-3">
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-500/20 text-2xl" aria-hidden="true">🆘</span>
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-500/20 text-2xl" aria-hidden="true"><Siren size={24} className="text-rose-200" aria-hidden="true" /></span>
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-200">Яаралтай мэдэгдэл</p>
                   <h2 className="mt-0.5 text-xl font-extrabold leading-tight text-rose-100 sm:text-2xl">Хүүхэд тусламж хүссэн</h2>
@@ -546,15 +546,15 @@ export default function GuardianPage() {
                   {picked && (
                     <div role="dialog" aria-label="Энд юу нэмэх вэ" className="absolute inset-x-3 bottom-3 z-500 rounded-2xl border border-(--sp-line) bg-black/90 p-3 shadow-lg backdrop-blur">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">📍 Энд юу нэмэх вэ?</p>
-                        <button type="button" onClick={() => setPicked(null)} aria-label="Хаах" className="grid size-9 place-items-center rounded-full text-(--sp-muted) hover:bg-white/10">✕</button>
+                        <p className="inline-flex items-center gap-1.5 text-sm font-semibold"><MapPin size={15} aria-hidden="true" /> Энд юу нэмэх вэ?</p>
+                        <button type="button" onClick={() => setPicked(null)} aria-label="Хаах" className="grid size-9 place-items-center rounded-full text-(--sp-muted) hover:bg-white/10"><X size={16} aria-hidden="true" /></button>
                       </div>
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <Link href={addHref("zones", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-(--sp-safe-bg) text-sm font-semibold text-(--sp-safe) ring-1 ring-(--sp-safe)/40">
-                          🛡️ Аюулгүй бүс
+                          <Shield size={15} aria-hidden="true" /> Аюулгүй бүс
                         </Link>
                         <Link href={addHref("checkpoints", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#7c3aed]/20 text-sm font-semibold text-[#c4b5fd] ring-1 ring-[#7c3aed]/50">
-                          🎯 Шалгах цэг
+                          <Target size={15} aria-hidden="true" /> Шалгах цэг
                         </Link>
                       </div>
                     </div>
@@ -732,9 +732,9 @@ export default function GuardianPage() {
                   const alertTime = new Date(alert.createdAt).getTime();
                   const isUrgent = alert.type !== "ZONE_ENTER";
                   const label = alert.type === "SOS"
-                    ? "🆘 ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
+                    ? "ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
                     : alert.type === "LOW_BATTERY"
-                      ? "🪫 Утасны цэнэг дуусах гэж байна"
+                      ? "Утасны цэнэг дуусах гэж байна"
                     : alert.type === "ZONE_EXIT"
                       ? "Аюулгүй бүсээс гарсан"
                       : alert.type === "ZONE_ENTER"

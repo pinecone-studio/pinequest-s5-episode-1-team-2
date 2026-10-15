@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useActionState, useState } from "react";
+import { MapPin, Shield } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { addZone, removeZone } from "@/app/actions/zones";
 import type { FormState } from "@/types/auth";
@@ -84,7 +85,7 @@ export function ZoneEditor({ childId, childName, zones, childPosition, initialPo
             </p>
           </div>
           <button type="button" onClick={pickMyLocation} disabled={locating} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-(--sp-line) px-3 text-xs font-semibold text-(--sp-primary) transition hover:bg-(--sp-primary-soft) disabled:opacity-50">
-            {locating && <SafePathLoading variant="button" />}{locating ? "Тогтоож байна…" : "📍 Миний байршил"}
+            {locating && <SafePathLoading variant="button" />}{locating ? "Тогтоож байна…" : <><MapPin size={14} aria-hidden="true" /> Миний байршил</>}
           </button>
         </div>
         <div className="h-[44vh] min-h-[280px] max-h-[460px] overflow-hidden">
@@ -160,7 +161,7 @@ export function ZoneEditor({ childId, childName, zones, childPosition, initialPo
             {zones.map((zone) => (
               <li key={zone.id} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-(--sp-line) px-3 py-2.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-(--sp-safe-bg) text-(--sp-safe)" aria-hidden="true">🛡️</span>
+                  <span className="grid size-9 shrink-0 place-items-center rounded-full bg-(--sp-safe-bg) text-(--sp-safe)" aria-hidden="true"><Shield size={16} /></span>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold">{zone.name}</span>
                     <span className="mt-0.5 block text-xs text-(--sp-muted)">Радиус · {formatRadius(zone.radiusMeters)}</span>
