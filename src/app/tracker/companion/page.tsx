@@ -6,7 +6,7 @@ import { ChevronLeft, Check } from "lucide-react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useCheckpoints } from "@/hooks/use-checkpoints";
-import { ACCESSORIES, FREE_COMPANIONS, REWARD_COMPANIONS, REWARD_IDS, isRewardLocked, type AccessoryId } from "@/types/rewards";
+import { ACCESSORIES, FREE_COMPANIONS, REWARD_COMPANIONS, REWARD_IDS, isRewardLocked } from "@/types/rewards";
 import type { AssistantSettings } from "@/types/safety";
 
 const COMPANIONS: AssistantSettings["avatar"][] = [...FREE_COMPANIONS, ...REWARD_COMPANIONS];
@@ -100,14 +100,26 @@ export default function CompanionPage() {
           </section>
 
           <section aria-labelledby="pick-accessory" className="mt-7">
-            <h2 id="pick-accessory" className="mb-3 text-[16px] font-bold">Чимэглэл зүүлгэ</h2>
-            <div className="grid grid-cols-4 gap-2.5" role="radiogroup" aria-labelledby="pick-accessory">
-              {[{ id: null, label: "Байхгүй", icon: "🚫" } as { id: AccessoryId | null; label: string; icon: string }, ...ACCESSORIES].map((item) => {
-                const isLocked = item.id !== null && locked(item.id);
+            <div className="mb-3 flex items-center justify-between">
+              <h2 id="pick-accessory" className="text-[16px] font-bold">Чимэглэл зүүлгэ</h2>
+              {accessory && (
+                <button
+                  type="button"
+                  onClick={() => update("accessory", null)}
+                  className="min-h-9 rounded-full px-3 text-[13px] font-semibold text-[#c4b5fd] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+                >
+                  Тайлах
+                </button>
+              )}
+            </div>
+            {/* Six accessories in two even rows of three. */}
+            <div className="grid grid-cols-3 gap-2.5" role="radiogroup" aria-labelledby="pick-accessory">
+              {ACCESSORIES.map((item) => {
+                const isLocked = locked(item.id);
                 const selected = accessory === item.id;
                 return (
                   <button
-                    key={item.id ?? "none"}
+                    key={item.id}
                     type="button"
                     role="radio"
                     aria-checked={selected}

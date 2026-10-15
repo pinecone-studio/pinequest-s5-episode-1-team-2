@@ -10,7 +10,7 @@ export const REWARD_COMPANIONS = ["Мяу", "Бамбар", "Пип", "Рокк�
 export const ACCESSORIES = [
   { id: "crown", label: "Титэм", icon: "👑" },
   { id: "hat", label: "Малгай", icon: "🎩" },
-  { id: "glasses", label: "Нүдний шил", icon: "🕶️" },
+  { id: "glasses", label: "Шил", icon: "🕶️" },
   { id: "bow", label: "Бант", icon: "🎀" },
   { id: "star", label: "Од", icon: "⭐" },
   { id: "rainbow", label: "Солонго", icon: "🌈" },
