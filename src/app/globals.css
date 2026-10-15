@@ -172,3 +172,15 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .companion-avatar *, .companion-avatar, .companion-picker__art, .companion-avatar__art::before, .companion-avatar__art::after, .companion-picker__art::before, .companion-picker__art::after { animation: none !important; transition: none !important; }
 }
+
+@keyframes loading-mark-trace {
+  to { stroke-dashoffset: -100; }
+}
+
+.loading-mark__arc {
+  animation: loading-mark-trace 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-mark__arc { animation-duration: 3s; }
+}
