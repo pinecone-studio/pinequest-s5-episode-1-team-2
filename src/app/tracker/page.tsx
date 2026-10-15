@@ -960,15 +960,30 @@ export default function TrackerPage() {
               : "flex-1 flex-col items-center justify-center"
           }`}
         >
-          <CompanionMark
-            state={companionState}
-            avatar={shownAvatar}
-            accessory={shownAccessory}
-            name={companionName}
-            className={`companion-avatar--compact shrink-0 ${
-              guiding ? "companion-avatar--mini" : ""
-            }`}
-          />
+          {/* Tapping the companion opens the screen where the child dresses and renames it. */}
+          <Link
+            href="/tracker/companion"
+            aria-label={`${companionName}-г өөрчлөх`}
+            className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#67e8f9]"
+          >
+            <CompanionMark
+              state={companionState}
+              avatar={shownAvatar}
+              accessory={shownAccessory}
+              name={companionName}
+              className={`companion-avatar--compact shrink-0 ${
+                guiding ? "companion-avatar--mini" : ""
+              }`}
+            />
+            {!guiding && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-1 right-1 z-[3] grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
+              >
+                ✏️
+              </span>
+            )}
+          </Link>
           <div
             className={`flex min-w-0 items-center gap-3 ${
               guiding ? "flex-1" : "w-full"
