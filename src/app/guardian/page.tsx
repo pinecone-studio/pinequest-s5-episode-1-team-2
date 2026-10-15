@@ -114,8 +114,8 @@ function useNow(intervalMs = 10_000) {
   }, [intervalMs]);
   return now;
 }
+
 export default function GuardianPage() {
-  // The guardian's own position, only for "how far is my child from me".
   const { location } = useGeolocation();
   const isOnline = useNetworkStatus();
   const { settings } = useAssistantSettings();
@@ -151,9 +151,6 @@ export default function GuardianPage() {
 
   const phone = (settings as { emergencyPhone?: string }).emergencyPhone ?? "";
 
-  // The guardian dashboard must assess the linked child's reported position,
-  // not the guardian's own phone GPS. Use the child's configured zones when available.
-  // The guardian can pick which child the map follows; by default it is the first one with a position.
   const monitoredChild =
     linkedChildren?.find((child) => child.childId === selectedChildId && child.position) ??
     linkedChildren?.find((child) => child.position) ??
@@ -170,7 +167,7 @@ export default function GuardianPage() {
   const monitoredZones = monitoredChild?.zones?.length
     ? monitoredChild.zones
     : SAFE_ZONES;
-  // Never stand the guardian's own GPS in for the child: without a child report the map waits.
+  
   const displayLocation = monitoredLocation;
   const mapPeople: MapPerson[] = (linkedChildren ?? []).flatMap((child) =>
     child.position && !child.paused
@@ -324,7 +321,6 @@ export default function GuardianPage() {
                   const fresh = age !== null && age < 120;
                   const shownOnMap = child.childId === monitoredChild?.childId;
                   return (
-                    // Tapping a child with a position points the map at them.
                     <div
                       key={child.childId}
                       role={point ? "button" : undefined}
@@ -541,11 +537,11 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
+<div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
           <div className="grid grid-cols-2 gap-2">
             <a
               href={`tel:${phone || "+97600000000"}`}
-              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,var(--sp-primary-deep)_0%,var(--sp-primary)_100%)] text-[15px] font-semibold text-green-300 shadow-[0_0_24px_-6px_rgba(79,143,168,0.75)] transition-transform active:scale-[0.97]"
+              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-[15px] font-semibold text-emerald-400 backdrop-blur transition-transform active:scale-[0.97]"
             >
               <PhoneIcon />
               Залгах
@@ -553,7 +549,7 @@ export default function GuardianPage() {
             <a
               href="#location"
               onClick={() => setActiveTab("map")}
-              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[rgba(79,143,168,0.35)] bg-(--sp-primary-soft) text-[15px] font-medium text-(--sp-primary) backdrop-blur transition-transform active:scale-[0.97]"
+              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[#22d3ee]/40 bg-(--sp-primary-soft) text-[15px] font-medium text-[#22d3ee] backdrop-blur transition-transform active:scale-[0.97]"
             >
               Байршил
             </a>
@@ -746,4 +742,3 @@ function Info({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
