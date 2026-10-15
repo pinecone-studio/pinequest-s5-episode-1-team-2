@@ -14,7 +14,7 @@ export function BackHeader({ title, right }: { title: string; right?: ReactNode 
   return (
     <header className="flex min-h-16 items-center justify-between gap-3 px-5 pt-[env(safe-area-inset-top)]">
       <div className="flex min-w-0 items-center gap-2">
-        <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-xl text-[#111111] transition-colors hover:bg-[#f7f7f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111111]">
+        <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-xl bg-black/5 text-current transition-colors hover:bg-black/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current">
           <ChevronLeftIcon />
         </BackButton>
         <h1 className="truncate text-[20px] font-semibold tracking-[-0.025em]">{title}</h1>
