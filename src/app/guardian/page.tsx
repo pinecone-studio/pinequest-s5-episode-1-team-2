@@ -16,6 +16,8 @@ import { DemoNotificationButton } from "@/components/demo-notification-button";
 import { SafePathLoading } from "@/components/safepath-loading";
 import type { MapPerson } from "@/components/live-map";
 import type { PlaceDescription } from "@/lib/reverse-geocode";
+import type { SeenLandmark } from "@/types/location";
+import { SCENE_LANDMARK_ICONS } from "@/types/vision";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -112,12 +114,14 @@ function formatRelative(ts: number | null, now: number) {
 const ROUGH_ACCURACY_METERS = 100;
 
 /** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
-function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, address, addressFailed }: {
+function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, landmarks, address, addressFailed }: {
   name: string;
   latitude: number;
   longitude: number;
   accuracy: number;
   updated: string;
+  /** The newest notable places the child's camera saw, with how long ago. */
+  landmarks: (SeenLandmark & { seen: string })[];
   address: PlaceDescription | null;
   addressFailed: boolean;
 }) {
@@ -148,6 +152,23 @@ function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, addres
           )}
         </div>
       </div>
+      {landmarks.length > 0 && (
+        <div className="mt-3 border-t border-(--sp-line) pt-3">
+          <p className="text-xs text-(--sp-muted)">Замдаа харсан тод газрууд</p>
+          <ul className="mt-2 space-y-2">
+            {landmarks.map((landmark) => (
+              <li key={landmark.id} className="flex items-start gap-2.5">
+                <span className="text-lg leading-6" aria-hidden="true">{SCENE_LANDMARK_ICONS[landmark.kind]}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-6">{landmark.label}</p>
+                  {landmark.detail && <p className="text-xs leading-5 text-(--sp-muted)">{landmark.detail}</p>}
+                </div>
+                <span className="shrink-0 text-xs leading-6 text-(--sp-muted)">{landmark.seen}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <a
         href={directionsUrl}
         target="_blank"
@@ -423,6 +444,7 @@ export default function GuardianPage() {
                     key={mapKey}
                     location={displayLocation}
                     people={mapPeople}
+                    landmarks={monitoredChild?.landmarks ?? []}
                     safeZones={monitoredZones}
                     currentRoute={currentRoute}
                     familiarRoute={familiarRoute}
@@ -458,6 +480,7 @@ export default function GuardianPage() {
                     className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
                   >
                     <Legend dot="bg-[#2a7fff]" label="Хүүхэд" />
+                    <Legend dot="bg-[#f59e0b]" label="Харсан газар" />
                     <Legend dot="bg-(--sp-secondary)" label="Одоогийн зам" />
                     <span className="inline-flex items-center gap-1.5">
                       <i className="h-0 w-4 border-t border-dashed border-(--sp-muted)" />
@@ -483,6 +506,10 @@ export default function GuardianPage() {
                 longitude={displayLocation.longitude}
                 accuracy={displayLocation.accuracy}
                 updated={formatRelative(displayLocation.lastUpdated, now)}
+                landmarks={(monitoredChild.landmarks ?? []).slice(0, 3).map((landmark) => ({
+                  ...landmark,
+                  seen: formatRelative(new Date(landmark.seenAt).getTime(), now),
+                }))}
                 address={childAddress}
                 addressFailed={childAddressFailed}
               />

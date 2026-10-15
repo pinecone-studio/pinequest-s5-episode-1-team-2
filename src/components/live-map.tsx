@@ -5,6 +5,11 @@ import { latLngBounds } from "leaflet";
 import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { SafeZone, SafetyLocation } from "@/types/safety";
+import type { SeenLandmark } from "@/types/location";
+import { SCENE_LANDMARK_ICONS } from "@/types/vision";
+
+// Only the newest few seen places keep their name on the map; older ones show it on tap.
+const LABELLED_LANDMARKS = 3;
 
 /** A tracked person drawn as a named pin; `fresh` is false once their last report is old. */
 export type MapPerson = {
@@ -25,6 +30,8 @@ type LiveMapProps = {
   location: SafetyLocation;
   /** When given, these named pins replace the plain dot at `location` (guardian variant). */
   people?: MapPerson[];
+  /** Notable places the selected child's camera saw, newest first. */
+  landmarks?: SeenLandmark[];
   safeZones?: SafeZone[];
   currentRoute?: [number, number][];
   destination?: Pick<SafetyLocation, "latitude" | "longitude">;
@@ -36,7 +43,7 @@ type LiveMapProps = {
   className?: string;
 };
 
-export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
+export default function LiveMap({ location, people = [], landmarks = [], safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -93,6 +100,18 @@ export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES,
           radius={9}
           pathOptions={{ color: "#ffffff", fillColor: "#111111", fillOpacity: 1, weight: 4 }}
         />}
+        {!companion && landmarks.map((landmark, index) => (
+          <CircleMarker
+            key={landmark.id}
+            center={[landmark.latitude, landmark.longitude]}
+            radius={6}
+            pathOptions={{ color: "#ffffff", fillColor: "#f59e0b", fillOpacity: index < LABELLED_LANDMARKS ? 1 : 0.7, weight: 2 }}
+          >
+            <Tooltip direction="top" offset={[0, -6]} permanent={index < LABELLED_LANDMARKS}>
+              {SCENE_LANDMARK_ICONS[landmark.kind]} {landmark.label}
+            </Tooltip>
+          </CircleMarker>
+        ))}
         {!companion && selectedPerson?.accuracy ? (
           <Circle
             center={[selectedPerson.latitude, selectedPerson.longitude]}
