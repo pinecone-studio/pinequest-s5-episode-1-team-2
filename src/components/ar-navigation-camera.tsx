@@ -8,13 +8,7 @@ import { Camera, CameraOff, MapPin, ChevronLeft, ChevronRight, Compass, Flag, Na
 import { SafePathLoading } from "@/components/safepath-loading";
 import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
 import { SCENE_LANDMARK_ICONS, type SceneLandmark, type SceneLandmarkSide } from "@/types/vision";
-
-type Coordinate = {
-  latitude: number;
-  longitude: number;
-};
-
-type RoutePoint = [number, number];
+import { bearingDegrees, distanceMeters, pickLookAheadPoint, relativeBearing as turnFrom, type Coordinate, type RoutePoint } from "@/lib/route-guidance";
 
 type ArNavigationCameraProps = {
   location: Coordinate;
@@ -31,8 +25,6 @@ type ArNavigationCameraProps = {
 type DeviceOrientationPermissionApi = typeof DeviceOrientationEvent & {
   requestPermission?: () => Promise<"granted" | "denied">;
 };
-
-const EARTH_RADIUS_METERS = 6_371_000;
 
 // Rough half-width of a phone's rear camera view in portrait; used to place the destination sign.
 const CAMERA_HALF_FOV_DEGREES = 28;
@@ -73,56 +65,8 @@ const CameraMiniMap = dynamic(() => import("@/components/live-map"), {
   loading: () => <SafePathLoading tone="light" className="h-full w-full bg-[#f4f5f3]" label="Газрын зураг ачаалж байна…" />,
 });
 
-function distanceMeters(from: Coordinate, to: Coordinate): number {
-  const radians = (degrees: number) => (degrees * Math.PI) / 180;
-  const dLat = radians(to.latitude - from.latitude);
-  const dLon = radians(to.longitude - from.longitude);
-  const lat1 = radians(from.latitude);
-  const lat2 = radians(to.latitude);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_METERS * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
-function bearingDegrees(from: Coordinate, to: Coordinate): number {
-  const radians = (degrees: number) => (degrees * Math.PI) / 180;
-  const degrees = (value: number) => (value * 180) / Math.PI;
-  const lat1 = radians(from.latitude);
-  const lat2 = radians(to.latitude);
-  const dLon = radians(to.longitude - from.longitude);
-  const y = Math.sin(dLon) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
-  return (degrees(Math.atan2(y, x)) + 360) % 360;
-}
 
-function pickLookAheadPoint(location: Coordinate, route: RoutePoint[]): Coordinate | null {
-  if (route.length < 2) return null;
-
-  let nearestIndex = 0;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  route.forEach(([latitude, longitude], index) => {
-    const distance = distanceMeters(location, { latitude, longitude });
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearestIndex = index;
-    }
-  });
-
-  // Aim a little ahead on the route rather than at the nearest point directly under the GPS dot.
-  for (let index = nearestIndex; index < route.length; index += 1) {
-    const [latitude, longitude] = route[index];
-    if (distanceMeters(location, { latitude, longitude }) >= 20 || index === route.length - 1) {
-      return { latitude, longitude };
-    }
-  }
-
-  const [latitude, longitude] = route[route.length - 1];
-  return { latitude, longitude };
-}
 
 function formatDistance(distance: number | null): string {
   if (distance === null || !Number.isFinite(distance)) return "";
@@ -407,6 +351,8 @@ export default function ArNavigationCamera({
     setMovement({ anchor: location, bearing: bearingDegrees(movement.anchor, location) });
   }
   const mapHeading = heading ?? movement.bearing;
+  // The arrows use the same fallback: without a compass, "ahead" is the way the child is walking.
+  const guideHeading = mapHeading;
   const compassNote = compassProblem || permissionNote;
   const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
@@ -485,8 +431,8 @@ export default function ArNavigationCamera({
     [location, target],
   );
   const relativeBearing =
-    targetBearing !== null && heading !== null
-      ? ((targetBearing - heading + 540) % 360) - 180
+    targetBearing !== null && guideHeading !== null
+      ? turnFrom(targetBearing, guideHeading)
       : null;
   const routeDestination = route.length
     ? { latitude: route[route.length - 1][0], longitude: route[route.length - 1][1] }
@@ -504,8 +450,8 @@ export default function ArNavigationCamera({
     ? 0
     : Math.max(-MAX_PATH_BEND_DEGREES, Math.min(MAX_PATH_BEND_DEGREES, relativeBearing));
   // The sign floats over the destination's real direction and pins to the screen edge when it is out of view.
-  const destinationRelative = routeDestination && heading !== null
-    ? ((bearingDegrees(location, routeDestination) - heading + 540) % 360) - 180
+  const destinationRelative = routeDestination && guideHeading !== null
+    ? turnFrom(bearingDegrees(location, routeDestination), guideHeading)
     : null;
   const signShift = destinationRelative === null
     ? 0
@@ -534,7 +480,7 @@ export default function ArNavigationCamera({
     ? destinationName
     : isFacingAway
       ? routeInstruction
-      : heading !== null
+      : guideHeading !== null
         ? directionLabel
         : stream ? compassNote : "";
   const bannerTone = isNearDestination
