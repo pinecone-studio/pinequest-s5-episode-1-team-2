@@ -15,6 +15,9 @@ import {LocationSharingStatus} from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
 import {AppShell, CompanionMark} from "@/components/safe-path";
+import {CheckpointGoal, RewardCelebration} from "@/components/checkpoint-goal";
+import {useCheckpoints} from "@/hooks/use-checkpoints";
+import {describeReward, effectiveAvatar, isAccessoryId} from "@/types/rewards";
 import {SafePathLoading} from "@/components/safepath-loading";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
 import {useCompassHeading} from "@/hooks/use-compass-heading";
@@ -69,7 +72,7 @@ export default function TrackerPage() {
   } = useGeolocation();
   const isOnline = useNetworkStatus();
 
-  const {settings} = useAssistantSettings();
+  const {settings, update} = useAssistantSettings();
 
   const [demoMode, setDemoMode] = useState(false);
   const [guiding, setGuiding] = useState(false);
@@ -170,6 +173,28 @@ export default function TrackerPage() {
   const profile = useMemo(() => toCompanionProfile(settings), [settings]);
 
   const currentLocation = demoMode ? demoLocation : location;
+  const {checkpoints, rewards} = useCheckpoints();
+  const goal = checkpoints.find((checkpoint) => !checkpoint.reachedAt) ?? null;
+  // Reward companions and accessories only show once earned.
+  const shownAvatar = effectiveAvatar(settings.avatar, rewards);
+  const shownAccessory =
+    settings.accessory && rewards?.includes(settings.accessory)
+      ? settings.accessory
+      : null;
+  const [celebrated, setCelebrated] = useState<string[]>(readCelebrated);
+  const celebrating =
+    checkpoints.find(
+      (checkpoint) => checkpoint.reachedAt && !celebrated.includes(checkpoint.id)
+    ) ?? null;
+  const finishCelebration = (id: string) => {
+    const next = [...celebrated, id].slice(-50);
+    setCelebrated(next);
+    try {
+      window.localStorage.setItem(CELEBRATED_KEY, JSON.stringify(next));
+    } catch {
+      // Without storage the celebration may show again next visit; that is harmless.
+    }
+  };
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
   const activeZones = demoMode ? SAFE_ZONES : savedZones;
@@ -758,6 +783,17 @@ export default function TrackerPage() {
     targetZone,
   ]);
 
+  // The companion says the good news out loud, once per reached checkpoint.
+  const announcedCheckpoint = useRef<string | null>(null);
+  useEffect(() => {
+    if (!celebrating || announcedCheckpoint.current === celebrating.id) return;
+    announcedCheckpoint.current = celebrating.id;
+    const reward = describeReward(celebrating.reward);
+    void speakMessage(
+      `Баяр хүргэе, ${profile.userName}! Чи ${celebrating.name}-д хүрлээ. ${reward.label} одоо чинийх боллоо!`
+    );
+  }, [celebrating, profile.userName, speakMessage]);
+
   useEffect(() => {
     const audio = audioElement.current;
     const cachedSpeech = speechCache.current;
@@ -884,7 +920,8 @@ export default function TrackerPage() {
         >
           <CompanionMark
             state={companionState}
-            avatar={settings.avatar}
+            avatar={shownAvatar}
+            accessory={shownAccessory}
             name={companionName}
             className={`companion-avatar--compact shrink-0 ${
               guiding ? "companion-avatar--mini" : ""
@@ -938,6 +975,10 @@ export default function TrackerPage() {
             </button>
           </div>
         </section>
+
+        {goal && (
+          <CheckpointGoal goal={goal} location={currentLocation ?? null} compact={guiding} />
+        )}
 
         {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
         <div
@@ -1069,6 +1110,19 @@ export default function TrackerPage() {
           )}
         </section>
 
+        {celebrating && (
+          <RewardCelebration
+            checkpoint={celebrating}
+            userName={profile.userName}
+            onUse={() => {
+              if (isAccessoryId(celebrating.reward)) update("accessory", celebrating.reward);
+              else update("avatar", celebrating.reward);
+              finishCelebration(celebrating.id);
+            }}
+            onClose={() => finishCelebration(celebrating.id)}
+          />
+        )}
+
         <audio
           ref={audioElement}
           className="sr-only"
@@ -1105,6 +1159,18 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
       );
     })
   );
+}
+
+const CELEBRATED_KEY = "safepath:celebrated-checkpoints";
+
+/** Checkpoints whose celebration this phone already showed. */
+function readCelebrated(): string[] {
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(CELEBRATED_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function getGuidanceFallback(zoneName: string, userName: string) {
