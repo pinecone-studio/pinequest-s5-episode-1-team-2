@@ -138,6 +138,18 @@ export default async function TrackerCodePage() {
             </section>
 
 
+            <Link
+              href="/tracker/companion"
+              className="mt-5 flex min-h-[64px] items-center gap-3 rounded-2xl border border-[#c4b5fd]/30 bg-[#7c3aed]/15 px-4 text-left transition hover:bg-[#7c3aed]/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+            >
+              <span className="grid size-10 place-items-center rounded-xl bg-[#7c3aed]/30 text-xl" aria-hidden="true">✨</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-white">Миний AI найз</span>
+                <span className="block text-[13px] text-[#c9bff0]">Дүр, чимэглэл, нэрээ солих</span>
+              </span>
+              <ChevronLeft size={18} className="rotate-180 text-[#c9bff0]" aria-hidden="true" />
+            </Link>
+
             <form action={logout} className="mt-5">
               <button
                 type="submit"
