@@ -537,7 +537,7 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
-<div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
+        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
           <div className="grid grid-cols-2 gap-2">
             <a
               href={`tel:${phone || "+97600000000"}`}
