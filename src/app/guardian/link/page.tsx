@@ -48,7 +48,8 @@ export default async function GuardianLinkPage() {
                 Хүүхдийнхээ утсан дээрх кодыг оруулна уу.
               </p>
 
-              <div className="[&_input]:border-(--sp-line) [&_input]:bg-black/60 [&_input]:text-(--sp-ink) [&_input]:placeholder:text-(--sp-muted) [&_input:focus]:border-(--sp-primary) [&_input:focus]:ring-(--sp-primary-soft) [&_button]:bg-[linear-gradient(135deg,var(--sp-primary-deep)_0%,var(--sp-primary)_100%)] [&_button]:text-white">
+              {/* Button CodeEntry keessaa akka button "Гарах" sanaatti bifa qabaatu gochuu */}
+              <div className="[&_input]:border-(--sp-line) [&_input]:bg-black/60 [&_input]:text-(--sp-ink) [&_input]:placeholder:text-(--sp-muted) [&_input:focus]:border-(--sp-primary) [&_input:focus]:ring-(--sp-primary-soft) [&_button]:flex [&_button]:min-h-12 [&_button]:w-full [&_button]:items-center [&_button]:justify-center [&_button]:gap-2.5 [&_button]:rounded-2xl [&_button]:border [&_button]:border-[#22d3ee]/40 [&_button]:bg-[#0e7490]/30 [&_button]:px-5 [&_button]:text-[15px] [&_button]:font-semibold [&_button]:text-white [&_button]:shadow-[0_0_15px_-3px_rgba(14,116,144,0.3)] [&_button]:transition-all [&_button]:duration-200 [&_button:hover]:border-[#22d3ee]/80 [&_button:hover]:bg-[#0e7490]/60 [&_button:active]:scale-[0.98] [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-[#67e8f9]">
                 <CodeEntry />
               </div>
             </section>
@@ -67,7 +68,7 @@ export default async function GuardianLinkPage() {
                   {children.map((child) => (
                     <li
                       key={child.linkId}
-                      className="flex min-h-14 items-center justify-between gap-3 py-1"
+                      className="flex min-h-14 items-center justify-between gap-3 py-2"
                     >
                       <div className="flex items-center gap-3">
                         <span className="grid size-9 place-items-center rounded-full bg-(--sp-primary-soft) text-sm font-semibold text-(--sp-primary)">
@@ -86,7 +87,7 @@ export default async function GuardianLinkPage() {
                         />
                         <button
                           type="submit"
-                          className="min-h-11 rounded-xl px-3 text-xs font-medium text-(--sp-risk) transition-colors hover:bg-black/40 active:scale-95"
+                          className="inline-flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:border-rose-500/60 hover:bg-rose-500/20 active:scale-95"
                         >
                           Салгах
                         </button>
