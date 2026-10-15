@@ -13,7 +13,7 @@ export default async function TrackerCodePage() {
   return (
     <AppShell>
       <main
-        className="relative isolate min-h-dvh w-full overflow-x-hidden px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1] sm:px-6"
+        className="relative isolate min-h-dvh w-full overflow-x-clip px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1] sm:px-6"
         style={{
           background:
             "linear-gradient(155deg, #05090d 0%, #07151b 52%, #03080c 100%)",
