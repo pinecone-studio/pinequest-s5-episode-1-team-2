@@ -501,6 +501,9 @@ export default function TrackerPage() {
     };
   }, []);
 
+  // When the companion last started talking, so an automatic game never cuts into guidance.
+  const lastSpeechAt = useRef(0);
+
   const speakMessage = useCallback(
     async (message: string) => {
       const text = message.trim();
@@ -512,6 +515,8 @@ export default function TrackerPage() {
       }
 
       const sequence = ++speechSequence.current;
+
+      lastSpeechAt.current = Date.now();
 
       speechController.current?.abort();
 
@@ -782,6 +787,43 @@ export default function TrackerPage() {
     safetyState,
     targetZone,
   ]);
+
+  // While the camera guides a safe walk, the companion starts a little game by itself now and
+  // then. It waits for a quiet moment, so a turn instruction always comes first.
+  const lastGameAt = useRef(0);
+  const guidingSince = useRef<number | null>(null);
+  const autoGameInputs = useRef({
+    safetyState,
+    busy: false,
+    requestAssistantMessage,
+  });
+  useEffect(() => {
+    autoGameInputs.current = {
+      safetyState,
+      busy:
+        assistantLoading ||
+        speechStatus === "loading" ||
+        speechStatus === "playing",
+      requestAssistantMessage,
+    };
+  });
+  useEffect(() => {
+    if (!guiding) return;
+    guidingSince.current = Date.now();
+    const interval = window.setInterval(() => {
+      const {safetyState: state, busy, requestAssistantMessage: request} =
+        autoGameInputs.current;
+      if (!state || state.riskLevel !== "SAFE" || busy) return;
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - (guidingSince.current ?? now) < AUTO_GAME_FIRST_DELAY_MS) return;
+      if (now - lastGameAt.current < AUTO_GAME_INTERVAL_MS) return;
+      if (now - lastSpeechAt.current < AUTO_GAME_QUIET_MS) return;
+      lastGameAt.current = now;
+      void request(state, "game");
+    }, AUTO_GAME_CHECK_MS);
+    return () => window.clearInterval(interval);
+  }, [guiding]);
 
   // The companion says the good news out loud, once per reached checkpoint.
   const announcedCheckpoint = useRef<string | null>(null);
@@ -1160,6 +1202,13 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
     })
   );
 }
+
+// Automatic walking games: the first a little after guidance starts, then every few minutes,
+// and only after the companion has been quiet for a while.
+const AUTO_GAME_FIRST_DELAY_MS = 40_000;
+const AUTO_GAME_INTERVAL_MS = 3 * 60_000;
+const AUTO_GAME_QUIET_MS = 25_000;
+const AUTO_GAME_CHECK_MS = 5_000;
 
 const CELEBRATED_KEY = "safepath:celebrated-checkpoints";
 
