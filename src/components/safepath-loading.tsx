@@ -50,10 +50,57 @@ export function SafePathLoading({
   );
 }
 
-function LoadingMark({ mark, icon, light = false }: { mark: string; icon: string; light?: boolean }) {
+function LoadingMark({
+  mark,
+  icon,
+  light = false,
+  radius = 30, 
+}: {
+  mark: string;
+  icon: string;
+  light?: boolean;
+  radius?: number;
+}) {
+  const color = light ? "text-[#0e7490]" : "text-[#67e8f9]";
+  const r = Math.min(Math.max(radius, 0), 48);
+  const a = 2;   
+  const b = 98;  
+
+
+  const d = [
+    `M ${a + r} ${a}`,
+    `H ${b - r}`,
+    `A ${r} ${r} 0 0 1 ${b} ${a + r}`,
+    `V ${b - r}`,
+    `A ${r} ${r} 0 0 1 ${b - r} ${b}`,
+    `H ${a + r}`,
+    `A ${r} ${r} 0 0 1 ${a} ${b - r}`,
+    `V ${a + r}`,
+    `A ${r} ${r} 0 0 1 ${a + r} ${a}`,
+    "Z",
+  ].join(" ");
+
   return (
     <span className={`relative grid shrink-0 place-items-center ${mark}`}>
-      <span className={`absolute inset-0 animate-spin rounded-[inherit] border-2 border-transparent ${light ? "border-t-[#0e7490]" : "border-t-[#67e8f9]"}`} aria-hidden="true" />
+      <svg viewBox="0 0 100 100" className={`absolute inset-0 size-full ${color}`} fill="none" aria-hidden="true">
+        <path d={d} stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
+        <path
+          d={d}
+          pathLength={100}
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray="25 75"
+        >
+          <animate
+            attributeName="stroke-dashoffset"
+            from="0"
+            to="-100"
+            dur="1s"
+            repeatCount="indefinite"
+          />
+        </path>
+      </svg>
       <span className={`grid place-items-center bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.25)] ${variantRadius(mark)}`}>
         <svg viewBox="0 0 24 24" className={icon} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" strokeLinejoin="round" />
