@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MapPin, Navigation } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { BackButton } from "@/components/back-button";
@@ -10,10 +10,12 @@ import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useChildLocations } from "@/hooks/use-child-locations";
+import { useChildAddress } from "@/hooks/use-child-address";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
 import { SafePathLoading } from "@/components/safepath-loading";
 import type { MapPerson } from "@/components/live-map";
+import type { PlaceDescription } from "@/lib/reverse-geocode";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -106,6 +108,58 @@ function formatRelative(ts: number | null, now: number) {
   });
 }
 
+// Above this, the phone is guessing from Wi-Fi or cell towers rather than GPS.
+const ROUGH_ACCURACY_METERS = 100;
+
+/** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
+function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, address, addressFailed }: {
+  name: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  updated: string;
+  address: PlaceDescription | null;
+  addressFailed: boolean;
+}) {
+  const headline = address?.place
+    ? `${address.place} орчим`
+    : address?.street ?? (addressFailed ? "Хаягийг тодорхойлж чадсангүй" : address ? "Нэргүй газар" : "Хаягийг тодорхойлж байна…");
+  const details = [address?.place ? address.street : null, address?.area].filter(Boolean).join(", ");
+  const rough = accuracy > ROUGH_ACCURACY_METERS;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude.toFixed(6)},${longitude.toFixed(6)}&travelmode=walking`;
+
+  return (
+    <section className="mt-3 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label={`${name} одоо хаана байна`} aria-live="polite">
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2a7fff]/15 text-[#2a7fff]" aria-hidden="true">
+          <MapPin size={20} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs text-(--sp-muted)">{name} одоо энд байна</p>
+          <p className="mt-0.5 text-[17px] font-semibold leading-6">{headline}</p>
+          {details && <p className="mt-0.5 text-sm leading-5 text-(--sp-muted)">{details}</p>}
+          <p className={`mt-1.5 text-xs ${rough ? "text-(--sp-caution)" : "text-(--sp-muted)"}`}>
+            ±{Math.round(accuracy)} м нарийвчлалтай · {updated}
+          </p>
+          {rough && (
+            <p className="mt-1 text-xs leading-5 text-(--sp-caution)">
+              Байршил тойм байна. Хүүхдийн утсанд GPS асаалттай, гадаа байгаа эсэхийг шалгаарай.
+            </p>
+          )}
+        </div>
+      </div>
+      <a
+        href={directionsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2a7fff] px-4 text-sm font-semibold text-white transition hover:bg-[#1c6fee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
+      >
+        <Navigation size={16} aria-hidden="true" /> {name} руу чиглэл авах
+      </a>
+    </section>
+  );
+}
+
 function useNow(intervalMs = 10_000) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -169,6 +223,7 @@ export default function GuardianPage() {
     : SAFE_ZONES;
   
   const displayLocation = monitoredLocation;
+  const { address: childAddress, failed: childAddressFailed } = useChildAddress(monitoredChild?.childId ?? null, monitoredLocation);
   const mapPeople: MapPerson[] = (linkedChildren ?? []).flatMap((child) =>
     child.position && !child.paused
       ? [{
@@ -178,6 +233,7 @@ export default function GuardianPage() {
           longitude: child.position.longitude,
           fresh: now - new Date(child.position.updatedAt).getTime() < 120_000,
           selected: child.childId === monitoredChild?.childId,
+          accuracy: child.position.accuracy,
         }]
       : [],
   );
@@ -419,6 +475,18 @@ export default function GuardianPage() {
                 </div>
               )}
             </div>
+
+            {monitoredChild && displayLocation && (
+              <ChildWhereabouts
+                name={monitoredChild.name}
+                latitude={displayLocation.latitude}
+                longitude={displayLocation.longitude}
+                accuracy={displayLocation.accuracy}
+                updated={formatRelative(displayLocation.lastUpdated, now)}
+                address={childAddress}
+                addressFailed={childAddressFailed}
+              />
+            )}
           </div>
 
           <section className={`px-5 pt-4 ${activeTab === "alerts" ? "hidden" : ""}`} aria-label="Одоогийн мэдээлэл">
