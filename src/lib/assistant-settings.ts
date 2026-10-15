@@ -1,4 +1,5 @@
 import type { AssistantSettings, CompanionProfile } from "@/types/safety";
+import { isAccessoryId } from "@/types/rewards";
 
 export const ASSISTANT_SETTINGS_STORAGE_KEY = "safepath-assistant-settings";
 
@@ -10,6 +11,7 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
   tone: "Тайван",
   speechSpeed: "Удаан",
   instructionLength: "Богино",
+  accessory: null,
 };
 
 export function normalizeAssistantSettings(value: unknown): AssistantSettings {
@@ -24,6 +26,7 @@ export function normalizeAssistantSettings(value: unknown): AssistantSettings {
     tone: stored.tone === "Найрсаг" ? "Найрсаг" : "Тайван",
     speechSpeed: stored.speechSpeed === "Энгийн" ? "Энгийн" : "Удаан",
     instructionLength: stored.instructionLength === "Энгийн" ? "Энгийн" : "Богино",
+    accessory: isAccessoryId(stored.accessory) ? stored.accessory : null,
   };
 }
 

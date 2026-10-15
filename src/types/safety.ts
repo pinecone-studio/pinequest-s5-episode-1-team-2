@@ -1,3 +1,5 @@
+import type { AccessoryId } from "@/types/rewards";
+
 export type SafetyStatus = "SAFE" | "WARNING" | "HIGH_RISK";
 
 export type SafeZone = {
@@ -41,6 +43,8 @@ export type AssistantSettings = {
   tone: "Тайван" | "Найрсаг";
   speechSpeed: "Удаан" | "Энгийн";
   instructionLength: "Богино" | "Энгийн";
+  /** An earned accessory the companion wears, or none. */
+  accessory: AccessoryId | null;
 };
 
 export type CompanionProfile = {

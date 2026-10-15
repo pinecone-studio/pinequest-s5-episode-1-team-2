@@ -1,3 +1,4 @@
+import { ACCESSORIES, type AccessoryId } from "@/types/rewards";
 import { BackButton } from "@/components/back-button";
 import type { ReactNode } from "react";
 import type { AssistantSettings, SafetyStatus } from "@/types/safety";
@@ -75,17 +76,22 @@ export function CompanionMark({
   state = "idle",
   avatar = "Мило",
   name = "Мило",
+  accessory = null,
   className = "",
 }: {
   state?: "idle" | "listening" | "speaking" | "warning";
   avatar?: AssistantSettings["avatar"];
   name?: string;
+  /** An earned accessory, worn at the companion's top corner. */
+  accessory?: AccessoryId | null;
   className?: string;
 }) {
+  const worn = accessory ? ACCESSORIES.find((item) => item.id === accessory) : undefined;
   return (
-    <div className={`companion-avatar companion-avatar--${avatar.toLowerCase()} companion-avatar--${state} ${className}`} role="img" aria-label={`${name} AI туслах, ${state}`}>
+    <div className={`companion-avatar companion-avatar--${avatar.toLowerCase()} companion-avatar--${state} ${className}`} role="img" aria-label={`${name} AI туслах${worn ? `, ${worn.label}-тай` : ""}, ${state}`}>
       <span className="companion-avatar__halo" aria-hidden="true" />
       <span className="companion-avatar__art" aria-hidden="true" />
+      {worn && <span className="companion-avatar__accessory" aria-hidden="true">{worn.icon}</span>}
     </div>
   );
 }
