@@ -14,6 +14,7 @@ import { useChildAddress } from "@/hooks/use-child-address";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
 import { SafePathLoading } from "@/components/safepath-loading";
+import { GUARDIAN_THEME } from "@/components/guardian-screen";
 import type { MapPerson } from "@/components/live-map";
 import type { PlaceDescription } from "@/lib/reverse-geocode";
 import type { SeenLandmark } from "@/types/location";
@@ -27,25 +28,7 @@ const LiveMap = dynamic(() => import("@/components/live-map"), {
   loading: () => <SafePathLoading className="h-full min-h-80" label="Газрын зураг ачаалж байна…" />,
 });
 
-const TOKENS = {
-  "--sp-primary": "#4F8FA8",
-  "--sp-primary-deep": "#3D7891",
-  "--sp-primary-soft": "rgba(79,143,168,0.18)",
-  "--sp-secondary": "#72B8B0",
-  "--sp-bg": "#000000",
-  "--sp-bg-top": "#081619",
-  "--sp-bg-bottom": "#000000",
-  "--sp-ink": "#E6F1F3",
-  "--sp-muted": "#87A0A8",
-  "--sp-line": "#1B2C32",
-  "--sp-surface": "#0C171B",
-  "--sp-safe": "#72B8B0",
-  "--sp-safe-bg": "rgba(114,184,176,0.12)",
-  "--sp-caution": "#E0A84A",
-  "--sp-caution-bg": "rgba(224,168,74,0.12)",
-  "--sp-risk": "#E57C66",
-  "--sp-risk-bg": "rgba(229,124,102,0.13)",
-} as React.CSSProperties;
+const TOKENS = GUARDIAN_THEME;
 
 type Tone = "safe" | "caution" | "risk";
 
