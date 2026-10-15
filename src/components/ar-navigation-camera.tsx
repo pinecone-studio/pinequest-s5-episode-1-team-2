@@ -4,10 +4,10 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSPrope
 import dynamic from "next/dynamic";
 import { useCompassHeading } from "@/hooks/use-compass-heading";
 import { useNetworkStatus } from "@/hooks/use-network-status";
-import { Camera, CameraOff, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
+import { Camera, CameraOff, MapPin, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
-import type { SceneLandmark, SceneLandmarkKind, SceneLandmarkSide } from "@/types/vision";
+import { SCENE_LANDMARK_ICONS, type SceneLandmark, type SceneLandmarkSide } from "@/types/vision";
 
 type Coordinate = {
   latitude: number;
@@ -128,6 +128,21 @@ function formatDistance(distance: number | null): string {
 }
 
 const SCENE_REQUEST_TIMEOUT_MS = 22_000;
+
+// Auto-scan: first look shortly after the camera opens, then again only after the child has
+// walked on, which keeps AI requests to a couple per minute at most.
+const AUTO_SCAN_FIRST_DELAY_MS = 6_000;
+const AUTO_SCAN_CHECK_MS = 5_000;
+const AUTO_SCAN_INTERVAL_MS = 25_000;
+const AUTO_SCAN_MIN_MOVE_METERS = 40;
+const SHARED_NOTICE_MS = 5_000;
+
+type SceneResult = {
+  description: string;
+  landmarks: SceneLandmark[];
+  snapshot: SceneSnapshot;
+  capturedAt: { latitude: number; longitude: number; heading: number | null };
+};
 // Half of a landmark tag's widest size (max-w-52) plus a small gutter, so tags never touch the screen edge.
 const TAG_HALF_WIDTH = 112;
 
@@ -140,19 +155,7 @@ type SceneSnapshot = {
 // High-contrast colours shared by each landmark's outline, number badge and list row.
 const LANDMARK_COLORS = ["#facc15", "#f472b6", "#4ade80", "#fb923c"];
 
-// Pictures carry the meaning for children who cannot read yet.
-const LANDMARK_ICONS: Record<SceneLandmarkKind, string> = {
-  building: "🏢",
-  shop: "🏪",
-  school: "🏫",
-  hospital: "🏥",
-  bus_stop: "🚌",
-  crossing: "🚸",
-  traffic_light: "🚦",
-  park: "🌳",
-  sign: "🪧",
-  other: "📍",
-};
+const LANDMARK_ICONS = SCENE_LANDMARK_ICONS;
 
 const LANDMARK_SIDE_TEXT: Record<SceneLandmarkSide, string> = {
   left: "Зүүн талд",
@@ -169,6 +172,7 @@ function readSceneLandmarks(value: unknown): SceneLandmark[] {
     && typeof entry.detail === "string"
     && entry.kind in LANDMARK_ICONS
     && entry.side in LANDMARK_SIDE_TEXT
+    && typeof entry.notable === "boolean"
     && (entry.box === null || (Array.isArray(entry.box) && entry.box.length === 4 && entry.box.every((n: unknown) => typeof n === "number"))),
   ).slice(0, LANDMARK_COLORS.length);
 }
@@ -413,6 +417,8 @@ export default function ArNavigationCamera({
   const [sceneLandmarks, setSceneLandmarks] = useState<SceneLandmark[]>([]);
   // The frame the AI looked at; frozen on screen so landmark labels stay on their buildings.
   const [sceneSnapshot, setSceneSnapshot] = useState<SceneSnapshot | null>(null);
+  // Names of the places just sent to the guardians' map, shown briefly to the child.
+  const [sharedNotice, setSharedNotice] = useState("");
 
   useEffect(() => {
     const root = rootRef.current;
@@ -810,13 +816,108 @@ export default function ArNavigationCamera({
     }
   }, []);
 
+  // Captures the current frame and asks the AI what is in it. Shared by the button and the auto-scan.
+  const requestScene = useCallback(async (signal: AbortSignal): Promise<SceneResult> => {
+    const video = videoRef.current;
+    if (!video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1) {
+      throw new Error("Эхлээд камераа асаагаад дүрс гарч ирэхийг хүлээнэ үү.");
+    }
+    const capturedAt = { latitude: location.latitude, longitude: location.longitude, heading };
+
+    // Downscale the still frame before upload to reduce mobile data and request size.
+    const maxDimension = 768;
+    const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error("Зургийг боловсруулах боломжгүй байна.");
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const image = await new Promise<string>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("Камерын зураг бэлдэж чадсангүй."));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") resolve(reader.result);
+          else reject(new Error("Камерын зургийг уншиж чадсангүй."));
+        };
+        reader.onerror = () => reject(new Error("Камерын зургийг уншиж чадсангүй."));
+        reader.readAsDataURL(blob);
+      }, "image/jpeg", 0.72);
+    });
+
+    const response = await fetch("/api/vision/describe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        image,
+        instruction: instruction.slice(0, 160),
+        routeContext: {
+          instruction: instruction.slice(0, 160),
+          destinationName: destinationName.slice(0, 80),
+          remainingDistanceMeters: Number.isFinite(remainingDistance) ? remainingDistance : null,
+          targetBearingDegrees: targetBearing,
+          deviceHeadingDegrees: heading,
+          relativeBearingDegrees: relativeBearing,
+          routeReady: route.length >= 2,
+        },
+      }),
+      // The server gives up within ~18 s; never leave the button spinning longer than this.
+      signal: AbortSignal.any([signal, AbortSignal.timeout(SCENE_REQUEST_TIMEOUT_MS)]),
+    });
+    const result: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const message = result && typeof result === "object" && "error" in result && typeof result.error === "string"
+        ? result.error
+        : "Орчныг таньж чадсангүй. Дахин оролдоно уу.";
+      throw new Error(message);
+    }
+    if (!result || typeof result !== "object" || !("description" in result) || typeof result.description !== "string") {
+      throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
+    }
+    return {
+      description: result.description,
+      landmarks: "landmarks" in result ? readSceneLandmarks(result.landmarks) : [],
+      snapshot: { url: image, width: canvas.width, height: canvas.height },
+      capturedAt,
+    };
+  }, [destinationName, heading, instruction, location.latitude, location.longitude, relativeBearing, remainingDistance, route.length, targetBearing]);
+
+  // Sends the places that stand out to the guardians' map. Best effort: navigation never waits on it.
+  const shareNotableLandmarks = useCallback(async ({ landmarks, capturedAt }: SceneResult) => {
+    const notable = landmarks.filter((landmark) => landmark.notable).slice(0, 2);
+    if (!notable.length) return;
+    try {
+      const response = await fetch("/api/landmarks/seen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          latitude: capturedAt.latitude,
+          longitude: capturedAt.longitude,
+          heading: capturedAt.heading,
+          landmarks: notable.map(({ label, detail, kind, box }) => ({ label, detail, kind, box })),
+        }),
+      });
+      if (!response.ok) return;
+      const result: unknown = await response.json().catch(() => null);
+      if (result && typeof result === "object" && "saved" in result && typeof result.saved === "number" && result.saved > 0) {
+        setSharedNotice(notable.map((landmark) => landmark.label).join(", "));
+      }
+    } catch {
+      // A missed share only means one fewer pin on the guardian's map.
+    }
+  }, []);
+
   const analyzeScene = useCallback(async () => {
     if (!isOnline) {
       setSceneError("Интернет холболтгүй байна. Сүлжээнд холбогдсоны дараа дахин оролдоно уу.");
       return;
     }
-    const video = videoRef.current;
-    if (!stream || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.videoWidth < 1) {
+    if (!stream) {
       setSceneError("Эхлээд камераа асаагаад дүрс гарч ирэхийг хүлээнэ үү.");
       return;
     }
@@ -832,66 +933,12 @@ export default function ArNavigationCamera({
     sceneAbortRef.current = controller;
 
     try {
-      // Downscale the still frame before upload to reduce mobile data and request size.
-      const maxDimension = 768;
-      const scale = Math.min(1, maxDimension / Math.max(video.videoWidth, video.videoHeight));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-      const context = canvas.getContext("2d", { alpha: false });
-      if (!context) throw new Error("Зургийг боловсруулах боломжгүй байна.");
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const image = await new Promise<string>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error("Камерын зураг бэлдэж чадсангүй."));
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === "string") resolve(reader.result);
-            else reject(new Error("Камерын зургийг уншиж чадсангүй."));
-          };
-          reader.onerror = () => reject(new Error("Камерын зургийг уншиж чадсангүй."));
-          reader.readAsDataURL(blob);
-        }, "image/jpeg", 0.72);
-      });
-
-      const response = await fetch("/api/vision/describe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          image,
-          instruction: instruction.slice(0, 160),
-          routeContext: {
-            instruction: instruction.slice(0, 160),
-            destinationName: destinationName.slice(0, 80),
-            remainingDistanceMeters: Number.isFinite(remainingDistance) ? remainingDistance : null,
-            targetBearingDegrees: targetBearing,
-            deviceHeadingDegrees: heading,
-            relativeBearingDegrees: relativeBearing,
-            routeReady: route.length >= 2,
-          },
-        }),
-        // The server gives up within ~18 s; never leave the button spinning longer than this.
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SCENE_REQUEST_TIMEOUT_MS)]),
-      });
-      const result: unknown = await response.json().catch(() => null);
-      if (!response.ok) {
-        const message = result && typeof result === "object" && "error" in result && typeof result.error === "string"
-          ? result.error
-          : "Орчныг таньж чадсангүй. Дахин оролдоно уу.";
-        throw new Error(message);
-      }
-      if (!result || typeof result !== "object" || !("description" in result) || typeof result.description !== "string") {
-        throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
-      }
-      const landmarks = "landmarks" in result ? readSceneLandmarks(result.landmarks) : [];
-      setSceneDescription(result.description);
-      setSceneLandmarks(landmarks);
-      if (landmarks.length > 0) setSceneSnapshot({ url: image, width: canvas.width, height: canvas.height });
-      if (voiceGuidanceEnabled) void playSpeech(spokenSceneText(result.description, landmarks));
+      const scene = await requestScene(controller.signal);
+      setSceneDescription(scene.description);
+      setSceneLandmarks(scene.landmarks);
+      if (scene.landmarks.length > 0) setSceneSnapshot(scene.snapshot);
+      if (voiceGuidanceEnabled) void playSpeech(spokenSceneText(scene.description, scene.landmarks));
+      void shareNotableLandmarks(scene);
     } catch (error) {
       if (!controller.signal.aborted) {
         setSceneError(
@@ -904,7 +951,58 @@ export default function ArNavigationCamera({
       if (sceneAbortRef.current === controller) sceneAbortRef.current = null;
       setIsAnalyzingScene(false);
     }
-  }, [destinationName, heading, instruction, isAnalyzingScene, isOnline, playSpeech, relativeBearing, remainingDistance, route.length, stream, targetBearing, voiceGuidanceEnabled]);
+  }, [isAnalyzingScene, isOnline, playSpeech, requestScene, shareNotableLandmarks, stream, voiceGuidanceEnabled]);
+
+  // The interval below reads the newest callbacks and position through refs, so it is not restarted on every GPS update.
+  const requestSceneRef = useRef(requestScene);
+  const shareNotableRef = useRef(shareNotableLandmarks);
+  const locationRef = useRef(location);
+  useEffect(() => {
+    requestSceneRef.current = requestScene;
+    shareNotableRef.current = shareNotableLandmarks;
+    locationRef.current = location;
+  });
+
+  // While the camera is on, quietly look again every so often once the child has walked on,
+  // so notable places reach the guardian's map without the child pressing anything.
+  useEffect(() => {
+    if (!stream || !isOnline) return;
+    const controller = new AbortController();
+    let busy = false;
+    let lastScan: { at: number; position: Coordinate } | null = null;
+
+    const tick = async () => {
+      // Skip while hidden, while the child's own "AI тайлбар" request runs, or while one is still going.
+      if (busy || document.visibilityState !== "visible" || sceneAbortRef.current) return;
+      const here = locationRef.current;
+      if (lastScan && (Date.now() - lastScan.at < AUTO_SCAN_INTERVAL_MS || distanceMeters(lastScan.position, here) < AUTO_SCAN_MIN_MOVE_METERS)) return;
+      busy = true;
+      lastScan = { at: Date.now(), position: here };
+      try {
+        const scene = await requestSceneRef.current(controller.signal);
+        if (!controller.signal.aborted) await shareNotableRef.current(scene);
+      } catch {
+        // Silent: the auto-scan never shows errors over the child's navigation.
+      } finally {
+        busy = false;
+      }
+    };
+
+    const first = window.setTimeout(() => void tick(), AUTO_SCAN_FIRST_DELAY_MS);
+    const interval = window.setInterval(() => void tick(), AUTO_SCAN_CHECK_MS);
+    return () => {
+      controller.abort();
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [isOnline, stream]);
+
+  // A short confirmation so the child knows what was shared, then it fades away.
+  useEffect(() => {
+    if (!sharedNotice) return;
+    const timer = window.setTimeout(() => setSharedNotice(""), SHARED_NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [sharedNotice]);
 
   const dismissScene = useCallback(() => {
     sceneAbortRef.current?.abort();
@@ -1099,6 +1197,12 @@ export default function ArNavigationCamera({
         {!isOnline && (
           <p className="pointer-events-auto inline-flex shrink-0 items-center gap-1.5 self-center rounded-full bg-amber-400/95 px-3 py-1.5 text-[13px] font-bold text-amber-950 shadow-lg">
             <WifiOff size={14} aria-hidden="true" /> Интернетгүй · AI болон дуу түр зогссон
+          </p>
+        )}
+
+        {sharedNotice && (
+          <p role="status" className="pointer-events-auto inline-flex shrink-0 items-center gap-1.5 self-center rounded-full bg-emerald-600/95 px-3 py-1.5 text-[13px] font-bold text-white shadow-lg">
+            <MapPin size={14} aria-hidden="true" /> Эцэг эхийн газрын зурагт нэмэгдлээ: {sharedNotice}
           </p>
         )}
 
