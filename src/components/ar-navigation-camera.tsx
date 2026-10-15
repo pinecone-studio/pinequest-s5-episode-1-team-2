@@ -44,6 +44,9 @@ const CHEVRON_WIDTH = 160;
 const CHEVRON_STRETCH = 1.6;
 const CHEVRON_LENGTH = CHEVRON_WIDTH * CHEVRON_STRETCH;
 
+// How far the child must walk before their direction of travel turns the mini-map.
+const MOVEMENT_HEADING_MIN_METERS = 10;
+
 // Strongest bend the ground path shows; bigger turns are spelled out in the banner instead.
 const MAX_PATH_BEND_DEGREES = 40;
 
@@ -397,6 +400,13 @@ export default function ArNavigationCamera({
   const [compassEnabled, setCompassEnabled] = useState(false);
   const [permissionNote, setCompassNote] = useState("Утсаа хөдөлгөж луужинг тохируулна уу.");
   const { heading, problem: compassProblem } = useCompassHeading(compassEnabled);
+  // Without a compass, the direction the child is walking still tells which way is "ahead".
+  // Updated only after a real step forward, so GPS jitter while standing does not spin the map.
+  const [movement, setMovement] = useState<{ anchor: Coordinate; bearing: number | null }>({ anchor: location, bearing: null });
+  if (distanceMeters(movement.anchor, location) >= MOVEMENT_HEADING_MIN_METERS) {
+    setMovement({ anchor: location, bearing: bearingDegrees(movement.anchor, location) });
+  }
+  const mapHeading = heading ?? movement.bearing;
   const compassNote = compassProblem || permissionNote;
   const [isAnalyzingScene, setIsAnalyzingScene] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
@@ -748,6 +758,14 @@ export default function ArNavigationCamera({
       return;
     }
 
+    // iOS only grants motion access while the tap is still active, so ask now, before awaiting the camera.
+    const orientationApi = typeof DeviceOrientationEvent !== "undefined"
+      ? DeviceOrientationEvent as DeviceOrientationPermissionApi
+      : null;
+    const compassPermission = typeof orientationApi?.requestPermission === "function"
+      ? orientationApi.requestPermission().catch(() => "error" as const)
+      : null;
+
     let nextStream: MediaStream | null = null;
     try {
       // Prefer the rear-facing camera. A simpler fallback helps devices whose WebView
@@ -775,18 +793,14 @@ export default function ArNavigationCamera({
 
       // Compass permission is separate from camera permission on some browsers (notably iOS).
       // The camera should remain usable even if the compass is unavailable or denied.
-      if (typeof DeviceOrientationEvent !== "undefined") {
-        const orientationApi = DeviceOrientationEvent as DeviceOrientationPermissionApi;
-        if (typeof orientationApi.requestPermission === "function") {
-          try {
-            const permission = await orientationApi.requestPermission();
-            setCompassEnabled(permission === "granted");
-            if (permission !== "granted") {
-              setCompassNote("Луужингийн зөвшөөрөл өгөөгүй тул сумны чиглэл утасны луужинтай таарахгүй байж болно.");
-            }
-          } catch {
-            setCompassEnabled(false);
-            setCompassNote("Луужингийн мэдрэгчийг нээж чадсангүй. Камер ажилласаар байна.");
+      if (orientationApi) {
+        if (compassPermission) {
+          const permission = await compassPermission;
+          setCompassEnabled(permission === "granted");
+          if (permission === "denied") {
+            setCompassNote("Луужингийн зөвшөөрөл өгөөгүй тул газрын зураг алхаж буй чиглэлээр эргэнэ.");
+          } else if (permission === "error") {
+            setCompassNote("Луужингийн мэдрэгчийг нээж чадсангүй. Газрын зураг алхаж буй чиглэлээр эргэнэ.");
           }
         } else {
           setCompassEnabled(true);
@@ -1270,7 +1284,7 @@ export default function ArNavigationCamera({
           {/* Inset back to the visible width so the map centres on the person, not on the off-screen dome. */}
           <div className="absolute inset-y-0 left-[13.2353%] right-[13.2353%]">
             {/* Seen from a slant and turned with the compass, so it matches the camera view above it. */}
-            <TiltedPlane tilt={45} centerPercent={50} heading={heading} fadeColor="#eef1f4">
+            <TiltedPlane tilt={45} centerPercent={50} heading={mapHeading} fadeColor="#eef1f4">
               <CameraMiniMap
                 location={miniMapLocation}
                 currentRoute={route}
@@ -1282,10 +1296,10 @@ export default function ArNavigationCamera({
               />
             </TiltedPlane>
             <div className="pointer-events-none absolute left-1/2 top-1/2 z-[403] -translate-x-1/2 -translate-y-1/2" aria-hidden="true">
-              {heading === null ? (
+              {mapHeading === null ? (
                 <span className="block size-4 rounded-full border-[3px] border-white bg-[#2a7fff] shadow-[0_0_0_6px_rgba(42,127,255,.22)]" />
               ) : (
-                // The map turns with the compass, so the person always faces straight up.
+                // The map turns with the compass (or walking direction), so the person always faces straight up.
                 <HeadingArrow />
               )}
             </div>
