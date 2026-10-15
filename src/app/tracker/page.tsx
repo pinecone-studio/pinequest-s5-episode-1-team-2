@@ -970,6 +970,7 @@ export default function TrackerPage() {
               state={companionState}
               avatar={shownAvatar}
               accessory={shownAccessory}
+              custom={settings.custom}
               name={companionName}
               className={`companion-avatar--compact shrink-0 ${
                 guiding ? "companion-avatar--mini" : ""

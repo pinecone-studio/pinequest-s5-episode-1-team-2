@@ -6,7 +6,9 @@ import { ChevronLeft, Check } from "lucide-react";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useCheckpoints } from "@/hooks/use-checkpoints";
+import { CompanionBuilder } from "@/components/companion-builder";
 import { ACCESSORIES, FREE_COMPANIONS, REWARD_COMPANIONS, REWARD_IDS, isRewardLocked } from "@/types/rewards";
+import { CUSTOM_AVATAR } from "@/types/custom-companion";
 import type { AssistantSettings } from "@/types/safety";
 
 const COMPANIONS: AssistantSettings["avatar"][] = [...FREE_COMPANIONS, ...REWARD_COMPANIONS];
@@ -22,11 +24,12 @@ export default function CompanionPage() {
   const name = settings.name || avatar;
   // An empty saved name falls back to the default, so keep what is typed until the field is left.
   const [draftName, setDraftName] = useState<string | null>(null);
+  const building = avatar === CUSTOM_AVATAR;
 
   return (
     <AppShell>
       <main
-        className="relative isolate min-h-dvh w-full overflow-x-hidden px-4 pb-[calc(32px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1]"
+        className="relative isolate min-h-dvh w-full overflow-x-clip px-4 pb-[calc(32px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1]"
         style={{ background: "linear-gradient(160deg, #1a0b3b 0%, #07151b 55%, #03080c 100%)" }}
       >
         <div aria-hidden="true" className="pointer-events-none absolute -right-20 top-10 size-72 rounded-full bg-[#7c3aed]/25 blur-3xl" />
@@ -50,7 +53,7 @@ export default function CompanionPage() {
         <div className="relative z-10 mx-auto w-full max-w-[420px]">
           {/* Live preview: every tap below changes this right away. */}
           <section aria-label="Урьдчилан харах" className="flex flex-col items-center pt-4">
-            <CompanionMark state="idle" avatar={avatar} accessory={accessory} name={name} className="companion-avatar--compact" />
+            <CompanionMark state="idle" avatar={avatar} accessory={accessory} custom={settings.custom} name={name} className="companion-avatar--compact" />
             <label htmlFor="companion-name" className="sr-only">Найзын нэр</label>
             <input
               id="companion-name"
@@ -68,7 +71,29 @@ export default function CompanionPage() {
             <p className="mt-2 text-[13px] text-[#c9bff0]">Нэр дээр дарж найзаа нэрлэж болно</p>
           </section>
 
-          <section aria-labelledby="pick-friend" className="mt-7">
+          {/* Pick a ready-made friend, or build one part by part. */}
+          <div className="mt-7 grid grid-cols-2 gap-1 rounded-2xl bg-white/5 p-1" role="tablist" aria-label="Найз хийх арга">
+            {[
+              { id: false, label: "Бэлэн найз" },
+              { id: true, label: "🎨 Өөрөө зохиох" },
+            ].map((tab) => (
+              <button
+                key={tab.label}
+                type="button"
+                role="tab"
+                aria-selected={building === tab.id}
+                onClick={() => update("avatar", tab.id ? CUSTOM_AVATAR : "Мило")}
+                className={`min-h-11 rounded-xl text-[15px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${building === tab.id ? "bg-[#a78bfa] text-[#1e1035]" : "text-[#d4cdf0] hover:bg-white/10"}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {building ? (
+            <CompanionBuilder parts={settings.custom} onChange={(next) => update("custom", next)} />
+          ) : (
+          <section aria-labelledby="pick-friend" className="mt-5">
             <h2 id="pick-friend" className="mb-3 text-[16px] font-bold">Найзаа сонго</h2>
             <div className="grid grid-cols-4 gap-2.5" role="radiogroup" aria-labelledby="pick-friend">
               {COMPANIONS.map((companion) => {
@@ -98,6 +123,7 @@ export default function CompanionPage() {
               })}
             </div>
           </section>
+          )}
 
           <section aria-labelledby="pick-accessory" className="mt-7">
             <div className="mb-3 flex items-center justify-between">
