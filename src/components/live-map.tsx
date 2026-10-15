@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { latLngBounds } from "leaflet";
 import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -14,7 +14,12 @@ export type MapPerson = {
   longitude: number;
   fresh: boolean;
   selected?: boolean;
+  /** Metres, as reported by the phone; drawn as a circle around the selected pin. */
+  accuracy?: number;
 };
+
+// Close enough to tell which side of the street, or which building, the child is at.
+const FOLLOW_ZOOM = 17;
 
 type LiveMapProps = {
   location: SafetyLocation;
@@ -35,6 +40,7 @@ export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES,
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
+  const selectedPerson = people.find((person) => person.selected);
 
   return (
     <div className={`safepath-map ${companion ? "safepath-map--companion absolute inset-0" : "relative rounded-[20px] border border-[#e7e7e5]"} isolate overflow-hidden bg-[#f7f7f5] ${className}`} aria-label={companion ? "Одоогийн байршил орчмын гудамж" : "Байршлын газрын зураг"}>
@@ -87,6 +93,13 @@ export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES,
           radius={9}
           pathOptions={{ color: "#ffffff", fillColor: "#111111", fillOpacity: 1, weight: 4 }}
         />}
+        {!companion && selectedPerson?.accuracy ? (
+          <Circle
+            center={[selectedPerson.latitude, selectedPerson.longitude]}
+            radius={selectedPerson.accuracy}
+            pathOptions={{ color: "#2a7fff", fillColor: "#2a7fff", fillOpacity: 0.12, weight: 1.5 }}
+          />
+        ) : null}
         {!companion && people.map((person) => (
           <CircleMarker
             key={person.id}
@@ -97,7 +110,11 @@ export default function LiveMap({ location, people = [], safeZones = SAFE_ZONES,
             <Tooltip direction="top" offset={[0, -10]} permanent>{person.name}</Tooltip>
           </CircleMarker>
         ))}
-        {companion ? <FollowLocation location={location} /> : <FitMap location={location} safeZones={safeZones} />}
+        {companion
+          ? <FollowLocation location={location} />
+          : selectedPerson
+            ? <FollowPerson person={selectedPerson} />
+            : <FitMap location={location} safeZones={safeZones} />}
       </MapContainer>
 
       {showCredit && <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="absolute right-2 top-2 z-[400] rounded-xl bg-white/90 px-2 py-1 text-[10px] text-[#737373]">© OpenStreetMap</a>}
@@ -119,6 +136,43 @@ function FollowLocation({ location }: { location: SafetyLocation }) {
     observer.observe(map.getContainer());
     return () => observer.disconnect();
   }, [map]);
+
+  return null;
+}
+
+/**
+ * Keeps the selected child in view as new positions arrive. Once the guardian drags the map
+ * themselves it stops following, until the map is remounted (the "back to child" button).
+ */
+function FollowPerson({ person }: { person: MapPerson }) {
+  const map = useMap();
+  const userMoved = useRef(false);
+  const started = useRef(false);
+  const { latitude, longitude, accuracy = 0 } = person;
+
+  useEffect(() => {
+    const stopFollowing = () => { userMoved.current = true; };
+    map.on("dragstart", stopFollowing);
+    return () => { map.off("dragstart", stopFollowing); };
+  }, [map]);
+
+  useEffect(() => {
+    if (userMoved.current) return;
+    // A rough Wi-Fi or cell fix would sit far outside a street-level view; show the whole circle instead.
+    if (accuracy > 120) {
+      const latitudeDelta = accuracy / 111_320;
+      const longitudeDelta = accuracy / (111_320 * Math.cos((latitude * Math.PI) / 180));
+      map.fitBounds(
+        latLngBounds([[latitude - latitudeDelta, longitude - longitudeDelta], [latitude + latitudeDelta, longitude + longitudeDelta]]),
+        { padding: [28, 28], maxZoom: FOLLOW_ZOOM, animate: started.current },
+      );
+    } else if (!started.current) {
+      map.setView([latitude, longitude], FOLLOW_ZOOM, { animate: false });
+    } else {
+      map.panTo([latitude, longitude], { animate: true });
+    }
+    started.current = true;
+  }, [accuracy, latitude, longitude, map]);
 
   return null;
 }
