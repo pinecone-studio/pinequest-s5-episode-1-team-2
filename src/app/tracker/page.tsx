@@ -1167,7 +1167,7 @@ export default function TrackerPage() {
           )}
         </div>
 
-        <LocationSharingStatus />
+        <LocationSharingStatus outsideSafeZone={guiding} />
 
         <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
           {sosConfirm && !demoMode ? (
