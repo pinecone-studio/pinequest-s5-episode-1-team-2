@@ -7,6 +7,7 @@ import { useNetworkStatus } from "@/hooks/use-network-status";
 import { Camera, CameraOff, ChevronLeft, ChevronRight, Compass, Flag, Navigation2, ScanEye, Sparkles, Volume2, VolumeX, WifiOff, X } from "lucide-react";
 import { SafePathLoading } from "@/components/safepath-loading";
 import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
+import type { SceneLandmark, SceneLandmarkKind, SceneLandmarkSide } from "@/types/vision";
 
 type Coordinate = {
   latitude: number;
@@ -126,7 +127,128 @@ function formatDistance(distance: number | null): string {
   return `${(distance / 1000).toFixed(1)} км`;
 }
 
-const OFFLINE_SCENE_ERROR = "Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу.";
+const SCENE_REQUEST_TIMEOUT_MS = 22_000;
+// Half of a landmark tag's widest size (max-w-52) plus a small gutter, so tags never touch the screen edge.
+const TAG_HALF_WIDTH = 112;
+
+type SceneSnapshot = {
+  url: string;
+  width: number;
+  height: number;
+};
+
+// High-contrast colours shared by each landmark's outline, number badge and list row.
+const LANDMARK_COLORS = ["#facc15", "#f472b6", "#4ade80", "#fb923c"];
+
+// Pictures carry the meaning for children who cannot read yet.
+const LANDMARK_ICONS: Record<SceneLandmarkKind, string> = {
+  building: "🏢",
+  shop: "🏪",
+  school: "🏫",
+  hospital: "🏥",
+  bus_stop: "🚌",
+  crossing: "🚸",
+  traffic_light: "🚦",
+  park: "🌳",
+  sign: "🪧",
+  other: "📍",
+};
+
+const LANDMARK_SIDE_TEXT: Record<SceneLandmarkSide, string> = {
+  left: "Зүүн талд",
+  center: "Яг урд чинь",
+  right: "Баруун талд",
+};
+
+function readSceneLandmarks(value: unknown): SceneLandmark[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is SceneLandmark =>
+    Boolean(entry)
+    && typeof entry === "object"
+    && typeof entry.label === "string"
+    && typeof entry.detail === "string"
+    && entry.kind in LANDMARK_ICONS
+    && entry.side in LANDMARK_SIDE_TEXT
+    && (entry.box === null || (Array.isArray(entry.box) && entry.box.length === 4 && entry.box.every((n: unknown) => typeof n === "number"))),
+  ).slice(0, LANDMARK_COLORS.length);
+}
+
+// Read the summary first, then each numbered landmark, so the voice matches the badges on screen.
+function spokenSceneText(summary: string, landmarks: SceneLandmark[]): string {
+  const items = landmarks.map((landmark, index) => `${index + 1}. ${LANDMARK_SIDE_TEXT[landmark.side]} ${landmark.label}.`);
+  return [summary, ...items].join(" ");
+}
+
+// Numbered outlines and name tags drawn over the frozen frame. The frame is shown with
+// object-cover, so the model's 0–1000 boxes are mapped through the same crop.
+function LandmarkMarkers({ landmarks, snapshot, width, height }: {
+  landmarks: SceneLandmark[];
+  snapshot: SceneSnapshot;
+  width: number;
+  height: number;
+}) {
+  if (!width || !height) return null;
+  const scale = Math.max(width / snapshot.width, height / snapshot.height);
+  const offsetX = (width - snapshot.width * scale) / 2;
+  const offsetY = (height - snapshot.height * scale) / 2;
+  const toX = (value: number) => Math.min(width, Math.max(0, (value / 1000) * snapshot.width * scale + offsetX));
+  const toY = (value: number) => Math.min(height, Math.max(0, (value / 1000) * snapshot.height * scale + offsetY));
+  const sideX = { left: 0.22, center: 0.5, right: 0.78 };
+
+  // Keep tags below the banner and above the bottom list, and nudge overlapping tags apart.
+  const tagTop = height * 0.18;
+  const tagBottom = height * 0.5;
+  const placed: { x: number; y: number }[] = [];
+  const markers = landmarks.map((landmark, index) => {
+    const rect = landmark.box
+      ? { left: toX(landmark.box[1]), top: toY(landmark.box[0]), right: toX(landmark.box[3]), bottom: toY(landmark.box[2]) }
+      : null;
+    const visibleRect = rect && rect.right - rect.left > 12 && rect.bottom - rect.top > 12 ? rect : null;
+    let x = visibleRect ? (visibleRect.left + visibleRect.right) / 2 : width * sideX[landmark.side];
+    let y = visibleRect ? visibleRect.top + Math.min(48, (visibleRect.bottom - visibleRect.top) / 3) : height * 0.42;
+    x = Math.min(width - TAG_HALF_WIDTH, Math.max(TAG_HALF_WIDTH, x));
+    y = Math.min(tagBottom, Math.max(tagTop, y));
+    while (placed.some((other) => Math.abs(other.x - x) < TAG_HALF_WIDTH * 2 && Math.abs(other.y - y) < 64)) y += 66;
+    placed.push({ x, y });
+    return { landmark, index, rect: visibleRect, x, y };
+  });
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20" aria-hidden="true">
+      {markers.map(({ index, rect }) => rect && (
+        <div
+          key={`box-${index}`}
+          className="absolute rounded-xl border-[3px] shadow-[0_0_0_2px_rgba(0,0,0,.35)]"
+          style={{
+            left: rect.left,
+            top: rect.top,
+            width: rect.right - rect.left,
+            height: rect.bottom - rect.top,
+            borderColor: LANDMARK_COLORS[index],
+          }}
+        />
+      ))}
+      {markers.map(({ landmark, index, x, y }) => (
+        <div
+          key={`tag-${index}`}
+          className="absolute flex w-max max-w-52 -translate-x-1/2 -translate-y-full items-center gap-1.5 rounded-[20px] bg-white py-1 pl-1 pr-3 text-[#0b1620] shadow-[0_6px_18px_rgba(0,0,0,.45)]"
+          style={{ left: x, top: y }}
+        >
+          <span
+            className="grid size-8 shrink-0 place-items-center rounded-full text-[17px] font-black text-black"
+            style={{ backgroundColor: LANDMARK_COLORS[index] }}
+          >
+            {index + 1}
+          </span>
+          <span className="text-[18px] leading-none">{LANDMARK_ICONS[landmark.kind]}</span>
+          <span className="line-clamp-2 text-[16px] font-extrabold leading-5">{landmark.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const OFFLINE_SCENE_ERROR ="Интернет тасарсан тул AI орчны танилт түр зогслоо. Сүлжээ сэргэсний дараа дахин оролдоно уу.";
 const OFFLINE_SPEECH_ERROR = "Интернет холболтгүй байна. Дууны заавар авахын тулд сүлжээгээ сэргээнэ үү.";
 
 const CHEVRON_PATHS = [16, 74, 132].map((top) => {
@@ -287,11 +409,18 @@ export default function ArNavigationCamera({
   const [mountedAt] = useState(() => Date.now());
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootHeight, setRootHeight] = useState(0);
+  const [rootWidth, setRootWidth] = useState(0);
+  const [sceneLandmarks, setSceneLandmarks] = useState<SceneLandmark[]>([]);
+  // The frame the AI looked at; frozen on screen so landmark labels stay on their buildings.
+  const [sceneSnapshot, setSceneSnapshot] = useState<SceneSnapshot | null>(null);
 
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    const observer = new ResizeObserver(([entry]) => setRootHeight(entry.contentRect.height));
+    const observer = new ResizeObserver(([entry]) => {
+      setRootHeight(entry.contentRect.height);
+      setRootWidth(entry.contentRect.width);
+    });
     observer.observe(root);
     return () => observer.disconnect();
   }, []);
@@ -369,6 +498,7 @@ export default function ArNavigationCamera({
     ? null
     : destinationRelative > 0 ? "right" : "left";
   const isNearDestination = remainingDistance !== null && remainingDistance < 15;
+  const showingSnapshot = stream !== null && sceneSnapshot !== null;
   const isFacingAway = relativeBearing !== null && Math.abs(relativeBearing) > 135;
   const directionLabel = isNearDestination
     ? "Зорьсон газартаа ойртлоо"
@@ -590,6 +720,8 @@ export default function ArNavigationCamera({
     setCameraError("");
     setSceneError("");
     setSceneDescription("");
+    setSceneLandmarks([]);
+    setSceneSnapshot(null);
     setIsAnalyzingScene(false);
     setVoiceGuidanceEnabled(false);
     lastAnnouncedInstructionRef.current = "";
@@ -693,6 +825,8 @@ export default function ArNavigationCamera({
     setIsAnalyzingScene(true);
     setSceneError("");
     setSceneDescription("");
+    setSceneLandmarks([]);
+    setSceneSnapshot(null);
     const controller = new AbortController();
     sceneAbortRef.current?.abort();
     sceneAbortRef.current = controller;
@@ -740,7 +874,8 @@ export default function ArNavigationCamera({
             routeReady: route.length >= 2,
           },
         }),
-        signal: controller.signal,
+        // The server gives up within ~18 s; never leave the button spinning longer than this.
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SCENE_REQUEST_TIMEOUT_MS)]),
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -752,11 +887,18 @@ export default function ArNavigationCamera({
       if (!result || typeof result !== "object" || !("description" in result) || typeof result.description !== "string") {
         throw new Error("AI-аас зөв хариу ирсэнгүй. Дахин оролдоно уу.");
       }
+      const landmarks = "landmarks" in result ? readSceneLandmarks(result.landmarks) : [];
       setSceneDescription(result.description);
-      if (voiceGuidanceEnabled) void playSpeech(result.description);
+      setSceneLandmarks(landmarks);
+      if (landmarks.length > 0) setSceneSnapshot({ url: image, width: canvas.width, height: canvas.height });
+      if (voiceGuidanceEnabled) void playSpeech(spokenSceneText(result.description, landmarks));
     } catch (error) {
       if (!controller.signal.aborted) {
-        setSceneError(error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.");
+        setSceneError(
+          error instanceof DOMException && error.name === "TimeoutError"
+            ? "AI хариу удаж байна. Түр хүлээгээд дахин оролдоно уу."
+            : error instanceof Error ? error.message : "Орчныг таних үед алдаа гарлаа.",
+        );
       }
     } finally {
       if (sceneAbortRef.current === controller) sceneAbortRef.current = null;
@@ -769,6 +911,8 @@ export default function ArNavigationCamera({
     sceneAbortRef.current = null;
     setIsAnalyzingScene(false);
     setSceneDescription("");
+    setSceneLandmarks([]);
+    setSceneSnapshot(null);
     setSceneError("");
   }, []);
 
@@ -781,6 +925,57 @@ export default function ArNavigationCamera({
     queueMicrotask(() => void startCamera());
   }, [autoStart, onAutoStartAttempted, startCamera]);
 
+  const sceneCard = (sceneDescription || visibleSceneError) ? (
+    <div className="pointer-events-auto shrink-0 rounded-2xl bg-[#0b1620]/90 px-4 py-3.5 shadow-xl ring-1 ring-cyan-100/20 backdrop-blur-md" aria-live="polite">
+      <div className="flex items-center gap-2 text-[15px] font-bold text-cyan-100">
+        <Sparkles size={15} aria-hidden="true" /> AI орчны тайлбар
+        <button
+          type="button"
+          onClick={dismissScene}
+          className="-my-2 -mr-2 ml-auto grid size-11 place-items-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+          aria-label="AI орчны тайлбарыг хаах"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      {sceneDescription && <p className="mt-1 text-[18px] font-semibold leading-7 text-white">{sceneDescription}</p>}
+      {sceneLandmarks.length > 0 && (
+        <ol className="mt-3 flex flex-col gap-2">
+          {sceneLandmarks.map((landmark, index) => (
+            <li key={`${index}-${landmark.label}`} className="flex items-start gap-3 rounded-xl bg-white/10 px-3 py-2.5">
+              <span
+                className="grid size-9 shrink-0 place-items-center rounded-full text-[18px] font-black text-black"
+                style={{ backgroundColor: LANDMARK_COLORS[index] }}
+                aria-hidden="true"
+              >
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[17px] font-extrabold leading-6">
+                  <span aria-hidden="true">{LANDMARK_ICONS[landmark.kind]} </span>{landmark.label}
+                </p>
+                <p className="text-[15px] leading-5 text-white/85">
+                  <span className="font-bold text-cyan-100">{LANDMARK_SIDE_TEXT[landmark.side]}</span>
+                  {landmark.detail && ` · ${landmark.detail}`}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {showingSnapshot && (
+        <button
+          type="button"
+          onClick={dismissScene}
+          className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#2a7fff] px-4 text-[16px] font-bold text-white transition hover:bg-[#1c6fee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
+        >
+          <Camera size={18} aria-hidden="true" /> Камер руу буцах
+        </button>
+      )}
+      {visibleSceneError && <p role="alert" className="mt-1 text-[15px] leading-5 text-rose-100">{visibleSceneError}</p>}
+      <p className="mt-2 text-[12px] leading-4 text-white/65">GPS заавар үндсэн хэвээр. AI зам хөндлөн гарах аюулгүй эсэхийг баталгаажуулахгүй.</p>
+    </div>
+  ) : null;
   return (
     <div
       ref={rootRef}
@@ -801,16 +996,29 @@ export default function ArNavigationCamera({
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.3),transparent_58%),linear-gradient(160deg,#1b3037,#050a0e)]" />
       )}
 
+      {showingSnapshot && (
+        // eslint-disable-next-line @next/next/no-img-element -- a local data URL; next/image adds nothing here.
+        <img
+          src={sceneSnapshot.url}
+          alt="AI-д харуулсан камерын зураг"
+          className="absolute inset-0 size-full object-cover"
+        />
+      )}
+
       {/* Darken only the top edge so the banner reads well without dimming the street. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-linear-to-b from-black/45 to-transparent" />
 
+      {showingSnapshot && (
+        <LandmarkMarkers landmarks={sceneLandmarks} snapshot={sceneSnapshot} width={rootWidth} height={rootHeight} />
+      )}
+
       {/* Facing away, a path "ahead" would mislead; the amber banner says to turn around instead. */}
-      {stream && route.length >= 2 && !isNearDestination && !isFacingAway && (
+      {stream && !showingSnapshot && route.length >= 2 && !isNearDestination && !isFacingAway && (
         <GroundPath bend={pathBend} muted={relativeBearing === null} scale={groundScale} />
       )}
 
       {/* Destination sign on a short post, standing in the street toward the destination. */}
-      {stream && (
+      {stream && !showingSnapshot && (
         <div
           className="pointer-events-none absolute z-20 flex -translate-x-1/2 flex-col items-center transition-[left] duration-300 ease-out"
           style={{
@@ -906,25 +1114,15 @@ export default function ArNavigationCamera({
           </p>
         )}
 
-        {(sceneDescription || visibleSceneError) && (
-          <div className="pointer-events-auto shrink-0 rounded-2xl bg-[#0b1620]/90 px-4 py-3.5 shadow-xl ring-1 ring-cyan-100/20 backdrop-blur-md" aria-live="polite">
-            <div className="flex items-center gap-2 text-[15px] font-bold text-cyan-100">
-              <Sparkles size={15} aria-hidden="true" /> AI орчны тайлбар
-              <button
-                type="button"
-                onClick={dismissScene}
-                className="-my-2 -mr-2 ml-auto grid size-11 place-items-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300"
-                aria-label="AI орчны тайлбарыг хаах"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            {sceneDescription && <p className="mt-1 text-[16px] leading-6 text-white">{sceneDescription}</p>}
-            {visibleSceneError && <p role="alert" className="mt-1 text-[15px] leading-5 text-rose-100">{visibleSceneError}</p>}
-            <p className="mt-2 text-[12px] leading-4 text-white/65">GPS заавар үндсэн хэвээр. AI зам хөндлөн гарах аюулгүй эсэхийг баталгаажуулахгүй.</p>
-          </div>
-        )}
+        {!showingSnapshot && sceneCard}
       </div>
+
+      {/* With the frame frozen, the list sits at the bottom so it never covers the numbered tags. */}
+      {showingSnapshot && sceneCard && (
+        <div className="pointer-events-none absolute inset-x-3 bottom-3 z-50 flex max-h-[46%] flex-col overflow-y-auto overscroll-contain [scrollbar-width:none]">
+          {sceneCard}
+        </div>
+      )}
 
       {/* Two quick actions resting on the dome's rim in the lower corners, clear of the path and the sign. */}
       <div
