@@ -86,6 +86,8 @@ const SHARED_NOTICE_MS = 5_000;
 // The surroundings photo sent to guardians when the camera opens: small, and after exposure settles.
 const SCENE_PHOTO_MAX_PX = 640;
 const SCENE_PHOTO_DELAY_MS = 1_500;
+const SCENE_PHOTO_RETRY_MS = 500;
+const SCENE_PHOTO_MAX_TRIES = 20;
 
 type SceneResult = {
   description: string;
@@ -967,9 +969,17 @@ export default function ArNavigationCamera({
     if (!stream || !video) return;
     const controller = new AbortController();
     let sent = false;
+    let tries = 0;
+    let timer: number | undefined;
 
     const sendFirstFrame = async () => {
-      if (sent || video.videoWidth < 1) return;
+      if (sent || controller.signal.aborted) return;
+      // Some phones take a few seconds before the first frame exists; keep checking for a while.
+      if (video.videoWidth < 1 || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        tries += 1;
+        if (tries < SCENE_PHOTO_MAX_TRIES) timer = window.setTimeout(() => void sendFirstFrame(), SCENE_PHOTO_RETRY_MS);
+        return;
+      }
       sent = true;
       const scale = Math.min(1, SCENE_PHOTO_MAX_PX / Math.max(video.videoWidth, video.videoHeight));
       const canvas = document.createElement("canvas");
@@ -987,16 +997,24 @@ export default function ArNavigationCamera({
           signal: controller.signal,
         });
         const result: unknown = await response.json().catch(() => null);
+        const reason = result && typeof result === "object" && "reason" in result ? result.reason : null;
         if (response.ok && result && typeof result === "object" && "saved" in result && result.saved === true) {
           setSharedNotice("📷 Орчны зураг ээж, аавд илгээгдлээ");
+        } else if (reason === "paused") {
+          setSharedNotice("📷 Байршил хуваалцах түр зогссон тул зураг илгээгдсэнгүй");
+        } else if (reason === "no-guardian") {
+          setSharedNotice("📷 Холбогдсон ээж, аав байхгүй тул зураг илгээгдсэнгүй");
+        } else if (!controller.signal.aborted) {
+          setSharedNotice("📷 Зургийг илгээж чадсангүй");
         }
       } catch {
         // The photo is a help for guardians, never a reason to interrupt the camera.
+        if (!controller.signal.aborted) setSharedNotice("📷 Зургийг илгээж чадсангүй");
       }
     };
 
     // Give the camera a moment to settle its exposure so the first frame is not dark.
-    const timer = window.setTimeout(() => void sendFirstFrame(), SCENE_PHOTO_DELAY_MS);
+    timer = window.setTimeout(() => void sendFirstFrame(), SCENE_PHOTO_DELAY_MS);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
