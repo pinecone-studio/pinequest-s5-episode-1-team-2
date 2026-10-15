@@ -2,30 +2,43 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, MapPin, Settings, Volume2, VolumeX, WifiOff } from "lucide-react";
-import { LocationSharingStatus } from "@/components/location-sharing-status";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {
+  ChevronLeft,
+  Settings,
+  Volume2,
+  VolumeX,
+  WifiOff,
+} from "lucide-react";
+import {LocationSharingStatus} from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
-import { BackButton } from "@/components/back-button";
-import { HeadingArrow, TiltedPlane } from "@/components/tilted-plane";
-import { AppShell, CompanionMark } from "@/components/safe-path";
-import { SafePathLoading } from "@/components/safepath-loading";
-import { useAssistantSettings } from "@/hooks/use-assistant-settings";
-import { useCompassHeading } from "@/hooks/use-compass-heading";
-import { useGeolocation } from "@/hooks/use-geolocation";
-import { useNetworkStatus } from "@/hooks/use-network-status";
-import { toCompanionProfile } from "@/lib/assistant-settings";
-import { getSafetyFallback } from "@/lib/ai/fallback-messages";
-import { calculateSafetyState } from "@/lib/risk-engine";
-import { getSafeZoneProximities } from "@/lib/geofence";
-import { SAFE_ZONES } from "@/lib/safe-zones";
-import type { SafeZone, SafetyAssistantRequest, SafetyState } from "@/types/safety";
+import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
+import {AppShell, CompanionMark} from "@/components/safe-path";
+import {SafePathLoading} from "@/components/safepath-loading";
+import {useAssistantSettings} from "@/hooks/use-assistant-settings";
+import {useCompassHeading} from "@/hooks/use-compass-heading";
+import {useGeolocation} from "@/hooks/use-geolocation";
+import {useNetworkStatus} from "@/hooks/use-network-status";
+import {toCompanionProfile} from "@/lib/assistant-settings";
+import {getSafetyFallback} from "@/lib/ai/fallback-messages";
+import {calculateSafetyState} from "@/lib/risk-engine";
+import {getSafeZoneProximities} from "@/lib/geofence";
+import {SAFE_ZONES} from "@/lib/safe-zones";
+import type {
+  SafeZone,
+  SafetyAssistantRequest,
+  SafetyState,
+} from "@/types/safety";
 
 const CompanionMap = dynamic(() => import("@/components/live-map"), {
   ssr: false,
-  loading: () => <SafePathLoading className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85" label="Газрын зураг ачаалж байна…" />,
+  loading: () => (
+    <SafePathLoading
+      className="absolute inset-x-4 bottom-5 rounded-xl bg-[#071116]/85"
+      label="Газрын зураг ачаалж байна…"
+    />
+  ),
 });
-
 
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
@@ -55,19 +68,19 @@ export default function TrackerPage() {
   } = useGeolocation();
   const isOnline = useNetworkStatus();
 
-  const { settings } = useAssistantSettings();
-
-  
+  const {settings} = useAssistantSettings();
 
   const [demoMode, setDemoMode] = useState(false);
   const [guiding, setGuiding] = useState(false);
   // The calm map turns with the compass; while guiding, the camera view reads its own.
-  const { heading: calmHeading } = useCompassHeading(!guiding);
+  const {heading: calmHeading} = useCompassHeading(!guiding);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
   const [zonesLoadError, setZonesLoadError] = useState("");
   const [sosConfirm, setSosConfirm] = useState(false);
-  const [sosStatus, setSosStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sosStatus, setSosStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
   const [sosMessage, setSosMessage] = useState("");
 
   useEffect(() => {
@@ -96,7 +109,9 @@ export default function TrackerPage() {
         }
       } catch {
         if (!controller.signal.aborted && active) {
-          setZonesLoadError("Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу.");
+          setZonesLoadError(
+            "Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу."
+          );
         }
       } finally {
         if (active) setZonesLoaded(true);
@@ -117,70 +132,51 @@ export default function TrackerPage() {
     lastUpdated: 0,
   });
 
-
-
   const [assistantMessage, setAssistantMessage] = useState("");
 
   const [assistantLoading, setAssistantLoading] = useState(false);
 
-  const [speechStatus, setSpeechStatus] =
-    useState<SpeechStatus>("idle");
+  const [speechStatus, setSpeechStatus] = useState<SpeechStatus>("idle");
 
   const [speechError, setSpeechError] = useState("");
 
-  const [route, setRoute] =
-    useState<RouteResult | null>(null);
+  const [route, setRoute] = useState<RouteResult | null>(null);
 
-  const [routeStatus, setRouteStatus] =
-    useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [routeStatus, setRouteStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
 
+  const routeController = useRef<AbortController | null>(null);
 
-  const routeController =
-    useRef<AbortController | null>(null);
+  const lastRouteAt = useRef(0);
 
-  const lastRouteAt =
-    useRef(0);
+  const lastRouteTargetId = useRef<string | null>(null);
 
-  const lastRouteTargetId =
-    useRef<string | null>(null);
+  const lastAutomaticRequest = useRef<string | null>(null);
 
-  const lastAutomaticRequest =
-    useRef<string | null>(null);
+  const requestSequence = useRef(0);
 
-  const requestSequence =
-    useRef(0);
+  const requestController = useRef<AbortController | null>(null);
 
-  const requestController =
-    useRef<AbortController | null>(null);
+  const speechSequence = useRef(0);
 
-  const speechSequence =
-    useRef(0);
+  const speechController = useRef<AbortController | null>(null);
 
-  const speechController =
-    useRef<AbortController | null>(null);
+  const speechCache = useRef(new Map<string, string>());
 
-  const speechCache =
-    useRef(new Map<string, string>());
+  const audioElement = useRef<HTMLAudioElement | null>(null);
 
-  const audioElement =
-    useRef<HTMLAudioElement | null>(null);
+  const profile = useMemo(() => toCompanionProfile(settings), [settings]);
 
-
-  const profile = useMemo(
-    () => toCompanionProfile(settings),
-    [settings],
-  );
-
-  const currentLocation =
-    demoMode
-      ? demoLocation
-      : location;
+  const currentLocation = demoMode ? demoLocation : location;
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
   const activeZones = demoMode ? SAFE_ZONES : savedZones;
   const targetZone = useMemo(() => {
     if (!currentLocation || activeZones.length === 0) return null;
-    return getSafeZoneProximities(currentLocation, activeZones)[0]?.zone ?? null;
+    return (
+      getSafeZoneProximities(currentLocation, activeZones)[0]?.zone ?? null
+    );
   }, [activeZones, currentLocation]);
 
   const sendSos = useCallback(async () => {
@@ -188,11 +184,21 @@ export default function TrackerPage() {
     setSosStatus("sending");
     setSosMessage("SOS дохио илгээж байна…");
     try {
-      const response = await fetch("/api/sos", { method: "POST", cache: "no-store" });
+      const response = await fetch("/api/sos", {
+        method: "POST",
+        cache: "no-store",
+      });
       const payload: unknown = await response.json().catch(() => null);
-      const message = payload && typeof payload === "object" && "message" in payload && typeof payload.message === "string"
-        ? payload.message
-        : payload && typeof payload === "object" && "error" in payload && typeof payload.error === "string"
+      const message =
+        payload &&
+        typeof payload === "object" &&
+        "message" in payload &&
+        typeof payload.message === "string"
+          ? payload.message
+          : payload &&
+            typeof payload === "object" &&
+            "error" in payload &&
+            typeof payload.error === "string"
           ? payload.error
           : "SOS хүсэлтийн хариуг уншиж чадсангүй.";
       if (!response.ok) throw new Error(message);
@@ -201,20 +207,15 @@ export default function TrackerPage() {
       setSosConfirm(false);
     } catch (error) {
       setSosStatus("error");
-      setSosMessage(error instanceof Error ? error.message : "SOS дохио илгээж чадсангүй.");
+      setSosMessage(
+        error instanceof Error ? error.message : "SOS дохио илгээж чадсангүй."
+      );
     }
   }, [demoMode, sosStatus]);
 
   const moveDemoLocation = useCallback(
-    (
-      direction:
-        | "up"
-        | "down"
-        | "left"
-        | "right",
-    ) => {
+    (direction: "up" | "down" | "left" | "right") => {
       setDemoLocation((current) => {
-      
         const step = 0.001;
 
         let latitude = current.latitude;
@@ -244,7 +245,7 @@ export default function TrackerPage() {
         };
       });
     },
-    [],
+    []
   );
 
   const routeDeviation = false;
@@ -258,7 +259,7 @@ export default function TrackerPage() {
             routeDeviation,
           })
         : null,
-    [activeZones, currentLocation, routeDeviation],
+    [activeZones, currentLocation, routeDeviation]
   );
 
   const navigationInstruction =
@@ -266,15 +267,16 @@ export default function TrackerPage() {
       ? route?.nextInstruction
       : undefined;
 
-
   // Outside a configured Safe Zone, the screen turns into camera guidance with the companion on
   // top; back inside, it returns to the calm map. Both switches wait a moment to ride out GPS jitter.
-  const isOutsideSafeZone = Boolean(safetyState && targetZone && !safetyState.isInsideSafeZone);
+  const isOutsideSafeZone = Boolean(
+    safetyState && targetZone && !safetyState.isInsideSafeZone
+  );
   useEffect(() => {
     if (isOutsideSafeZone === guiding) return;
     const timer = window.setTimeout(
       () => setGuiding(isOutsideSafeZone),
-      isOutsideSafeZone ? GUIDANCE_START_DELAY_MS : GUIDANCE_STOP_DELAY_MS,
+      isOutsideSafeZone ? GUIDANCE_START_DELAY_MS : GUIDANCE_STOP_DELAY_MS
     );
     return () => window.clearTimeout(timer);
   }, [guiding, isOutsideSafeZone]);
@@ -342,7 +344,7 @@ export default function TrackerPage() {
             Array.isArray(point) &&
             point.length === 2 &&
             Number.isFinite(point[0]) &&
-            Number.isFinite(point[1]),
+            Number.isFinite(point[1])
         ) &&
         typeof result.nextInstruction === "string"
       );
@@ -402,33 +404,29 @@ export default function TrackerPage() {
             Array.isArray(point) &&
             point.length >= 2 &&
             Number.isFinite(point[0]) &&
-            Number.isFinite(point[1]),
+            Number.isFinite(point[1])
         )
         .map(
-          (point: [number, number]) =>
-            [point[1], point[0]] as [number, number],
+          (point: [number, number]) => [point[1], point[0]] as [number, number]
         );
 
       if (points.length < 2) {
         throw new Error("Fallback route geometry is invalid");
       }
 
-      const step =
-        osrmRoute.legs?.[0]?.steps?.[0];
+      const step = osrmRoute.legs?.[0]?.steps?.[0];
       const maneuver = step?.maneuver;
       const modifier =
-        typeof maneuver?.modifier === "string"
-          ? maneuver.modifier
-          : "";
+        typeof maneuver?.modifier === "string" ? maneuver.modifier : "";
 
       const instruction =
         modifier === "right"
           ? "Баруун тийш эргээрэй."
           : modifier === "left"
-            ? "Зүүн тийш эргээрэй."
-            : modifier === "straight"
-              ? "Энэ замаараа урагшаа яваарай."
-              : "Буцах замаараа тайван яваарай.";
+          ? "Зүүн тийш эргээрэй."
+          : modifier === "straight"
+          ? "Энэ замаараа урагшаа яваарай."
+          : "Буцах замаараа тайван яваарай.";
 
       return {
         destination: {
@@ -437,13 +435,9 @@ export default function TrackerPage() {
         },
         route: points,
         distanceMeters:
-          typeof osrmRoute.distance === "number"
-            ? osrmRoute.distance
-            : null,
+          typeof osrmRoute.distance === "number" ? osrmRoute.distance : null,
         durationSeconds:
-          typeof osrmRoute.duration === "number"
-            ? osrmRoute.duration
-            : null,
+          typeof osrmRoute.duration === "number" ? osrmRoute.duration : null,
         nextInstruction: instruction,
       };
     };
@@ -465,7 +459,15 @@ export default function TrackerPage() {
         setRoute(null);
         setRouteStatus("error");
       });
-  }, [currentLatitude, currentLongitude, demoMode, safetyState?.isInsideSafeZone, targetZone?.id, targetZone?.latitude, targetZone?.longitude]);
+  }, [
+    currentLatitude,
+    currentLongitude,
+    demoMode,
+    safetyState?.isInsideSafeZone,
+    targetZone?.id,
+    targetZone?.latitude,
+    targetZone?.longitude,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -479,30 +481,22 @@ export default function TrackerPage() {
 
       if (!text) {
         setSpeechStatus("error");
-        setSpeechError(
-          "Дуу тоглуулах боломжгүй байна.",
-        );
+        setSpeechError("Дуу тоглуулах боломжгүй байна.");
         return;
       }
 
-      const sequence =
-        ++speechSequence.current;
+      const sequence = ++speechSequence.current;
 
       speechController.current?.abort();
 
-      const controller =
-        new AbortController();
+      const controller = new AbortController();
 
-      speechController.current =
-        controller;
+      speechController.current = controller;
 
       const cacheKey =
-        `${profile.voice}\u0000` +
-        `${settings.speechSpeed}\u0000` +
-        text;
+        `${profile.voice}\u0000` + `${settings.speechSpeed}\u0000` + text;
 
-      const audio =
-        audioElement.current;
+      const audio = audioElement.current;
 
       audio?.pause();
 
@@ -513,300 +507,188 @@ export default function TrackerPage() {
       setSpeechError("");
 
       try {
-        let audioUrl =
-          speechCache.current.get(
-            cacheKey,
-          );
+        let audioUrl = speechCache.current.get(cacheKey);
 
         if (!audioUrl) {
           setSpeechStatus("loading");
 
-          const response =
-            await fetch("/api/tts", {
-              method: "POST",
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-              body: JSON.stringify({
-                text,
-                voice: profile.voice,
-              }),
-              signal:
-                controller.signal,
-            });
+          const response = await fetch("/api/tts", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text,
+              voice: profile.voice,
+            }),
+            signal: controller.signal,
+          });
 
           if (!response.ok) {
-            throw new Error(
-              "Speech generation failed.",
-            );
+            throw new Error("Speech generation failed.");
           }
 
-          const blob =
-            await response.blob();
+          const blob = await response.blob();
 
-          if (
-            !blob.size ||
-            !blob.type.startsWith(
-              "audio/",
-            )
-          ) {
-            throw new Error(
-              "Invalid audio response.",
-            );
+          if (!blob.size || !blob.type.startsWith("audio/")) {
+            throw new Error("Invalid audio response.");
           }
 
-          audioUrl =
-            URL.createObjectURL(
-              blob,
-            );
+          audioUrl = URL.createObjectURL(blob);
 
-          speechCache.current.set(
-            cacheKey,
-            audioUrl,
-          );
+          speechCache.current.set(cacheKey, audioUrl);
         }
 
-        if (
-          sequence !==
-          speechSequence.current
-        ) {
+        if (sequence !== speechSequence.current) {
           return;
         }
 
-        const currentAudio =
-          audioElement.current;
+        const currentAudio = audioElement.current;
 
         if (!currentAudio) {
-          throw new Error(
-            "Audio playback is unavailable.",
-          );
+          throw new Error("Audio playback is unavailable.");
         }
 
         setSpeechStatus("idle");
 
-        currentAudio.src =
-          audioUrl;
+        currentAudio.src = audioUrl;
 
-        currentAudio.currentTime =
-          0;
+        currentAudio.currentTime = 0;
 
-        currentAudio.playbackRate =
-          settings.speechSpeed ===
-          "Удаан"
-            ? 0.86
-            : 1;
+        currentAudio.playbackRate = settings.speechSpeed === "Удаан" ? 0.86 : 1;
 
         await currentAudio.play();
 
-        if (
-          sequence ===
-          speechSequence.current
-        ) {
-          setSpeechStatus(
-            "playing",
-          );
+        if (sequence === speechSequence.current) {
+          setSpeechStatus("playing");
         }
       } catch {
-        if (
-          sequence !==
-          speechSequence.current
-        ) {
+        if (sequence !== speechSequence.current) {
           return;
         }
 
         setSpeechStatus("error");
 
-        setSpeechError(
-          "Дуу тоглуулах боломжгүй байна.",
-        );
+        setSpeechError("Дуу тоглуулах боломжгүй байна.");
       } finally {
-        if (
-          sequence ===
-          speechSequence.current
-        ) {
-          speechController.current =
-            null;
+        if (sequence === speechSequence.current) {
+          speechController.current = null;
         }
       }
     },
-    [
-      profile.voice,
-      settings.speechSpeed,
-    ],
+    [profile.voice, settings.speechSpeed]
   );
 
+  const requestAssistantMessage = useCallback(
+    async (state: SafetyState) => {
+      const sequence = ++requestSequence.current;
 
-  const requestAssistantMessage =
-    useCallback(
-      async (state: SafetyState) => {
-        const sequence =
-          ++requestSequence.current;
+      requestController.current?.abort();
 
-        requestController.current?.abort();
+      const controller = new AbortController();
 
-        const controller =
-          new AbortController();
+      requestController.current = controller;
 
-        requestController.current =
-          controller;
+      // Outside the zone the guidance screen is open, so even the offline message should
+      // point the way home rather than say that everything is fine.
+      const fallbackMessage =
+        !state.isInsideSafeZone && targetZone
+          ? getGuidanceFallback(targetZone.name)
+          : getSafetyFallback(state.riskLevel, profile.userName);
 
-        // Outside the zone the guidance screen is open, so even the offline message should
-        // point the way home rather than say that everything is fine.
-        const fallbackMessage =
-          !state.isInsideSafeZone && targetZone
-            ? getGuidanceFallback(targetZone.name)
-            : getSafetyFallback(
-                state.riskLevel,
-                profile.userName,
-              );
+      speechSequence.current += 1;
 
-        speechSequence.current += 1;
+      speechController.current?.abort();
 
-        speechController.current?.abort();
+      speechController.current = null;
 
-        speechController.current =
-          null;
+      audioElement.current?.pause();
 
-        audioElement.current?.pause();
+      if (audioElement.current) {
+        audioElement.current.currentTime = 0;
+      }
 
-        if (audioElement.current) {
-          audioElement.current.currentTime =
-            0;
+      setSpeechStatus("idle");
+      setSpeechError("");
+
+      setAssistantMessage(fallbackMessage);
+
+      setAssistantLoading(true);
+
+      const input: SafetyAssistantRequest = {
+        ...profile,
+
+        riskLevel: state.riskLevel,
+
+        riskScore: state.riskScore,
+
+        insideSafeZone: state.isInsideSafeZone,
+
+        routeDeviationMeters: state.routeDeviation ? null : 0,
+
+        nearestSafeZone: state.nearestSafeZone.name,
+
+        distanceFromSafeZone: state.distanceToNearestZoneMeters,
+
+        destination: targetZone?.name ?? state.nearestSafeZone.name,
+
+        nearbyLandmarks: [],
+
+        ...(navigationInstruction
+          ? {
+              navigationInstruction,
+            }
+          : {}),
+      };
+
+      try {
+        const response = await fetch("/api/assistant", {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify(input),
+
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Assistant request failed.");
         }
 
-        setSpeechStatus("idle");
-        setSpeechError("");
+        const result: unknown = await response.json();
 
-        setAssistantMessage(
-          fallbackMessage,
-        );
-
-        setAssistantLoading(true);
-
-        const input:
-          SafetyAssistantRequest = {
-          ...profile,
-
-          riskLevel:
-            state.riskLevel,
-
-          riskScore:
-            state.riskScore,
-
-          insideSafeZone:
-            state.isInsideSafeZone,
-
-          routeDeviationMeters:
-            state.routeDeviation
-              ? null
-              : 0,
-
-          nearestSafeZone:
-            state.nearestSafeZone
-              .name,
-
-          distanceFromSafeZone:
-            state.distanceToNearestZoneMeters,
-
-          destination:
-            targetZone?.name ?? state.nearestSafeZone.name,
-
-          nearbyLandmarks: [],
-
-          ...(navigationInstruction
-            ? {
-                navigationInstruction,
-              }
-            : {}),
-        };
-
-        try {
-          const response =
-            await fetch(
-              "/api/assistant",
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-
-                body:
-                  JSON.stringify(input),
-
-                signal:
-                  controller.signal,
-              },
-            );
-
-          if (!response.ok) {
-            throw new Error(
-              "Assistant request failed.",
-            );
-          }
-
-          const result: unknown =
-            await response.json();
-
-          if (
-            !result ||
-            typeof result !==
-              "object" ||
-            !("message" in result) ||
-            typeof result.message !==
-              "string" ||
-            !result.message.trim()
-          ) {
-            throw new Error(
-              "Assistant returned an empty message.",
-            );
-          }
-
-          if (
-            sequence ===
-            requestSequence.current
-          ) {
-            setAssistantMessage(
-              result.message.trim(),
-            );
-
-            void speakMessage(
-              result.message.trim(),
-            );
-          }
-        } catch {
-          if (
-            sequence ===
-            requestSequence.current
-          ) {
-            setAssistantMessage(
-              fallbackMessage,
-            );
-
-            void speakMessage(
-              fallbackMessage,
-            );
-          }
-        } finally {
-          if (
-            sequence ===
-            requestSequence.current
-          ) {
-            setAssistantLoading(
-              false,
-            );
-          }
+        if (
+          !result ||
+          typeof result !== "object" ||
+          !("message" in result) ||
+          typeof result.message !== "string" ||
+          !result.message.trim()
+        ) {
+          throw new Error("Assistant returned an empty message.");
         }
-      },
-      [
-        navigationInstruction,
-        profile,
-        speakMessage,
-        targetZone,
-      ],
-    );
+
+        if (sequence === requestSequence.current) {
+          setAssistantMessage(result.message.trim());
+
+          void speakMessage(result.message.trim());
+        }
+      } catch {
+        if (sequence === requestSequence.current) {
+          setAssistantMessage(fallbackMessage);
+
+          void speakMessage(fallbackMessage);
+        }
+      } finally {
+        if (sequence === requestSequence.current) {
+          setAssistantLoading(false);
+        }
+      }
+    },
+    [navigationInstruction, profile, speakMessage, targetZone]
+  );
 
   const automaticRequestKey =
     safetyState &&
@@ -837,7 +719,9 @@ export default function TrackerPage() {
       setAssistantLoading(false);
       setSpeechStatus("idle");
       setSpeechError("");
-      setAssistantMessage(`Та ${targetZone.name} аюулгүй бүсэд байна. Тайван байгаарай.`);
+      setAssistantMessage(
+        `Та ${targetZone.name} аюулгүй бүсэд байна. Тайван байгаарай.`
+      );
       return;
     }
 
@@ -853,12 +737,18 @@ export default function TrackerPage() {
     if (
       !automaticRequestKey ||
       lastAutomaticRequest.current === automaticRequestKey
-    ) return;
+    )
+      return;
 
     lastAutomaticRequest.current = automaticRequestKey;
     void requestAssistantMessage(safetyState);
-  }, [automaticRequestKey, requestAssistantMessage, routeStatus, safetyState, targetZone]);
-
+  }, [
+    automaticRequestKey,
+    requestAssistantMessage,
+    routeStatus,
+    safetyState,
+    targetZone,
+  ]);
 
   useEffect(() => {
     const audio = audioElement.current;
@@ -871,48 +761,78 @@ export default function TrackerPage() {
 
       audio?.pause();
 
-      cachedSpeech.forEach(
-        (url) => {
-          URL.revokeObjectURL(url);
-        },
-      );
+      cachedSpeech.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
     };
   }, []);
 
-
   const companionName = settings.name || "Мило";
-  const companionMessage = assistantMessage || (safetyState
-    ? isOutsideSafeZone && targetZone
-      ? getGuidanceFallback(targetZone.name)
-      : getSafetyFallback(safetyState.riskLevel, profile.userName)
-    : zonesLoadError || (zonesLoaded && !demoMode && savedZones.length === 0
-      ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй."
-      : "Байршил болон аюулгүй бүс ачаалж байна…"));
-  const companionState = safetyState?.riskLevel === "HIGH_RISK" || safetyState?.riskLevel === "WARNING"
-    ? "warning"
-    : speechStatus === "playing"
+  const companionMessage =
+    assistantMessage ||
+    (safetyState
+      ? isOutsideSafeZone && targetZone
+        ? getGuidanceFallback(targetZone.name)
+        : getSafetyFallback(safetyState.riskLevel, profile.userName)
+      : zonesLoadError ||
+        (zonesLoaded && !demoMode && savedZones.length === 0
+          ? "Асран хамгаалагчаасаа аюулгүй бүс тохируулж өгөхийг хүсээрэй."
+          : "Байршил болон аюулгүй бүс ачаалж байна…"));
+  const companionState =
+    safetyState?.riskLevel === "HIGH_RISK" ||
+    safetyState?.riskLevel === "WARNING"
+      ? "warning"
+      : speechStatus === "playing"
       ? "speaking"
       : "idle";
 
   return (
     <AppShell>
       <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl" />
-        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl" />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 top-[12%] size-64 rounded-full bg-[#06b6d4]/20 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl"
+        />
 
         <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1">
-            <BackButton className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-[#d4e1e5] transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]">
+            <Link
+              href="/"
+              aria-label="Нүүр хуудас руу буцах"
+              className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-[#d4e1e5] transition hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+            >
               <ChevronLeft size={24} aria-hidden="true" />
-            </BackButton>
+            </Link>
             <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
-              <span className="grid size-8 place-items-center rounded-xl bg-[#0e7490] text-[#cffafe]"><MapPin size={17} fill="currentColor" /></span>
+              <span className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_4px_12px_rgba(6,182,212,.25)]">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-[17px]"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+                </svg>
+              </span>
               SafePath
             </div>
           </div>
           <div className="flex items-center gap-2">
             {!isOnline && (
-              <span role="status" className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[12px] font-bold text-amber-950">
+              <span
+                role="status"
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/90 px-2.5 py-1 text-[12px] font-bold text-amber-950"
+              >
                 <WifiOff size={13} aria-hidden="true" /> Интернетгүй
               </span>
             )}
@@ -920,9 +840,18 @@ export default function TrackerPage() {
               type="button"
               onClick={() => setDemoMode((value) => !value)}
               aria-pressed={demoMode}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition ${demoMode ? "border-[#67e8f9] bg-[#0e7490] text-white" : "border-[#67e8f9]/25 bg-[#101c22] text-[#b7c7cc]"}`}
+              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition ${
+                demoMode
+                  ? "border-[#67e8f9] bg-[#0e7490] text-white"
+                  : "border-[#67e8f9]/25 bg-[#101c22] text-[#b7c7cc]"
+              }`}
             >
-              <span className={`size-2 rounded-full ${demoMode ? "bg-[#4ade80]" : "bg-[#60747b]"}`} aria-hidden="true" />
+              <span
+                className={`size-2 rounded-full ${
+                  demoMode ? "bg-[#4ade80]" : "bg-[#60747b]"
+                }`}
+                aria-hidden="true"
+              />
               Demo
             </button>
             <Link
@@ -939,45 +868,73 @@ export default function TrackerPage() {
             middle while calm, a small strip above the camera while guiding. */}
         <section
           aria-label={`${companionName} AI туслах`}
-          className={`relative z-10 flex gap-3 ${guiding ? "items-center" : "flex-1 flex-col items-center justify-center"}`}
+          className={`relative z-10 flex gap-3 ${
+            guiding
+              ? "items-center"
+              : "flex-1 flex-col items-center justify-center"
+          }`}
         >
           <CompanionMark
             state={companionState}
             avatar={settings.avatar}
             name={companionName}
-            className={`companion-avatar--compact shrink-0 ${guiding ? "companion-avatar--mini" : ""}`}
+            className={`companion-avatar--compact shrink-0 ${
+              guiding ? "companion-avatar--mini" : ""
+            }`}
           />
-          <div className={`flex min-w-0 items-center gap-3 ${guiding ? "flex-1" : "w-full"}`}>
+          <div
+            className={`flex min-w-0 items-center gap-3 ${
+              guiding ? "flex-1" : "w-full"
+            }`}
+          >
             <p
               aria-live="polite"
               aria-busy={assistantLoading}
-              className={`line-clamp-4 min-w-0 flex-1 rounded-2xl bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${guiding ? "rounded-tl-md" : "text-center"}`}
+              className={`line-clamp-4 min-w-0 flex-1 rounded-2xl bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
+                guiding ? "rounded-tl-md" : "text-center"
+              }`}
             >
               {companionMessage}
             </p>
             <button
               type="button"
-              disabled={!safetyState || assistantLoading || speechStatus === "loading"}
+              disabled={
+                !safetyState || assistantLoading || speechStatus === "loading"
+              }
               onClick={() => void speakMessage(assistantMessage)}
               aria-label={`${companionName}-г дахин сонсох`}
               className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
             >
-              {assistantLoading || speechStatus === "loading"
-                ? <SafePathLoading variant="button" />
-                : speechError
-                  ? <VolumeX size={22} aria-hidden="true" />
-                  : <Volume2 size={22} className={speechStatus === "playing" ? "animate-pulse" : ""} aria-hidden="true" />}
+              {assistantLoading || speechStatus === "loading" ? (
+                <SafePathLoading variant="button" />
+              ) : speechError ? (
+                <VolumeX size={22} aria-hidden="true" />
+              ) : (
+                <Volume2
+                  size={22}
+                  className={speechStatus === "playing" ? "animate-pulse" : ""}
+                  aria-hidden="true"
+                />
+              )}
             </button>
           </div>
         </section>
 
         {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
-        <div className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${guiding ? "min-h-[360px] flex-1" : "h-[230px] shrink-0"}`}>
+        <div
+          className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
+            guiding ? "min-h-[360px] flex-1" : "h-[230px] shrink-0"
+          }`}
+        >
           {guiding && currentLocation ? (
             <ArNavigationCamera
               location={currentLocation}
               route={route?.route ?? []}
-              instruction={navigationInstruction ?? route?.nextInstruction ?? "Аюулгүй бүс рүү буцах зам тооцоолж байна…"}
+              instruction={
+                navigationInstruction ??
+                route?.nextInstruction ??
+                "Аюулгүй бүс рүү буцах зам тооцоолж байна…"
+              }
               destinationName={targetZone?.name ?? "Аюулгүй бүс"}
               distanceMeters={route?.distanceMeters ?? null}
               autoStart
@@ -987,7 +944,10 @@ export default function TrackerPage() {
           ) : currentLocation ? (
             <>
               {/* Turns with the compass so the way the person faces is always up. */}
-              <TiltedPlane centerPercent={CALM_MAP_CENTER_PERCENT} heading={calmHeading}>
+              <TiltedPlane
+                centerPercent={CALM_MAP_CENTER_PERCENT}
+                heading={calmHeading}
+              >
                 <CompanionMap
                   location={currentLocation}
                   destination={targetZone ?? undefined}
@@ -999,19 +959,36 @@ export default function TrackerPage() {
               <span
                 aria-hidden="true"
                 className="pointer-events-none absolute left-1/2 z-[403] -translate-x-1/2 -translate-y-1/2"
-                style={{ top: `${CALM_MAP_CENTER_PERCENT}%` }}
+                style={{top: `${CALM_MAP_CENTER_PERCENT}%`}}
               >
-                {calmHeading === null
-                  ? <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
-                  : <HeadingArrow />}
+                {calmHeading === null ? (
+                  <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+                ) : (
+                  <HeadingArrow />
+                )}
               </span>
             </>
           ) : (
-            <div role="status" className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur">
-              {locationStatus === "loading" ? <SafePathLoading className="flex-col gap-1" label="Байршил тогтоож байна…" /> : locationError || "Байршлын зөвшөөрлөө шалгана уу."}
+            <div
+              role="status"
+              className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur"
+            >
+              {locationStatus === "loading" ? (
+                <SafePathLoading
+                  className="flex-col gap-1"
+                  label="Байршил тогтоож байна…"
+                />
+              ) : (
+                locationError || "Байршлын зөвшөөрлөө шалгана уу."
+              )}
             </div>
           )}
-          {demoMode && <DemoPad riskLevel={safetyState?.riskLevel ?? null} onMove={moveDemoLocation} />}
+          {demoMode && (
+            <DemoPad
+              riskLevel={safetyState?.riskLevel ?? null}
+              onMove={moveDemoLocation}
+            />
+          )}
         </div>
 
         <LocationSharingStatus />
@@ -1019,11 +996,27 @@ export default function TrackerPage() {
         <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
           {sosConfirm && !demoMode ? (
             <div className="rounded-2xl border border-rose-400/40 bg-[#140d12] p-3">
-              <p className="text-center text-[16px] font-bold text-white">Асран хамгаалагчдаа SOS илгээх үү?</p>
+              <p className="text-center text-[16px] font-bold text-white">
+                Асран хамгаалагчдаа SOS илгээх үү?
+              </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => setSosConfirm(false)} className="min-h-12 rounded-xl border border-white/15 px-3 text-[15px] font-semibold text-white">Болих</button>
-                <button type="button" onClick={() => void sendSos()} disabled={sosStatus === "sending"} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[15px] font-bold text-white disabled:opacity-50">
-                  {sosStatus === "sending" && <SafePathLoading variant="button" />}{sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}
+                <button
+                  type="button"
+                  onClick={() => setSosConfirm(false)}
+                  className="min-h-12 rounded-xl border border-white/15 px-3 text-[15px] font-semibold text-white"
+                >
+                  Болих
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendSos()}
+                  disabled={sosStatus === "sending"}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[15px] font-bold text-white disabled:opacity-50"
+                >
+                  {sosStatus === "sending" && (
+                    <SafePathLoading variant="button" />
+                  )}
+                  {sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}
                 </button>
               </div>
             </div>
@@ -1041,7 +1034,20 @@ export default function TrackerPage() {
               🆘 SOS — Тусламж дуудах
             </button>
           )}
-          {sosMessage && <p role={sosStatus === "error" ? "alert" : "status"} className={`mt-2 rounded-xl px-3 py-2 text-center text-sm leading-5 ${sosStatus === "error" ? "bg-rose-500/10 text-rose-200" : sosStatus === "sent" ? "bg-emerald-500/10 text-emerald-200" : "text-[#d4e1e5]"}`}>{sosMessage}</p>}
+          {sosMessage && (
+            <p
+              role={sosStatus === "error" ? "alert" : "status"}
+              className={`mt-2 rounded-xl px-3 py-2 text-center text-sm leading-5 ${
+                sosStatus === "error"
+                  ? "bg-rose-500/10 text-rose-200"
+                  : sosStatus === "sent"
+                  ? "bg-emerald-500/10 text-emerald-200"
+                  : "text-[#d4e1e5]"
+              }`}
+            >
+              {sosMessage}
+            </p>
+          )}
         </section>
 
         <audio
@@ -1061,24 +1067,30 @@ export default function TrackerPage() {
 }
 
 function isSafeZoneList(value: unknown): value is SafeZone[] {
-  return Array.isArray(value) && value.every((item) => {
-    if (!item || typeof item !== "object") return false;
-    const zone = item as Record<string, unknown>;
-    return (
-      typeof zone.id === "string" &&
-      typeof zone.name === "string" &&
-      typeof zone.latitude === "number" && Number.isFinite(zone.latitude) &&
-      typeof zone.longitude === "number" && Number.isFinite(zone.longitude) &&
-      typeof zone.radiusMeters === "number" && Number.isFinite(zone.radiusMeters) &&
-      zone.radiusMeters >= 50 && zone.radiusMeters <= 2000
-    );
-  });
+  return (
+    Array.isArray(value) &&
+    value.every((item) => {
+      if (!item || typeof item !== "object") return false;
+      const zone = item as Record<string, unknown>;
+      return (
+        typeof zone.id === "string" &&
+        typeof zone.name === "string" &&
+        typeof zone.latitude === "number" &&
+        Number.isFinite(zone.latitude) &&
+        typeof zone.longitude === "number" &&
+        Number.isFinite(zone.longitude) &&
+        typeof zone.radiusMeters === "number" &&
+        Number.isFinite(zone.radiusMeters) &&
+        zone.radiusMeters >= 50 &&
+        zone.radiusMeters <= 2000
+      );
+    })
+  );
 }
 
 function getGuidanceFallback(zoneName: string) {
   return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
 }
-
 
 type DemoDirection = "up" | "down" | "left" | "right";
 
@@ -1089,8 +1101,19 @@ const DEMO_STATUS_COLORS: Record<SafetyState["riskLevel"], string> = {
 };
 
 /** Small glass D-pad laid over the map that walks the demo location ~110 m per tap. */
-function DemoPad({ riskLevel, onMove }: { riskLevel: SafetyState["riskLevel"] | null; onMove: (direction: DemoDirection) => void }) {
-  const arrow = (direction: DemoDirection, label: string, glyph: string, area: string) => (
+function DemoPad({
+  riskLevel,
+  onMove,
+}: {
+  riskLevel: SafetyState["riskLevel"] | null;
+  onMove: (direction: DemoDirection) => void;
+}) {
+  const arrow = (
+    direction: DemoDirection,
+    label: string,
+    glyph: string,
+    area: string
+  ) => (
     <button
       type="button"
       onClick={() => onMove(direction)}
@@ -1110,7 +1133,9 @@ function DemoPad({ riskLevel, onMove }: { riskLevel: SafetyState["riskLevel"] | 
       <span
         role="status"
         aria-label={`Demo төлөв: ${riskLevel ?? "тодорхойгүй"}`}
-        className={`col-start-2 row-start-2 m-auto size-3 rounded-full ${riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"}`}
+        className={`col-start-2 row-start-2 m-auto size-3 rounded-full ${
+          riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"
+        }`}
       />
       {arrow("right", "Demo: зүүн зүг рүү", "→", "col-start-3 row-start-2")}
       {arrow("down", "Demo: урд зүг рүү", "↓", "col-start-2 row-start-3")}
