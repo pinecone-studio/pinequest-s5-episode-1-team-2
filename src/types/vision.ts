@@ -13,20 +13,6 @@ export const SCENE_LANDMARK_KINDS = [
 
 export type SceneLandmarkKind = (typeof SCENE_LANDMARK_KINDS)[number];
 
-// Pictures carry the meaning for children who cannot read yet, and for a quick glance at the map.
-export const SCENE_LANDMARK_ICONS: Record<SceneLandmarkKind, string> = {
-  building: "🏢",
-  shop: "🏪",
-  school: "🏫",
-  hospital: "🏥",
-  bus_stop: "🚌",
-  crossing: "🚸",
-  traffic_light: "🚦",
-  park: "🌳",
-  sign: "🪧",
-  other: "📍",
-};
-
 export const SCENE_LANDMARK_SIDES = ["left", "center", "right"] as const;
 
 export type SceneLandmarkSide = (typeof SCENE_LANDMARK_SIDES)[number];

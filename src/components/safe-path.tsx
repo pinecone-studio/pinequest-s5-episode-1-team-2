@@ -1,6 +1,7 @@
 import { ACCESSORIES, type AccessoryId } from "@/types/rewards";
 import { CUSTOM_AVATAR, type CustomCompanion } from "@/types/custom-companion";
 import { CustomCompanionArt } from "@/components/custom-companion";
+import { AccessoryIcon } from "@/components/app-icons";
 import { BackButton } from "@/components/back-button";
 import type { ReactNode } from "react";
 import type { AssistantSettings, SafetyStatus } from "@/types/safety";
@@ -98,7 +99,7 @@ export function CompanionMark({
       <span className="companion-avatar__art" aria-hidden="true">
         {avatar === CUSTOM_AVATAR && custom && <CustomCompanionArt parts={custom} />}
       </span>
-      {worn && <span className="companion-avatar__accessory" aria-hidden="true">{worn.icon}</span>}
+      {worn && <span className="companion-avatar__accessory" aria-hidden="true"><AccessoryIcon id={worn.id} size={20} /></span>}
     </div>
   );
 }

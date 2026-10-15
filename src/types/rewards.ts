@@ -8,12 +8,12 @@ export const REWARD_COMPANIONS = ["Мяу", "Бамбар", "Пип", "Рокк�
 
 /** Things a child can put on their companion once earned. */
 export const ACCESSORIES = [
-  { id: "crown", label: "Титэм", icon: "👑" },
-  { id: "hat", label: "Малгай", icon: "🎩" },
-  { id: "glasses", label: "Шил", icon: "🕶️" },
-  { id: "bow", label: "Бант", icon: "🎀" },
-  { id: "star", label: "Од", icon: "⭐" },
-  { id: "rainbow", label: "Солонго", icon: "🌈" },
+  { id: "crown", label: "Титэм" },
+  { id: "hat", label: "Малгай" },
+  { id: "glasses", label: "Шил" },
+  { id: "bow", label: "Бант" },
+  { id: "star", label: "Од" },
+  { id: "rainbow", label: "Солонго" },
 ] as const;
 
 export type AccessoryId = (typeof ACCESSORIES)[number]["id"];
@@ -31,12 +31,10 @@ export function isAccessoryId(value: unknown): value is AccessoryId {
   return typeof value === "string" && ACCESSORIES.some((accessory) => accessory.id === value);
 }
 
-/** How a reward is shown: its name, and an emoji for accessories. */
-export function describeReward(reward: RewardId): { label: string; icon: string | null; companion: boolean } {
+/** How a reward is named, and whether it is a companion (pictured) or an accessory (an icon). */
+export function describeReward(reward: RewardId): { label: string; companion: boolean } {
   const accessory = ACCESSORIES.find((item) => item.id === reward);
-  return accessory
-    ? { label: accessory.label, icon: accessory.icon, companion: false }
-    : { label: reward, icon: null, companion: true };
+  return accessory ? { label: accessory.label, companion: false } : { label: reward, companion: true };
 }
 
 /**
