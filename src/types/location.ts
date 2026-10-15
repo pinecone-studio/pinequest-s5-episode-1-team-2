@@ -1,5 +1,6 @@
 import type { SafeZone } from "@/types/safety";
 import type { SceneLandmarkKind } from "@/types/vision";
+import type { RewardId } from "@/types/rewards";
 
 /** A document in locations: the latest position a child shared. */
 export type LocationRecord = {
@@ -45,6 +46,40 @@ export type SeenLandmark = {
   latitude: number;
   longitude: number;
   seenAt: string;
+};
+
+/** A document in checkpoints: a place a guardian asked the child to reach, with a reward for getting there. */
+export type CheckpointRecord = {
+  _id: string;
+  childId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  reward: RewardId;
+  /** When the child's phone first reported a good fix inside; reaching needs them to stay a moment. */
+  insideSince: Date | null;
+  reachedAt: Date | null;
+  createdBy: string;
+  createdAt: Date;
+};
+
+/** A document in childRewards, keyed by child id: everything the child has earned. */
+export type ChildRewardsRecord = {
+  _id: string;
+  items: RewardId[];
+  updatedAt: Date;
+};
+
+/** A checkpoint as the guardian's and child's pages receive it. */
+export type Checkpoint = {
+  id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  reward: RewardId;
+  reachedAt: string | null;
 };
 
 /** What a guardian's page receives for each linked child. */

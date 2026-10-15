@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { zonesByChild } from "@/lib/child-zones";
+import { checkReachedCheckpoints } from "@/lib/checkpoints";
 import { updateChildGeofenceState } from "@/lib/safety-alerts";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import type { ChildLocation, SeenLandmark, SharingState } from "@/types/location";
@@ -79,6 +80,13 @@ export async function saveChildLocation(childId: string, { ageMs, ...position }:
     return { ...state, shared: true, geofenceCheck: "skipped-stale-reading" as const, alertsCreated: 0 };
   }
 
+  // A reached checkpoint is a reward, not a safety event: a failure here must not stop the geofence check.
+  try {
+    await checkReachedCheckpoints(childId, { ...position, updatedAt });
+  } catch (error) {
+    console.error("SAFEPATH_CHECKPOINT_CHECK_FAILED", error);
+  }
+
   try {
     const alertsCreated = await updateChildGeofenceState(childId, { ...position, updatedAt });
     return { ...state, shared: true, geofenceCheck: "ok" as const, alertsCreated };
@@ -105,12 +113,14 @@ export async function setSharingPaused(childId: string, paused: boolean): Promis
 
 /** After a link is removed: a child nobody is linked to any more keeps no stored position or safe zones. */
 export async function forgetUnwatchedChild(childId: string) {
-  const { guardianLinks, locations, safeZones, geofenceStates, safetyAlerts, seenLandmarks } = await getCollections();
+  const { guardianLinks, locations, safeZones, geofenceStates, safetyAlerts, seenLandmarks, checkpoints } = await getCollections();
   const watched = await guardianLinks.countDocuments({ childId }, { limit: 1 });
   if (!watched) {
     await Promise.all([
       locations.deleteOne({ _id: childId }),
       seenLandmarks.deleteMany({ childId }),
+      // Goals set by a guardian who is no longer linked go too; rewards the child already earned stay.
+      checkpoints.deleteMany({ childId }),
       safeZones.deleteMany({ childId }),
       geofenceStates.deleteOne({ _id: childId }),
       safetyAlerts.deleteMany({ childId }),
