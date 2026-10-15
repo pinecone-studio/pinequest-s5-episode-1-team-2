@@ -23,6 +23,7 @@ const SCENE_SYSTEM_PROMPT = `Та SafePath нэртэй хүүхэд, гэр б�
 - "kind": building, shop, school, hospital, bus_stop, crossing, traffic_light, park, sign, other-оос нэгийг сонго.
 - "side": зураг дээр зүүн тал бол left, голд бол center, баруун тал бол right.
 - "box_2d": тухайн зүйлийг хүрээлсэн дөрвөлжин [ymin, xmin, ymax, xmax], 0-1000 хооронд хэвийн болгосон.
+- "notable": бусад барилгаас тод ялгарч, хүмүүс амархан таньж уулзах цэг болгож болох зүйл бол true (нэр нь уншигдах дэлгүүр, сургууль, эмнэлэг, онцгой өнгө хэлбэртэй эсвэл хамгийн өндөр барилга). Энгийн, ижил төстэй орон сууц, жижиг тэмдэг бол false.
 "summary": Монгол кириллээр 1-2 богино өгүүлбэр, нийт 200 тэмдэгтээс ихгүй. Ойролцоох тод барилгыг ашиглан хаашаа явахыг энгийнээр хэл (жишээ: "Шар байрны хажуугаар чигээрээ яваарай.").
 Зураг бүдэг, харанхуй эсвэл тодорхой бус бол summary-д үүнийг шууд хэлж, landmarks-ийг хоосон үлдээ; таамгаар нэр, хаяг, гудамж, байршил, зай, чиглэл зохиож болохгүй.
 Доорх GPS маршрут нь чиглүүлэлтийн үндсэн эх сурвалж. Зурагт харагдахгүй зүйлсийг маршруттай холбоотой гэж бүү дүгнэ, GPS зааврыг өөрчилж болохгүй. Зураг маршрутын замтай таарч байгаа эсэх тодорхойгүй бол тодорхойгүй гэдгийг хэл.
@@ -44,8 +45,9 @@ const SCENE_RESPONSE_SCHEMA = {
           kind: { type: "string", enum: [...SCENE_LANDMARK_KINDS] },
           side: { type: "string", enum: [...SCENE_LANDMARK_SIDES] },
           box_2d: { type: "array", items: { type: "number" }, minItems: 4, maxItems: 4 },
+          notable: { type: "boolean" },
         },
-        required: ["label", "detail", "kind", "side", "box_2d"],
+        required: ["label", "detail", "kind", "side", "box_2d", "notable"],
       },
     },
   },
@@ -237,7 +239,7 @@ function readLandmark(value: unknown): SceneLandmark | null {
   const side = box
     ? sideFromBox(box)
     : SCENE_LANDMARK_SIDES.find((candidate) => candidate === value.side) ?? "center";
-  return { label, detail: cleanText(value.detail, 80), kind, side, box };
+  return { label, detail: cleanText(value.detail, 80), kind, side, box, notable: value.notable === true };
 }
 
 function sideFromBox([, xmin, , xmax]: [number, number, number, number]): SceneLandmark["side"] {
