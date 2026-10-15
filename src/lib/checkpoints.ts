@@ -148,6 +148,20 @@ export async function checkReachedCheckpoints(
   }
 }
 
+/** Each child's checkpoints still to be reached, newest first. */
+export async function openCheckpointsByChild(childIds: string[]): Promise<Map<string, Checkpoint[]>> {
+  const result = new Map<string, Checkpoint[]>();
+  if (!childIds.length) return result;
+  const { checkpoints } = await getCollections();
+  const records = await checkpoints.find({ childId: { $in: childIds }, reachedAt: null }).sort({ createdAt: -1 }).toArray();
+  for (const record of records) {
+    const list = result.get(record.childId) ?? [];
+    list.push(toCheckpoint(record));
+    result.set(record.childId, list);
+  }
+  return result;
+}
+
 function metersBetween(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
   const rad = (degrees: number) => (degrees * Math.PI) / 180;
   const dLat = rad(b.latitude - a.latitude);

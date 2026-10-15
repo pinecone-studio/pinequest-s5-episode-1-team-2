@@ -116,6 +116,8 @@ export type ChildLocation = {
   landmarks: SeenLandmark[];
   /** The newest surroundings photo from the child's camera, if any in the last day. */
   photo: { id: string; takenAt: string } | null;
+  /** Checkpoints the child has not reached yet, shown on the guardian's map. */
+  checkpoints: Checkpoint[];
   /** Estimated speed in km/h, when enough location data is available. */
   speedKmh?: number | null;
 };

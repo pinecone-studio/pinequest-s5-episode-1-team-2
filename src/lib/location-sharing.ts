@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { zonesByChild } from "@/lib/child-zones";
-import { checkReachedCheckpoints } from "@/lib/checkpoints";
+import { checkReachedCheckpoints, openCheckpointsByChild } from "@/lib/checkpoints";
 import { createLowBatteryAlert, LOW_BATTERY_LEVEL, updateChildGeofenceState } from "@/lib/safety-alerts";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import type { ChildLocation, SeenLandmark, SharingState } from "@/types/location";
@@ -148,12 +148,13 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
   const { guardianLinks, users, locations } = await getCollections();
   const links = await guardianLinks.find({ guardianId }).sort({ createdAt: 1 }).toArray();
   const childIds = links.map((link) => link.childId);
-  const [children, positions, zones, landmarks, photos] = await Promise.all([
+  const [children, positions, zones, landmarks, photos, goals] = await Promise.all([
     users.find({ _id: { $in: childIds } }, { projection: { childName: 1, locationPaused: 1 } }).toArray(),
     locations.find({ _id: { $in: childIds } }).toArray(),
     zonesByChild(childIds),
     seenLandmarksByChild(childIds),
     latestPhotoByChild(childIds),
+    openCheckpointsByChild(childIds),
   ]);
   const byId = new Map(children.map((child) => [child._id, child]));
   const latest = new Map(positions.map((position) => [position._id, position]));
@@ -169,6 +170,7 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
       zones: zones.get(childId) ?? [],
       landmarks: paused ? [] : landmarks.get(childId) ?? [],
       photo: paused ? null : photos.get(childId) ?? null,
+      checkpoints: goals.get(childId) ?? [],
       paused,
       position: position
         ? {
