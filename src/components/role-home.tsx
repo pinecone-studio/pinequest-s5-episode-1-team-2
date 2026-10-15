@@ -1,7 +1,7 @@
-import { ArrowUpRight, MapPin, ShieldCheck, UserRound } from "lucide-react";
-import { InstallAppPrompt } from "@/components/install-app-prompt";
-import { RoleForm } from "@/components/role-form";
-import { AppShell } from "@/components/safe-path";
+import {ArrowUpRight, ShieldCheck, UserRound} from "lucide-react";
+import {InstallAppPrompt} from "@/components/install-app-prompt";
+import {RoleForm} from "@/components/role-form";
+import {AppShell} from "@/components/safe-path";
 
 export function RoleHome() {
   return (
@@ -10,7 +10,7 @@ export function RoleHome() {
         className="relative isolate flex min-h-dvh flex-col overflow-hidden px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] sm:px-5 sm:pb-[calc(24px+env(safe-area-inset-bottom))] sm:pt-[calc(20px+env(safe-area-inset-top))]"
         style={{
           background:
-            "linear-gradient(155deg, #05090d 0%, #07151b 52%, #03080c 100%)",
+            "linear-gradient(155deg, #05090d 0%, #07151b 52%, #03080c 100% )",
         }}
       >
         <div
@@ -21,10 +21,10 @@ export function RoleHome() {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-28 -left-24 size-80 rounded-full bg-[#0e7490]/30 blur-3xl"
         />
+
+        {/* Header хэсэг */}
         <header className="relative z-10 mx-auto flex h-14 w-full max-w-[390px] items-center gap-2.5">
-          <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
-            <MapPin size={22} fill="currentColor" strokeWidth={2.2} />
-          </span>
+          <LoadingMark mark="size-10 rounded-[14px]" icon="size-[22px]" />
           <span className="text-[16px] font-bold tracking-[-0.04em] text-[#f0f6f1]">
             SafePath
           </span>
@@ -91,6 +91,7 @@ export function RoleHome() {
             </RoleForm>
           </div>
         </section>
+
         <p className="relative z-10 mx-auto mt-auto flex w-full max-w-[390px] items-center justify-center gap-2 pt-5 text-[12px] text-[#c2d0d5]">
           <span className="size-1.5 rounded-full bg-[#22d3ee]" />
           Аюулгүй аялал эндээс эхэлнэ
@@ -98,5 +99,28 @@ export function RoleHome() {
         <InstallAppPrompt />
       </main>
     </AppShell>
+  );
+}
+
+function LoadingMark({mark, icon}: {mark: string; icon: string}) {
+  return (
+    <span
+      className={`grid place-items-center bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)] ${mark}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className={icon}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        aria-hidden="true"
+      >
+        <path
+          d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"
+          strokeLinejoin="round"
+        />
+        <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+      </svg>
+    </span>
   );
 }
