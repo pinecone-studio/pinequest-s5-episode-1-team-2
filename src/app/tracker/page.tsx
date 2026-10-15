@@ -17,6 +17,12 @@ import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
 import {AppShell, CompanionMark} from "@/components/safe-path";
 import {CheckpointGoal, RewardCelebration} from "@/components/checkpoint-goal";
 import {useCheckpoints} from "@/hooks/use-checkpoints";
+import {
+  buildOfflineRoute,
+  loadOfflineZones,
+  saveOfflineRoute,
+  saveOfflineZones,
+} from "@/lib/offline-guidance";
 import {describeReward, effectiveAvatar, isAccessoryId} from "@/types/rewards";
 import {SafePathLoading} from "@/components/safepath-loading";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
@@ -62,6 +68,8 @@ type RouteResult = {
   distanceMeters: number | null;
   durationSeconds: number | null;
   nextInstruction: string;
+  /** True when worked out on the phone without the internet. */
+  offline?: boolean;
 };
 
 export default function TrackerPage() {
@@ -110,12 +118,20 @@ export default function TrackerPage() {
         if (active) {
           setSavedZones(payload.zones);
           setZonesLoadError("");
+          saveOfflineZones(payload.zones);
         }
       } catch {
         if (!controller.signal.aborted && active) {
-          setZonesLoadError(
-            "Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу."
-          );
+          // Without the internet, the zones saved on this phone still guide the child home.
+          const saved = loadOfflineZones();
+          if (saved) {
+            setSavedZones(saved);
+            setZonesLoadError("");
+          } else {
+            setZonesLoadError(
+              "Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу."
+            );
+          }
         }
       } finally {
         if (active) setZonesLoaded(true);
@@ -471,6 +487,19 @@ export default function TrackerPage() {
       };
     };
 
+    const here = {latitude: currentLatitude, longitude: currentLongitude};
+    const zone = targetZone;
+    const guideWithoutInternet = () => {
+      setRoute(buildOfflineRoute(here, zone));
+      setRouteStatus("ready");
+    };
+
+    // No point waiting on route servers that cannot be reached.
+    if (!navigator.onLine) {
+      guideWithoutInternet();
+      return;
+    }
+
     void fetchAppRoute()
       .catch(async (error) => {
         if (controller.signal.aborted) throw error;
@@ -479,14 +508,15 @@ export default function TrackerPage() {
       })
       .then((result) => {
         if (controller.signal.aborted) return;
+        saveOfflineRoute(zone.id, result);
         setRoute(result);
         setRouteStatus("ready");
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
         console.error("ROUTE ERROR:", error);
-        setRoute(null);
-        setRouteStatus("error");
+        // Both route services failed (often no data): guide from the phone instead of giving up.
+        guideWithoutInternet();
       });
   }, [
     currentLatitude,
