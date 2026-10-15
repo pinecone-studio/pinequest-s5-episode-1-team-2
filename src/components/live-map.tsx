@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { latLngBounds } from "leaflet";
-import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { Circle, CircleMarker, MapContainer, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { SAFE_ZONES } from "@/lib/safe-zones";
 import type { SafeZone, SafetyLocation } from "@/types/safety";
 import type { SeenLandmark } from "@/types/location";
@@ -32,6 +32,12 @@ type LiveMapProps = {
   people?: MapPerson[];
   /** Notable places the selected child's camera saw, newest first. */
   landmarks?: SeenLandmark[];
+  /** Places the child has been asked to reach. */
+  checkpoints?: { id: string; name: string; latitude: number; longitude: number; radiusMeters: number }[];
+  /** Called with the tapped point, so a guardian can add a zone or checkpoint there. */
+  onPick?: (latitude: number, longitude: number) => void;
+  /** Without a child's position, `location` is only where the map starts; no dot is drawn there. */
+  hideCenterDot?: boolean;
   safeZones?: SafeZone[];
   currentRoute?: [number, number][];
   destination?: Pick<SafetyLocation, "latitude" | "longitude">;
@@ -43,7 +49,7 @@ type LiveMapProps = {
   className?: string;
 };
 
-export default function LiveMap({ location, people = [], landmarks = [], safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
+export default function LiveMap({ location, people = [], landmarks = [], checkpoints = [], onPick, hideCenterDot = false, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -95,7 +101,18 @@ export default function LiveMap({ location, people = [], landmarks = [], safeZon
           radius={8}
           pathOptions={{ color: "#ffffff", fillColor: "#2e7d4f", fillOpacity: 1, weight: 3 }}
         />}
-        {!companion && people.length === 0 && <CircleMarker
+        {!companion && checkpoints.map((checkpoint) => (
+          <Circle
+            key={checkpoint.id}
+            center={[checkpoint.latitude, checkpoint.longitude]}
+            radius={checkpoint.radiusMeters}
+            pathOptions={{ color: "#a78bfa", fillColor: "#a78bfa", fillOpacity: 0.15, weight: 2, dashArray: "3 5" }}
+          >
+            <Tooltip direction="top" permanent>🎯 {checkpoint.name}</Tooltip>
+          </Circle>
+        ))}
+        {!companion && onPick && <PickOnClick onPick={onPick} />}
+        {!companion && people.length === 0 && !hideCenterDot && <CircleMarker
           center={center}
           radius={9}
           pathOptions={{ color: "#ffffff", fillColor: "#111111", fillOpacity: 1, weight: 4 }}
@@ -193,6 +210,11 @@ function FollowPerson({ person }: { person: MapPerson }) {
     started.current = true;
   }, [accuracy, latitude, longitude, map]);
 
+  return null;
+}
+
+function PickOnClick({ onPick }: { onPick: (latitude: number, longitude: number) => void }) {
+  useMapEvents({ click: (event) => onPick(event.latlng.lat, event.latlng.lng) });
   return null;
 }
 
