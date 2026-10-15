@@ -125,6 +125,10 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     voice: value.voice,
     tone: value.tone,
     instructionLength: value.instructionLength,
+    // Without this the model never saw the turn it was meant to say, and fell back to vague distances.
+    ...(typeof value.navigationInstruction === "string" && value.navigationInstruction.trim()
+      ? { navigationInstruction: value.navigationInstruction.trim() }
+      : {}),
     ...(value.mode === "game" ? { mode: "game" as const } : {}),
     ...(Array.isArray(value.nearbyLandmarks)
   ? { nearbyLandmarks: value.nearbyLandmarks }
