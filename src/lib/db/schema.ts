@@ -1,5 +1,6 @@
 import type { Db, Document, IndexDescription } from "mongodb";
 import { NAME_MAX_LENGTH, PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH } from "@/lib/auth/schemas";
+import { SCENE_LANDMARK_KINDS } from "@/types/vision";
 
 type CollectionSchema = {
   validator: Document;
@@ -87,6 +88,30 @@ export const SCHEMA: Record<string, CollectionSchema> = {
     },
     // A position nobody refreshed for a day is deleted, so a child's whereabouts are not kept forever.
     indexes: [{ key: { updatedAt: 1 }, name: "updatedAt_ttl", expireAfterSeconds: 24 * 60 * 60 }],
+  },
+  seenLandmarks: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "label", "detail", "kind", "latitude", "longitude", "seenAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          label: { bsonType: "string", minLength: 1, maxLength: 48 },
+          detail: { bsonType: "string", maxLength: 80 },
+          kind: { bsonType: "string", enum: [...SCENE_LANDMARK_KINDS] },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          seenAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { childId: 1, seenAt: -1 }, name: "childId_seenAt_desc" },
+      // Like positions, the places a child passed are only kept for a day.
+      { key: { seenAt: 1 }, name: "seenAt_ttl", expireAfterSeconds: 24 * 60 * 60 },
+    ],
   },
   safeZones: {
     validator: {
