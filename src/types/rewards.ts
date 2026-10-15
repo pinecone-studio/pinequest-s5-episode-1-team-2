@@ -39,6 +39,15 @@ export function describeReward(reward: RewardId): { label: string; icon: string 
     : { label: reward, icon: null, companion: true };
 }
 
+/**
+ * Whether a companion or accessory is still locked for this account. `rewards` is null while
+ * unknown, which keeps rewards locked; `isChild` false (a guardian) opens everything.
+ */
+export function isRewardLocked(id: string, rewards: readonly string[] | null, isChild: boolean | null) {
+  if (isChild === false || !(REWARD_IDS as readonly string[]).includes(id)) return false;
+  return !rewards?.includes(id);
+}
+
 /** The companion actually shown: a reward companion only once it has been earned. */
 export function effectiveAvatar(avatar: AssistantSettings["avatar"], unlocked: readonly string[] | null): AssistantSettings["avatar"] {
   if (unlocked === null) return avatar;

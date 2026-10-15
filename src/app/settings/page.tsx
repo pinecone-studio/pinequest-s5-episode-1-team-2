@@ -8,7 +8,7 @@ import {AppShell} from "@/components/safe-path";
 import {ProfileForm} from "@/components/auth/profile-form";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
 import {useCheckpoints} from "@/hooks/use-checkpoints";
-import {ACCESSORIES, REWARD_COMPANIONS} from "@/types/rewards";
+import {ACCESSORIES, isRewardLocked} from "@/types/rewards";
 import type {AssistantSettings} from "@/types/safety";
 
 const avatars: AssistantSettings["avatar"][] = [
@@ -27,11 +27,7 @@ export default function SettingsPage() {
   const {settings, update} = useAssistantSettings();
   // Children earn the reward companions and accessories; other accounts see everything open.
   const {rewards, isChild} = useCheckpoints({poll: false});
-  const isLocked = (id: string) =>
-    isChild !== false &&
-    ((REWARD_COMPANIONS as readonly string[]).includes(id) ||
-      ACCESSORIES.some((accessory) => accessory.id === id)) &&
-    !rewards?.includes(id as never);
+  const isLocked = (id: string) => isRewardLocked(id, rewards, isChild);
   const [pushToken, setPushToken] = useState("");
   const [section, setSection] = useState<"menu" | "parent" | "assistant">(
     "menu"
