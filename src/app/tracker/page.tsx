@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
   ChevronLeft,
+  Gamepad2,
   Settings,
   Volume2,
   VolumeX,
@@ -20,7 +21,7 @@ import {useCompassHeading} from "@/hooks/use-compass-heading";
 import {useGeolocation} from "@/hooks/use-geolocation";
 import {useNetworkStatus} from "@/hooks/use-network-status";
 import {toCompanionProfile} from "@/lib/assistant-settings";
-import {getSafetyFallback} from "@/lib/ai/fallback-messages";
+import {getGameFallback, getSafetyFallback} from "@/lib/ai/fallback-messages";
 import {calculateSafetyState} from "@/lib/risk-engine";
 import {getSafeZoneProximities} from "@/lib/geofence";
 import {SAFE_ZONES} from "@/lib/safe-zones";
@@ -580,8 +581,10 @@ export default function TrackerPage() {
   );
 
   const requestAssistantMessage = useCallback(
-    async (state: SafetyState) => {
+    async (state: SafetyState, mode: "guide" | "game" = "guide") => {
       const sequence = ++requestSequence.current;
+      // The server answers a game request with guidance anyway unless the child is safe.
+      const game = mode === "game" && state.riskLevel === "SAFE";
 
       requestController.current?.abort();
 
@@ -591,9 +594,10 @@ export default function TrackerPage() {
 
       // Outside the zone the guidance screen is open, so even the offline message should
       // point the way home rather than say that everything is fine.
-      const fallbackMessage =
-        !state.isInsideSafeZone && targetZone
-          ? getGuidanceFallback(targetZone.name)
+      const fallbackMessage = game
+        ? getGameFallback(profile.userName)
+        : !state.isInsideSafeZone && targetZone
+          ? getGuidanceFallback(targetZone.name, profile.userName)
           : getSafetyFallback(state.riskLevel, profile.userName);
 
       speechSequence.current += 1;
@@ -611,7 +615,8 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
 
-      setAssistantMessage(fallbackMessage);
+      // A game keeps the current words on screen until its own question arrives.
+      if (!game) setAssistantMessage(fallbackMessage);
 
       setAssistantLoading(true);
 
@@ -633,6 +638,8 @@ export default function TrackerPage() {
         destination: targetZone?.name ?? state.nearestSafeZone.name,
 
         nearbyLandmarks: [],
+
+        ...(game ? { mode: "game" as const } : {}),
 
         ...(navigationInstruction
           ? {
@@ -720,7 +727,7 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
       setAssistantMessage(
-        `Та ${targetZone.name} аюулгүй бүсэд байна. Тайван байгаарай.`
+        `${profile.userName}, чи ${targetZone.name} аюулгүй бүсэд байна. Ёстой гоё!`
       );
       return;
     }
@@ -744,6 +751,7 @@ export default function TrackerPage() {
     void requestAssistantMessage(safetyState);
   }, [
     automaticRequestKey,
+    profile.userName,
     requestAssistantMessage,
     routeStatus,
     safetyState,
@@ -772,7 +780,7 @@ export default function TrackerPage() {
     assistantMessage ||
     (safetyState
       ? isOutsideSafeZone && targetZone
-        ? getGuidanceFallback(targetZone.name)
+        ? getGuidanceFallback(targetZone.name, profile.userName)
         : getSafetyFallback(safetyState.riskLevel, profile.userName)
       : zonesLoadError ||
         (zonesLoaded && !demoMode && savedZones.length === 0
@@ -896,6 +904,17 @@ export default function TrackerPage() {
             >
               {companionMessage}
             </p>
+            {safetyState?.riskLevel === "SAFE" && (
+              <button
+                type="button"
+                disabled={assistantLoading}
+                onClick={() => void requestAssistantMessage(safetyState, "game")}
+                aria-label={`${companionName}-тэй тоглоом тоглох`}
+                className="grid size-12 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-white shadow-[0_8px_20px_rgba(124,58,237,.3)] transition hover:bg-[#6d28d9] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+              >
+                <Gamepad2 size={22} aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               disabled={
@@ -1088,8 +1107,8 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
   );
 }
 
-function getGuidanceFallback(zoneName: string) {
-  return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
+function getGuidanceFallback(zoneName: string, userName: string) {
+  return `${userName}, ${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай, би чамтай хамт байна.`;
 }
 
 type DemoDirection = "up" | "down" | "left" | "right";
