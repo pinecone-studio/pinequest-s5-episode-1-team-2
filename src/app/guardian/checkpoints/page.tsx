@@ -40,7 +40,7 @@ export default async function CheckpointsPage({ searchParams }: { searchParams: 
                   </nav>
                 )}
                 <section className="mb-6 rounded-2xl bg-[#f4f1ff] px-5 py-4 sm:px-6">
-                  <p className="text-sm font-semibold text-[#3b2a6b]">🎯 {selected.name}-д зорилго өгөөрэй</p>
+                  <p className="text-sm font-semibold text-[#3b2a6b]">🎯 Зорилго өгөх: {selected.name}</p>
                   <p className="mt-1 text-sm leading-6 text-[#5b5470]">Сургууль, номын сан зэрэг газрыг сонгоод шагнал тавина. {selected.name} тэнд GPS-ээр үнэхээр хүрч очвол шинэ найз эсвэл чимэглэл автоматаар нээгдэнэ.</p>
                 </section>
                 <CheckpointEditor

@@ -51,7 +51,7 @@ export function CheckpointEditor({ childId, childName, zones, checkpoints, child
       <section className="min-w-0 overflow-hidden rounded-3xl border border-[#e9e9e5] bg-white shadow-[0_8px_30px_rgba(17,17,17,0.04)]">
         <div className="px-5 py-4 sm:px-6">
           <h2 className="text-base font-semibold tracking-tight">Очих газар</h2>
-          <p className="mt-1 text-xs text-[#737373]">Газрын зураг дээр {childName}-ийн очих газрыг дарж сонгоно уу.</p>
+          <p className="mt-1 text-xs text-[#737373]">Газрын зураг дээр хүүхдийн очих газрыг дарж сонгоно уу.</p>
         </div>
         <div className="h-[42vh] min-h-[300px] max-h-[520px] overflow-hidden bg-[#f1f1ee] sm:h-[480px] lg:h-[560px]">
           <ZoneMap center={center} zones={openAsZones} draft={point} draftRadius={radius} childPosition={childPosition} onPick={(latitude, longitude) => setPoint({ latitude, longitude })} />

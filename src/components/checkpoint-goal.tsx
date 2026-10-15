@@ -65,14 +65,14 @@ export function RewardCelebration({ checkpoint, userName, onUse, onClose }: {
         </div>
         <h2 id="reward-title" className="mt-5 text-[26px] font-extrabold leading-8 tracking-tight">Баяр хүргэе, {userName}!</h2>
         <p className="mt-2 text-[16px] leading-6 text-[#e9e3ff]">
-          Чи <b className="text-white">{checkpoint.name}</b>-д хүрлээ. {reward.companion ? "Шинэ найз" : "Шинэ чимэглэл"} <b className="text-white">{reward.label}</b> чинийх боллоо!
+          Чи <b className="text-white">{checkpoint.name}</b> хүртэл алхаж очлоо. {reward.companion ? "Шинэ найз" : "Шинэ чимэглэл"} <b className="text-white">{reward.label}</b> чинийх боллоо!
         </p>
         <button
           type="button"
           onClick={onUse}
           className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-2xl bg-[#a78bfa] px-5 text-[17px] font-bold text-[#1e1035] transition hover:bg-[#c4b5fd] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          {reward.companion ? `${reward.label}-г найзаа болгох` : `${reward.label} зүүх`}
+          {reward.companion ? "Одоо найзаа болгох" : "Одоо зүүх"}
         </button>
         <button type="button" onClick={onClose} className="mt-2 min-h-11 w-full rounded-2xl text-[15px] font-semibold text-[#c4b5fd] transition hover:bg-white/5">
           Дараа

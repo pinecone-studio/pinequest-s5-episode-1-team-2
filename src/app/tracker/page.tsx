@@ -832,7 +832,7 @@ export default function TrackerPage() {
     announcedCheckpoint.current = celebrating.id;
     const reward = describeReward(celebrating.reward);
     void speakMessage(
-      `Баяр хүргэе, ${profile.userName}! Чи ${celebrating.name}-д хүрлээ. ${reward.label} одоо чинийх боллоо!`
+      `Баяр хүргэе, ${profile.userName}! Чи ${celebrating.name} хүртэл алхаж очлоо. ${reward.label} одоо чинийх боллоо!`
     );
   }, [celebrating, profile.userName, speakMessage]);
 
@@ -963,7 +963,7 @@ export default function TrackerPage() {
           {/* Tapping the companion opens the screen where the child dresses and renames it. */}
           <Link
             href="/tracker/companion"
-            aria-label={`${companionName}-г өөрчлөх`}
+            aria-label={`AI найзаа өөрчлөх: ${companionName}`}
             className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#67e8f9]"
           >
             <CompanionMark
@@ -1003,7 +1003,7 @@ export default function TrackerPage() {
                 type="button"
                 disabled={assistantLoading}
                 onClick={() => void requestAssistantMessage(safetyState, "game")}
-                aria-label={`${companionName}-тэй тоглоом тоглох`}
+                aria-label="Хамт тоглоом тоглох"
                 className="grid size-12 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-white shadow-[0_8px_20px_rgba(124,58,237,.3)] transition hover:bg-[#6d28d9] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
               >
                 <Gamepad2 size={22} aria-hidden="true" />
@@ -1015,7 +1015,7 @@ export default function TrackerPage() {
                 !safetyState || assistantLoading || speechStatus === "loading"
               }
               onClick={() => void speakMessage(assistantMessage)}
-              aria-label={`${companionName}-г дахин сонсох`}
+              aria-label={`Дахин сонсох: ${companionName}`}
               className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
             >
               {assistantLoading || speechStatus === "loading" ? (
@@ -1238,7 +1238,7 @@ function readCelebrated(): string[] {
 }
 
 function getGuidanceFallback(zoneName: string, userName: string) {
-  return `${userName}, ${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай, би чамтай хамт байна.`;
+  return `${userName}, ${zoneName} хүртэл хамт алхъя. Цэнхэр сумыг дагаад алхаарай, би чамтай хамт байна.`;
 }
 
 type DemoDirection = "up" | "down" | "left" | "right";

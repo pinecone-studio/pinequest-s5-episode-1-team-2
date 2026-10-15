@@ -176,13 +176,13 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
         rel="noreferrer"
         className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2a7fff] px-4 text-sm font-semibold text-white transition hover:bg-[#1c6fee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
       >
-        <Navigation size={16} aria-hidden="true" /> {name} руу чиглэл авах
+        <Navigation size={16} aria-hidden="true" /> {name} хүртэл чиглэл авах
       </a>
       <Link
         href={`/guardian/checkpoints?child=${childId}`}
         className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#7c3aed]/50 px-4 text-sm font-semibold text-[#c4b5fd] transition hover:bg-[#7c3aed]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c3aed]"
       >
-        <span aria-hidden="true">🎯</span> {name}-д шалгах цэг, шагнал өгөх
+        <span aria-hidden="true">🎯</span> Шалгах цэг, шагнал өгөх
       </Link>
     </section>
   );
@@ -533,7 +533,7 @@ export default function GuardianPage() {
                     ? "Тодорхойгүй"
                     : inside
                       ? zone.name
-                      : `${zone.name}-с ${
+                      : `${zone.name} хүртэл ${
                           distance !== null ? formatDistance(distance) : "—"
                         }`
                 }

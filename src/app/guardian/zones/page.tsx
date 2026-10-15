@@ -39,7 +39,7 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
                 </nav>
               )}
               <section className="mb-6 rounded-2xl bg-[#f7f7f5] px-5 py-4 sm:px-6">
-                <p className="text-sm font-semibold text-[#252622]">{selected.name}-ийн аюулгүй бүсүүд</p>
+                <p className="text-sm font-semibold text-[#252622]">Аюулгүй бүсүүд · {selected.name}</p>
                 <p className="mt-1 text-sm leading-6 text-[#737373]">Гэр, сургууль зэрэг газрыг тэмдэглэж, хүүхдийн байршлыг бүсүүдтэй харьцуулан хянаарай.</p>
               </section>
               <ZoneEditor

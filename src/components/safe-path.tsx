@@ -88,7 +88,7 @@ export function CompanionMark({
 }) {
   const worn = accessory ? ACCESSORIES.find((item) => item.id === accessory) : undefined;
   return (
-    <div className={`companion-avatar companion-avatar--${avatar.toLowerCase()} companion-avatar--${state} ${className}`} role="img" aria-label={`${name} AI туслах${worn ? `, ${worn.label}-тай` : ""}, ${state}`}>
+    <div className={`companion-avatar companion-avatar--${avatar.toLowerCase()} companion-avatar--${state} ${className}`} role="img" aria-label={`${name} AI туслах${worn ? `, чимэглэл: ${worn.label}` : ""}, ${state}`}>
       <span className="companion-avatar__halo" aria-hidden="true" />
       <span className="companion-avatar__art" aria-hidden="true" />
       {worn && <span className="companion-avatar__accessory" aria-hidden="true">{worn.icon}</span>}
