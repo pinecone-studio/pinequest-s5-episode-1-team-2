@@ -197,3 +197,12 @@ select {
   .reward-celebration__prize, .reward-celebration__confetti span { animation: none !important; }
   .reward-celebration__confetti { display: none; }
 }
+
+/* The child's own companion is an SVG drawn inside the art layer instead of a sprite picture. */
+.companion-avatar--өөрийн .companion-avatar__art { background-image: none; padding: 9%; }
+.companion-avatar--өөрийн .companion-avatar__art::before, .companion-avatar--өөрийн .companion-avatar__art::after { display: none; }
+.companion-avatar--өөрийн .companion-avatar__halo { background: #f1f5ff; border-color: #dfe6f5; }
+.custom-companion { display: block; width: 100%; height: 100%; overflow: visible; }
+.custom-companion__blink { transform-box: fill-box; transform-origin: center; animation: custom-companion-blink 5.8s ease-in-out infinite; }
+@keyframes custom-companion-blink { 0%, 94%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } 96% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .custom-companion__blink { animation: none; } }

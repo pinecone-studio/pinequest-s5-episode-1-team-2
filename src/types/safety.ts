@@ -1,4 +1,5 @@
 import type { AccessoryId } from "@/types/rewards";
+import type { CustomCompanion } from "@/types/custom-companion";
 
 export type SafetyStatus = "SAFE" | "WARNING" | "HIGH_RISK";
 
@@ -39,12 +40,15 @@ export type AssistantSettings = {
   userName: string;
   name: string;
   voice: "Эмэгтэй" | "Эрэгтэй";
-  avatar: "Мило" | "Ари" | "Номи" | "Туяа" | "Мяу" | "Бамбар" | "Пип" | "Рокки";
+  /** A ready-made companion, or "Өөрийн" for the one the child built from parts. */
+  avatar: "Мило" | "Ари" | "Номи" | "Туяа" | "Мяу" | "Бамбар" | "Пип" | "Рокки" | "Өөрийн";
   tone: "Тайван" | "Найрсаг";
   speechSpeed: "Удаан" | "Энгийн";
   instructionLength: "Богино" | "Энгийн";
   /** An earned accessory the companion wears, or none. */
   accessory: AccessoryId | null;
+  /** The parts of the child's own companion, kept even while a ready-made one is chosen. */
+  custom: CustomCompanion;
 };
 
 export type CompanionProfile = {

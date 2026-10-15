@@ -1,5 +1,6 @@
 import type { AssistantSettings, CompanionProfile } from "@/types/safety";
 import { isAccessoryId } from "@/types/rewards";
+import { DEFAULT_CUSTOM_COMPANION, normalizeCustomCompanion } from "@/types/custom-companion";
 
 export const ASSISTANT_SETTINGS_STORAGE_KEY = "safepath-assistant-settings";
 
@@ -12,6 +13,7 @@ export const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = {
   speechSpeed: "Удаан",
   instructionLength: "Богино",
   accessory: null,
+  custom: DEFAULT_CUSTOM_COMPANION,
 };
 
 export function normalizeAssistantSettings(value: unknown): AssistantSettings {
@@ -27,6 +29,7 @@ export function normalizeAssistantSettings(value: unknown): AssistantSettings {
     speechSpeed: stored.speechSpeed === "Энгийн" ? "Энгийн" : "Удаан",
     instructionLength: stored.instructionLength === "Энгийн" ? "Энгийн" : "Богино",
     accessory: isAccessoryId(stored.accessory) ? stored.accessory : null,
+    custom: normalizeCustomCompanion(stored.custom),
   };
 }
 
@@ -47,5 +50,5 @@ function readText(value: unknown, fallback: string, maxLength: number) {
 }
 
 function isAvatar(value: unknown): value is AssistantSettings["avatar"] {
-  return value === "Мило" || value === "Ари" || value === "Номи" || value === "Туяа" || value === "Мяу" || value === "Бамбар" || value === "Пип" || value === "Рокки";
+  return value === "Мило" || value === "Ари" || value === "Номи" || value === "Туяа" || value === "Мяу" || value === "Бамбар" || value === "Пип" || value === "Рокки" || value === "Өөрийн";
 }
