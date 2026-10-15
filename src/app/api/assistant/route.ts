@@ -9,6 +9,7 @@ import {
   WALKING_GAME_SYSTEM_PROMPT,
 } from "@/lib/ai/safety-prompt";
 import { getGameFallback, getSafetyFallback } from "@/lib/ai/fallback-messages";
+import { tidyMongolianText } from "@/lib/ai/mongolian-text";
 import type { SafetyAssistantRequest, SafetyStatus } from "@/types/safety";
 
 export const runtime = "nodejs";
@@ -137,7 +138,7 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
 }
 
 function normalizeModelMessage(value: string | undefined) {
-  const message = value?.trim();
+  const message = value ? tidyMongolianText(value) : undefined;
   const sentenceCount = message?.split(/[.!?]+/u).filter((sentence) => sentence.trim()).length ?? 0;
   if (
     !message ||

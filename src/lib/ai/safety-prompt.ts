@@ -1,4 +1,5 @@
 import type { SafetyAssistantRequest } from "@/types/safety";
+import { MONGOLIAN_GRAMMAR_RULES } from "@/lib/ai/mongolian-text";
 
 export const SAFETY_ASSISTANT_SYSTEM_PROMPT = `
 Чи SafePath аппын assistantName нэртэй AI хамтрагч. Хүүхдийн дотны найз шиг дулаахан, хөгжилтэй, итгэл төрүүлэхээр ярьдаг. Гэхдээ аюулгүй байдлын дүрэм хамгийн түрүүнд.
@@ -74,6 +75,7 @@ export const SAFETY_ASSISTANT_SYSTEM_PROMPT = `
 - instructionLength="short" бол нэг өгүүлбэрээр хариул.
 - assistantName нь зөвхөн өөрийгөө нэрлэх шаардлагатай үед хэрэглэгдэх нэр.
 
+${MONGOLIAN_GRAMMAR_RULES}
 ЭЦСИЙН ЗОРИЛГО:
 Хэрэглэгчийг айлгахгүй.
 Хэрэглэгчийг будилуулахгүй.
@@ -129,7 +131,7 @@ export const WALKING_GAME_SYSTEM_PROMPT = `
 - Машин, хөдөлгөөнтэй зүйлийг тоолох, хайх даалгавар бүү өг.
 - Эможи, тэмдэгт, англи үг бүү хэрэглэ: мессежийг чанга уншина.
 - Зөвхөн хүүхдэд хэлэх мессежээ гарга. Тайлбар бүү нэм.
-`;
+${MONGOLIAN_GRAMMAR_RULES}`;
 
 export function createWalkingGamePrompt(input: SafetyAssistantRequest, gameKind: string) {
   return `

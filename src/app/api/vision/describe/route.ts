@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { getSessionUserId } from "@/lib/auth/dal";
 import { allowAttempt } from "@/lib/auth/rate-limit";
+import { MONGOLIAN_GRAMMAR_RULES, tidyMongolianText } from "@/lib/ai/mongolian-text";
 import { SCENE_LANDMARK_KINDS, SCENE_LANDMARK_SIDES, type SceneLandmark } from "@/types/vision";
 
 export const runtime = "nodejs";
@@ -28,7 +29,9 @@ const SCENE_SYSTEM_PROMPT = `Та SafePath нэртэй хүүхэд, гэр б�
 Зураг бүдэг, харанхуй эсвэл тодорхой бус бол summary-д үүнийг шууд хэлж, landmarks-ийг хоосон үлдээ; таамгаар нэр, хаяг, гудамж, байршил, зай, чиглэл зохиож болохгүй.
 Доорх GPS маршрут нь чиглүүлэлтийн үндсэн эх сурвалж. Зурагт харагдахгүй зүйлсийг маршруттай холбоотой гэж бүү дүгнэ, GPS зааврыг өөрчилж болохгүй. Зураг маршрутын замтай таарч байгаа эсэх тодорхойгүй бол тодорхойгүй гэдгийг хэл.
 Машин эсвэл зам харагдвал зөвхөн зурагт үндэслэн гарцаар гарах нь аюулгүй гэж хэзээ ч бүү хэл. Хүүхдэд замын захад зогсож, дохио болон асран хамгаалагчийн зааврыг шалгахыг сануул.
-GPS болон тооцоолсон маршрут үндсэн чиглүүлэгч хэвээр; зураг дангаараа бодит байршил, замын аюулгүй байдлыг баталж чадахгүй.`;
+GPS болон тооцоолсон маршрут үндсэн чиглүүлэгч хэвээр; зураг дангаараа бодит байршил, замын аюулгүй байдлыг баталж чадахгүй.
+${MONGOLIAN_GRAMMAR_RULES}
+Самбар дээрх нэрийг (жишээ нь "Huawei") уншигдсан чигээр нь үлдээж болно.`;
 
 const SCENE_RESPONSE_SCHEMA = {
   type: "object",
@@ -202,7 +205,7 @@ function readSceneRouteContext(value: unknown): SceneRouteContext | null {
 }
 
 function normalizeDescription(value: string | undefined): string | null {
-  const text = value?.replace(/\s+/g, " ").trim();
+  const text = value ? tidyMongolianText(value) : undefined;
   if (!text || text.length > 500 || !/\p{Script=Cyrillic}/u.test(text)) return null;
   return text.slice(0, 350);
 }
@@ -228,7 +231,7 @@ function parseSceneResponse(value: string | undefined): { description: string | 
 function readLandmark(value: unknown): SceneLandmark | null {
   if (!isRecord(value)) return null;
   const cleanText = (input: unknown, limit: number) =>
-    typeof input === "string" ? input.replace(/\s+/g, " ").trim().slice(0, limit) : "";
+    typeof input === "string" ? tidyMongolianText(input).slice(0, limit) : "";
 
   const label = cleanText(value.label, 48);
   if (!label) return null;
