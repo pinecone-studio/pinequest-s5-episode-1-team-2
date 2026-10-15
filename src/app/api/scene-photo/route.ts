@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
   const result = await saveScenePhoto(user.id, parsed.data);
   if (result === "too-large") return Response.json({ error: "Photo too large." }, { status: 413 });
-  return Response.json({ saved: result === "saved" });
+  return Response.json({ saved: result === "saved", ...(result === "saved" ? {} : { reason: result }) });
 }
 
 /** A guardian fetches one photo of a child linked to them. */

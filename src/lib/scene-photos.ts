@@ -21,9 +21,10 @@ export type ScenePhotoReport = z.infer<typeof ScenePhotoReportSchema>;
  * Stores the surroundings photo the child's camera took when it opened, so guardians can see
  * where the child is. Like positions, nothing is kept while sharing is paused or nobody is linked.
  */
-export async function saveScenePhoto(childId: string, report: ScenePhotoReport): Promise<"saved" | "not-shared" | "too-large"> {
+export async function saveScenePhoto(childId: string, report: ScenePhotoReport): Promise<"saved" | "paused" | "no-guardian" | "too-large"> {
   const state = await getSharingState(childId);
-  if (state.paused || state.watchers === 0) return "not-shared";
+  if (state.paused) return "paused";
+  if (state.watchers === 0) return "no-guardian";
 
   const bytes = Buffer.from(report.image.slice(report.image.indexOf(",") + 1), "base64");
   if (bytes.length > MAX_IMAGE_BYTES) return "too-large";
