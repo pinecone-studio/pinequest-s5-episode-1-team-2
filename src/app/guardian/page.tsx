@@ -114,7 +114,8 @@ function formatRelative(ts: number | null, now: number) {
 const ROUGH_ACCURACY_METERS = 100;
 
 /** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
-function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, landmarks, address, addressFailed }: {
+function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, updated, landmarks, address, addressFailed }: {
+  childId: string;
   name: string;
   latitude: number;
   longitude: number;
@@ -177,6 +178,12 @@ function ChildWhereabouts({ name, latitude, longitude, accuracy, updated, landma
       >
         <Navigation size={16} aria-hidden="true" /> {name} руу чиглэл авах
       </a>
+      <Link
+        href={`/guardian/checkpoints?child=${childId}`}
+        className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#7c3aed]/50 px-4 text-sm font-semibold text-[#c4b5fd] transition hover:bg-[#7c3aed]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c3aed]"
+      >
+        <span aria-hidden="true">🎯</span> {name}-д шалгах цэг, шагнал өгөх
+      </Link>
     </section>
   );
 }
@@ -501,6 +508,7 @@ export default function GuardianPage() {
 
             {monitoredChild && displayLocation && (
               <ChildWhereabouts
+                childId={monitoredChild.childId}
                 name={monitoredChild.name}
                 latitude={displayLocation.latitude}
                 longitude={displayLocation.longitude}
