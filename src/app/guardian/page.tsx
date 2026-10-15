@@ -114,6 +114,25 @@ function formatRelative(ts: number | null, now: number) {
 const ROUGH_ACCURACY_METERS = 100;
 
 /** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
+/** The newest surroundings photo from a child's camera, opening full size on tap. */
+function ScenePhoto({ childId, name, photo }: { childId: string; name: string; photo: { id: string; taken: string } }) {
+  const src = `/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`;
+  return (
+    <>
+      <p className="text-xs text-(--sp-muted)">📷 Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
+      <a
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block overflow-hidden rounded-xl border border-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-guardian image route; next/image would cache it publicly. */}
+        <img src={src} alt={`${name} камераа нээх үед харж байсан орчин`} className="max-h-64 w-full object-cover" loading="lazy" />
+      </a>
+    </>
+  );
+}
+
 // The child's phone reports every ~10 s while sharing; this long without one means it may be off or offline.
 const SILENT_MINUTES = 10;
 
@@ -179,21 +198,7 @@ function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, update
       </div>
       {photo && (
         <div className="mt-3 border-t border-(--sp-line) pt-3">
-          <p className="text-xs text-(--sp-muted)">📷 Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
-          <a
-            href={`/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 block overflow-hidden rounded-xl border border-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-guardian image route; next/image would cache it publicly. */}
-            <img
-              src={`/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`}
-              alt={`${name} камераа нээх үед харж байсан орчин`}
-              className="max-h-64 w-full object-cover"
-              loading="lazy"
-            />
-          </a>
+          <ScenePhoto childId={childId} name={name} photo={photo} />
         </div>
       )}
       {landmarks.length > 0 && (
@@ -294,6 +299,10 @@ export default function GuardianPage() {
     : SAFE_ZONES;
   
   const displayLocation = monitoredLocation;
+  // The child whose photo to show when no linked child has shared a position yet.
+  const photoOnlyChild = linkedChildren?.find((child) => child.childId === selectedChildId && child.photo)
+    ?? linkedChildren?.find((child) => child.photo)
+    ?? null;
   const { address: childAddress, failed: childAddressFailed } = useChildAddress(monitoredChild?.childId ?? null, monitoredLocation);
   const mapPeople: MapPerson[] = (linkedChildren ?? []).flatMap((child) =>
     child.position && !child.paused
@@ -566,6 +575,17 @@ export default function GuardianPage() {
                 </div>
               )}
             </div>
+
+            {/* Without a position yet, a photo from the camera is still worth showing on its own. */}
+            {!displayLocation && photoOnlyChild?.photo && (
+              <section className="mt-3 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label={`Орчны зураг · ${photoOnlyChild.name}`}>
+                <ScenePhoto
+                  childId={photoOnlyChild.childId}
+                  name={photoOnlyChild.name}
+                  photo={{ id: photoOnlyChild.photo.id, taken: formatRelative(new Date(photoOnlyChild.photo.takenAt).getTime(), now) }}
+                />
+              </section>
+            )}
 
             {monitoredChild && displayLocation && (
               <ChildWhereabouts
