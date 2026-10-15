@@ -83,6 +83,8 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           latitude: { bsonType: "number", minimum: -90, maximum: 90 },
           longitude: { bsonType: "number", minimum: -180, maximum: 180 },
           accuracy: { bsonType: "number", minimum: 0 },
+          batteryLevel: { bsonType: ["number", "null"], minimum: 0, maximum: 1 },
+          charging: { bsonType: ["bool", "null"] },
           updatedAt: { bsonType: "date" },
         },
       },
@@ -115,6 +117,28 @@ export const SCHEMA: Record<string, CollectionSchema> = {
       { key: { childId: 1, createdAt: -1 }, name: "childId_createdAt_desc" },
       // Reached checkpoints stay for a month as a record of the child's trips, then go.
       { key: { reachedAt: 1 }, name: "reachedAt_ttl_30_days", expireAfterSeconds: 30 * 24 * 60 * 60 },
+    ],
+  },
+  scenePhotos: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "image", "latitude", "longitude", "takenAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          image: { bsonType: "binData" },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          takenAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { childId: 1, takenAt: -1 }, name: "childId_takenAt_desc" },
+      // Photos of where a child is are as sensitive as positions: kept for a day at most.
+      { key: { takenAt: 1 }, name: "takenAt_ttl", expireAfterSeconds: 24 * 60 * 60 },
     ],
   },
   childRewards: {
@@ -243,7 +267,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
         properties: {
           _id: { bsonType: "string" },
           childId: { bsonType: "string" },
-          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS"] },
+          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS", "LOW_BATTERY"] },
           transitionKey: { bsonType: "string", minLength: 1, maxLength: 200 },
           zoneName: { bsonType: "string", maxLength: 40 },
           message: { bsonType: "string", minLength: 1, maxLength: 200 },

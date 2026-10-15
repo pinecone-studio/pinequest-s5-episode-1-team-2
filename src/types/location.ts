@@ -1,3 +1,4 @@
+import type { Binary } from "mongodb";
 import type { SafeZone } from "@/types/safety";
 import type { SceneLandmarkKind } from "@/types/vision";
 import type { RewardId } from "@/types/rewards";
@@ -9,6 +10,9 @@ export type LocationRecord = {
   longitude: number;
   /** Metres, as reported by the phone. */
   accuracy: number;
+  /** Battery charge 0–1 at the time of the report, when the phone shares it. */
+  batteryLevel?: number | null;
+  charging?: boolean | null;
   updatedAt: Date;
 };
 
@@ -71,6 +75,17 @@ export type ChildRewardsRecord = {
   updatedAt: Date;
 };
 
+/** A document in scenePhotos: what the child's camera saw when it opened. */
+export type ScenePhotoRecord = {
+  _id: string;
+  childId: string;
+  /** JPEG bytes, about 640 px on the long side. */
+  image: Binary;
+  latitude: number;
+  longitude: number;
+  takenAt: Date;
+};
+
 /** A checkpoint as the guardian's and child's pages receive it. */
 export type Checkpoint = {
   id: string;
@@ -93,9 +108,14 @@ export type ChildLocation = {
     longitude: number;
     accuracy: number;
     updatedAt: string;
+    /** Battery charge 0–1 with the last report, so a guardian knows if the phone may switch off. */
+    batteryLevel: number | null;
+    charging: boolean | null;
   } | null;
   /** Notable places the child's camera saw in the last day, newest first. */
   landmarks: SeenLandmark[];
+  /** The newest surroundings photo from the child's camera, if any in the last day. */
+  photo: { id: string; takenAt: string } | null;
   /** Estimated speed in km/h, when enough location data is available. */
   speedKmh?: number | null;
 };
