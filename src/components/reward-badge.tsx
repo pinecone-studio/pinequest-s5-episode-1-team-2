@@ -1,6 +1,6 @@
 import { describeReward, type RewardId } from "@/types/rewards";
 
-const PIXELS = { sm: 36, md: 56, lg: 132 } as const;
+const PIXELS = { sm: 36, picker: 44, md: 56, lg: 132 } as const;
 
 /** A reward's picture: the companion's artwork, or the accessory's emoji. */
 export function RewardBadge({ reward, size = "md" }: { reward: RewardId; size?: keyof typeof PIXELS }) {

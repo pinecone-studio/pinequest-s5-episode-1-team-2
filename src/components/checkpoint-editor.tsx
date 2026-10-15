@@ -84,7 +84,7 @@ export function CheckpointEditor({ childId, childName, zones, checkpoints, child
             </div>
             <fieldset>
               <legend className="text-[13px] font-semibold text-[#393a36]">Шагнал</legend>
-              <div className="mt-2 grid grid-cols-5 gap-2" role="radiogroup" aria-label="Шагнал сонгох">
+              <div className="mt-2 grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="Шагнал сонгох">
                 {[...REWARD_COMPANIONS, ...ACCESSORIES.map((accessory) => accessory.id)].map((id) => {
                   const selected = reward === id;
                   return (
@@ -96,7 +96,7 @@ export function CheckpointEditor({ childId, childName, zones, checkpoints, child
                       onClick={() => setReward(id)}
                       className={`flex flex-col items-center gap-1 rounded-xl p-1.5 text-center transition ${selected ? "bg-white ring-2 ring-[#7c3aed]" : "hover:bg-white"}`}
                     >
-                      <RewardBadge reward={id} />
+                      <RewardBadge reward={id} size="picker" />
                       <span className="text-[11px] leading-4 text-[#393a36]">{describeReward(id).label}</span>
                     </button>
                   );
