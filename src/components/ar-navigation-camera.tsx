@@ -83,6 +83,9 @@ const AUTO_SCAN_CHECK_MS = 5_000;
 const AUTO_SCAN_INTERVAL_MS = 25_000;
 const AUTO_SCAN_MIN_MOVE_METERS = 40;
 const SHARED_NOTICE_MS = 5_000;
+// The surroundings photo sent to guardians when the camera opens: small, and after exposure settles.
+const SCENE_PHOTO_MAX_PX = 640;
+const SCENE_PHOTO_DELAY_MS = 1_500;
 
 type SceneResult = {
   description: string;
@@ -865,7 +868,7 @@ export default function ArNavigationCamera({
       if (!response.ok) return;
       const result: unknown = await response.json().catch(() => null);
       if (result && typeof result === "object" && "saved" in result && typeof result.saved === "number" && result.saved > 0) {
-        setSharedNotice(notable.map((landmark) => landmark.label).join(", "));
+        setSharedNotice(`Эцэг эхийн газрын зурагт нэмэгдлээ: ${notable.map((landmark) => landmark.label).join(", ")}`);
       }
     } catch {
       // A missed share only means one fewer pin on the guardian's map.
@@ -956,6 +959,49 @@ export default function ArNavigationCamera({
       window.clearInterval(interval);
     };
   }, [isOnline, stream]);
+
+  // When the camera opens, its first clear frame goes to the guardians, so they can see where the
+  // child is. Once per opening; the child is told it was sent. The server drops it if sharing is paused.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!stream || !video) return;
+    const controller = new AbortController();
+    let sent = false;
+
+    const sendFirstFrame = async () => {
+      if (sent || video.videoWidth < 1) return;
+      sent = true;
+      const scale = Math.min(1, SCENE_PHOTO_MAX_PX / Math.max(video.videoWidth, video.videoHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+      canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) return;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const here = locationRef.current;
+      try {
+        const response = await fetch("/api/scene-photo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: canvas.toDataURL("image/jpeg", 0.6), latitude: here.latitude, longitude: here.longitude }),
+          signal: controller.signal,
+        });
+        const result: unknown = await response.json().catch(() => null);
+        if (response.ok && result && typeof result === "object" && "saved" in result && result.saved === true) {
+          setSharedNotice("📷 Орчны зураг ээж, аавд илгээгдлээ");
+        }
+      } catch {
+        // The photo is a help for guardians, never a reason to interrupt the camera.
+      }
+    };
+
+    // Give the camera a moment to settle its exposure so the first frame is not dark.
+    const timer = window.setTimeout(() => void sendFirstFrame(), SCENE_PHOTO_DELAY_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [stream]);
 
   // A short confirmation so the child knows what was shared, then it fades away.
   useEffect(() => {
@@ -1162,7 +1208,7 @@ export default function ArNavigationCamera({
 
         {sharedNotice && (
           <p role="status" className="pointer-events-auto inline-flex shrink-0 items-center gap-1.5 self-center rounded-full bg-emerald-600/95 px-3 py-1.5 text-[13px] font-bold text-white shadow-lg">
-            <MapPin size={14} aria-hidden="true" /> Эцэг эхийн газрын зурагт нэмэгдлээ: {sharedNotice}
+            <MapPin size={14} aria-hidden="true" /> {sharedNotice}
           </p>
         )}
 
