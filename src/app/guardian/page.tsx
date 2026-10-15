@@ -299,6 +299,28 @@ export default function GuardianPage() {
     : SAFE_ZONES;
   
   const displayLocation = monitoredLocation;
+  // The child new zones and checkpoints are for: the one picked in the list, else the one on the map.
+  const editChild = linkedChildren?.find((child) => child.childId === selectedChildId)
+    ?? monitoredChild
+    ?? linkedChildren?.[0]
+    ?? null;
+  // With no position yet, the map still opens: on the child's zones, the guardian, or central Ulaanbaatar.
+  const mapZones = displayLocation ? monitoredZones : editChild?.zones ?? [];
+  const mapLocation = displayLocation ?? (mapZones[0]
+    ? { latitude: mapZones[0].latitude, longitude: mapZones[0].longitude, accuracy: 0, lastUpdated: 0 }
+    : location
+      ? { latitude: location.latitude, longitude: location.longitude, accuracy: 0, lastUpdated: 0 }
+      : { latitude: 47.9186, longitude: 106.9176, accuracy: 0, lastUpdated: 0 });
+  const [picked, setPicked] = useState<{ latitude: number; longitude: number } | null>(null);
+  const addHref = (page: "zones" | "checkpoints", point?: { latitude: number; longitude: number } | null) => {
+    const params = new URLSearchParams();
+    if (editChild) params.set("child", editChild.childId);
+    if (point) {
+      params.set("lat", point.latitude.toFixed(6));
+      params.set("lng", point.longitude.toFixed(6));
+    }
+    return `/guardian/${page}?${params.toString()}`;
+  };
   // The child whose photo to show when no linked child has shared a position yet.
   const photoOnlyChild = linkedChildren?.find((child) => child.childId === selectedChildId && child.photo)
     ?? linkedChildren?.find((child) => child.photo)
@@ -515,20 +537,47 @@ export default function GuardianPage() {
 
           <div id="location" className={`px-4 ${activeTab === "alerts" ? "hidden" : ""}`}>
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
-              {displayLocation ? (
+              {linkedChildren && linkedChildren.length > 0 ? (
                 <>
                   <LiveMap
                     key={mapKey}
-                    location={displayLocation}
+                    location={mapLocation}
                     people={mapPeople}
                     landmarks={monitoredChild?.landmarks ?? []}
-                    safeZones={monitoredZones}
+                    checkpoints={editChild?.checkpoints ?? []}
+                    safeZones={mapZones}
                     currentRoute={currentRoute}
                     familiarRoute={familiarRoute}
+                    hideCenterDot={!displayLocation}
+                    onPick={(latitude, longitude) => setPicked({ latitude, longitude })}
                     className="h-full rounded-none border-0"
                   />
 
-                  {typeof displayLocation.accuracy === "number" && (
+                  {!displayLocation && !picked && (
+                    <p className="absolute left-3 right-16 top-3 z-400 rounded-xl border border-(--sp-line) bg-black/80 px-3 py-2 text-[12px] leading-5 text-(--sp-muted) shadow-sm backdrop-blur">
+                      Хүүхдийн байршил хараахан ирээгүй байна. Газрын зураг дээр дарж аюулгүй бүс, шалгах цэг нэмж болно.
+                    </p>
+                  )}
+
+                  {/* A tapped point: choose what to add there. */}
+                  {picked && (
+                    <div role="dialog" aria-label="Энд юу нэмэх вэ" className="absolute inset-x-3 bottom-3 z-500 rounded-2xl border border-(--sp-line) bg-black/90 p-3 shadow-lg backdrop-blur">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">📍 Энд юу нэмэх вэ?</p>
+                        <button type="button" onClick={() => setPicked(null)} aria-label="Хаах" className="grid size-9 place-items-center rounded-full text-(--sp-muted) hover:bg-white/10">✕</button>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <Link href={addHref("zones", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-(--sp-safe-bg) text-sm font-semibold text-(--sp-safe) ring-1 ring-(--sp-safe)/40">
+                          🛡️ Аюулгүй бүс
+                        </Link>
+                        <Link href={addHref("checkpoints", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#7c3aed]/20 text-sm font-semibold text-[#c4b5fd] ring-1 ring-[#7c3aed]/50">
+                          🎯 Шалгах цэг
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {displayLocation && typeof displayLocation.accuracy === "number" && (
                     <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
                       ±{Math.round(displayLocation.accuracy)} м
                     </span>
@@ -552,29 +601,39 @@ export default function GuardianPage() {
                     </svg>
                   </button>
 
-                  <div
+                  {!picked && <div
                     aria-label="Газрын зургийн тэмдэглэгээ"
                     className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
                   >
                     <Legend dot="bg-[#2a7fff]" label="Хүүхэд" />
                     <Legend dot="bg-[#f59e0b]" label="Харсан газар" />
+                    {(editChild?.checkpoints.length ?? 0) > 0 && <Legend dot="bg-[#a78bfa]" label="Шалгах цэг" />}
                     <Legend dot="bg-(--sp-secondary)" label="Одоогийн зам" />
                     <span className="inline-flex items-center gap-1.5">
                       <i className="h-0 w-4 border-t border-dashed border-(--sp-muted)" />
                       Танил зам
                     </span>
-                  </div>
+                  </div>}
                 </>
               ) : (
                 <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-(--sp-muted)">
                   {linkedChildren === null
                     ? <SafePathLoading className="flex-col gap-1" label="Хүүхдийн байршлыг ачаалж байна…" />
-                    : linkedChildren.length === 0
-                      ? "Хүүхэд холбогдоогүй байна. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана."
-                      : "Хүүхдийн байршил хараахан ирээгүй байна. Хүүхдийн утсан дээр SafePath нээлттэй, байршлын зөвшөөрөл өгсөн эсэхийг шалгаарай."}
+                    : "Хүүхэд холбогдоогүй байна. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана."}
                 </div>
               )}
             </div>
+
+            {editChild && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link href={addHref("zones")} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-(--sp-line) bg-(--sp-surface) text-sm font-semibold text-(--sp-safe)">
+                  + Аюулгүй бүс
+                </Link>
+                <Link href={addHref("checkpoints")} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-(--sp-line) bg-(--sp-surface) text-sm font-semibold text-[#c4b5fd]">
+                  + Шалгах цэг
+                </Link>
+              </div>
+            )}
 
             {/* Without a position yet, a photo from the camera is still worth showing on its own. */}
             {!displayLocation && photoOnlyChild?.photo && (
@@ -727,24 +786,6 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`tel:${phone || "+97600000000"}`}
-              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-[15px] font-semibold text-emerald-400 backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              <PhoneIcon />
-              Залгах
-            </a>
-            <a
-              href="#location"
-              onClick={() => setActiveTab("map")}
-              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[#22d3ee]/40 bg-(--sp-primary-soft) text-[15px] font-medium text-[#22d3ee] backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              Байршил
-            </a>
-          </div>
-        </div>
       </div>
     </AppShell>
   );
