@@ -49,7 +49,7 @@ export function RoleHome() {
             <RoleForm role="guardian">
               <button
                 type="submit"
-                className="group relative flex min-h-[150px] w-full flex-col items-start gap-4 rounded-[22px] border border-[#22d3ee]/70 bg-[#0e7490] p-3.5 text-left shadow-[0_14px_32px_rgba(6,182,212,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#0c819d] hover:shadow-[0_16px_36px_rgba(6,182,212,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[200px] sm:p-4"
+                className="group relative flex min-h-[160px] w-full flex-col items-start gap-3 rounded-[22px] border border-[#22d3ee]/70 bg-[#0e7490] p-3.5 pb-9 text-left shadow-[0_14px_32px_rgba(6,182,212,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#0c819d] hover:shadow-[0_16px_36px_rgba(6,182,212,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[210px] sm:p-4 sm:pb-10"
               >
                 <span className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-white/15 text-white shadow-sm sm:size-[52px] sm:rounded-[18px]">
                   <ShieldCheck size={23} strokeWidth={1.8} />
@@ -71,7 +71,7 @@ export function RoleHome() {
             <RoleForm role="child">
               <button
                 type="submit"
-                className="group relative flex min-h-[150px] w-full flex-col items-start gap-4 rounded-[22px] border border-[#22d3ee]/45 bg-[#155e75] p-3.5 text-left shadow-[0_14px_32px_rgba(8,145,178,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#176b83] hover:shadow-[0_16px_36px_rgba(8,145,178,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[200px] sm:p-4"
+                className="group relative flex min-h-[160px] w-full flex-col items-start gap-3 rounded-[22px] border border-[#22d3ee]/45 bg-[#155e75] p-3.5 pb-9 text-left shadow-[0_14px_32px_rgba(8,145,178,.2)] transition duration-200 active:scale-[.99] hover:border-[#67e8f9] hover:bg-[#176b83] hover:shadow-[0_16px_36px_rgba(8,145,178,.3)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] sm:min-h-[210px] sm:p-4 sm:pb-10"
               >
                 <span className="grid size-11 shrink-0 place-items-center rounded-[15px] bg-white/15 text-white shadow-sm sm:size-[52px] sm:rounded-[18px]">
                   <UserRound size={22} strokeWidth={1.8} />
