@@ -321,7 +321,7 @@ export default function GuardianPage() {
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
         />
-        <main className="relative min-h-dvh pb-[calc(150px+env(safe-area-inset-bottom))]">
+        <main className="relative min-h-dvh pb-[calc(84px+env(safe-area-inset-bottom))]">
           {!isOnline && (
             <div role="status" aria-live="polite" className="mx-4 mt-3 rounded-xl border border-amber-300/35 bg-amber-950/70 px-3 py-2 text-sm leading-5 text-amber-100">
               Интернет тасарсан байна. Хүүхдийн сүүлийн мэдээлэл харагдаж болох ч шинэ байршил, Safe Zone дохио серверээс шинэчлэгдэхгүй байж болно.
@@ -344,26 +344,44 @@ export default function GuardianPage() {
                 </p>
               </div>
             </div>
-            <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
+            <div className="flex shrink-0 items-center gap-1">
+              {safetyState ? (
+                <StatusIndicator status={safetyState.riskLevel} />
+              ) : (
+                <span className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium tracking-[0.02em] text-(--sp-muted)">
+                  <span className="size-2 rounded-full bg-current" aria-hidden="true" />
+                  ТОДОРХОЙГҮЙ
+                </span>
+              )}
+              {phone && (
+                <a
+                  href={`tel:${phone}`}
+                  aria-label="Яаралтай дугаар руу залгах"
+                  className="grid size-11 place-items-center rounded-full text-emerald-400 transition hover:bg-emerald-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                >
+                  <PhoneIcon />
+                </a>
+              )}
+            </div>
           </header>
 
           <section
             role={tone === "risk" ? "alert" : "status"}
             aria-live="polite"
-            className={`mx-4 mb-3 rounded-2xl px-4 py-3 ${TONE[tone].bg} ${activeTab === "alerts" ? "hidden" : ""}`}
+            className={`mx-4 mb-3 mt-3 rounded-2xl px-4 py-3 ${safetyState ? TONE[tone].bg : "bg-(--sp-surface)"} ${activeTab === "alerts" ? "hidden" : ""}`}
           >
             <div className="flex items-center gap-2">
               <span
-                className={`size-2.5 shrink-0 rounded-full ${TONE[tone].bar} ${
+                className={`size-2.5 shrink-0 rounded-full ${safetyState ? TONE[tone].bar : "bg-(--sp-muted)"} ${
                   tone === "risk" ? "animate-pulse" : ""
                 }`}
               />
-              <p className={`text-[17px] font-semibold ${TONE[tone].text}`}>
+              <p className={`text-[17px] font-semibold ${safetyState ? TONE[tone].text : "text-(--sp-ink)"}`}>
                 {headline}
               </p>
             </div>
             <p className="mt-1 pl-4.5 text-sm text-(--sp-muted)">
-              {subline} · {formatRelative(lastUpdate, now)}
+              {lastUpdate ? `${subline} · ${formatRelative(lastUpdate, now)}` : subline}
             </p>
           </section>
 
@@ -640,24 +658,6 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
-<div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`tel:${phone || "+97600000000"}`}
-              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-[15px] font-semibold text-emerald-400 backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              <PhoneIcon />
-              Залгах
-            </a>
-            <a
-              href="#location"
-              onClick={() => setActiveTab("map")}
-              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[#22d3ee]/40 bg-(--sp-primary-soft) text-[15px] font-medium text-[#22d3ee] backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              Байршил
-            </a>
-          </div>
-        </div>
       </div>
     </AppShell>
   );
@@ -709,7 +709,7 @@ function TabBar({
   return (
     <nav
       aria-label="Асран хамгаалагчийн цэс"
-      className="fixed inset-x-0 bottom-[calc(74px+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-107.5 border-t border-[rgba(79,143,168,0.15)] bg-black/85 backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-[rgba(79,143,168,0.15)] bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
     >
       <ul className="grid grid-cols-4">
         {TABS.map((tab) => {
