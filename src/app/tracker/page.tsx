@@ -805,10 +805,10 @@ export default function TrackerPage() {
               <ChevronLeft size={24} aria-hidden="true" />
             </Link>
             <div className="inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.02em]">
-              <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_4px_12px_rgba(6,182,212,.25)]">
+              <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
                 <svg
                   viewBox="0 0 24 24"
-                  className="size-[15px]"
+                  className="size-[22px]"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.2"
@@ -821,7 +821,9 @@ export default function TrackerPage() {
                   <circle cx="12" cy="10" r="2.5" fill="currentColor" />
                 </svg>
               </span>
-              SafePath
+              <span className="text-[18px] font-bold tracking-[-0.04em]">
+                SafePath
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">

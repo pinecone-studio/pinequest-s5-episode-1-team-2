@@ -37,7 +37,7 @@ export default async function TrackerCodePage() {
             >
               <ChevronLeft size={22} aria-hidden="true" />
             </Link>
-            <span className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_4px_12px_rgba(6,182,212,.25)]">
+            <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
               <svg
                 viewBox="0 0 24 24"
                 className="size-[22px]"
