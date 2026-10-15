@@ -11,6 +11,7 @@ import {
   VolumeX,
   WifiOff,
 } from "lucide-react";
+import {ChevronLeft, Settings, Volume2, VolumeX, WifiOff} from "lucide-react";
 import {LocationSharingStatus} from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
@@ -197,7 +198,10 @@ export default function TrackerPage() {
   };
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
-  const activeZones = demoMode ? SAFE_ZONES : savedZones;
+  // Demo uses the guardian's own saved zones (e.g. "Гэр"); the sample list is only a fallback
+  // for when nothing has been saved yet.
+  const demoZones = savedZones.length > 0 ? savedZones : SAFE_ZONES;
+  const activeZones = demoMode ? demoZones : savedZones;
   const targetZone = useMemo(() => {
     if (!currentLocation || activeZones.length === 0) return null;
     return (
@@ -884,7 +888,7 @@ export default function TrackerPage() {
           className="pointer-events-none absolute -bottom-24 -left-24 size-64 rounded-full bg-[#0e7490]/20 blur-3xl"
         />
 
-        <header className="relative z-10 flex min-h-14 items-center justify-between gap-2">
+        <header className="relative z-10 flex min-h-12 items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-1">
             <Link
               href="/"
@@ -893,11 +897,11 @@ export default function TrackerPage() {
             >
               <ChevronLeft size={24} aria-hidden="true" />
             </Link>
-            <div className="inline-flex items-center gap-2 text-[17px] font-bold tracking-[-0.02em]">
-              <span className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_4px_12px_rgba(6,182,212,.25)]">
+            <div className="inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.02em]">
+              <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
                 <svg
                   viewBox="0 0 24 24"
-                  className="size-[17px]"
+                  className="size-[22px]"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.2"
@@ -910,7 +914,9 @@ export default function TrackerPage() {
                   <circle cx="12" cy="10" r="2.5" fill="currentColor" />
                 </svg>
               </span>
-              SafePath
+              <span className="text-[18px] font-bold tracking-[-0.04em]">
+                SafePath
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -924,9 +930,20 @@ export default function TrackerPage() {
             )}
             <button
               type="button"
-              onClick={() => setDemoMode((value) => !value)}
+              onClick={() => {
+                if (!demoMode) {
+                  const start = demoZones[0];
+                  setDemoLocation({
+                    latitude: start.latitude,
+                    longitude: start.longitude,
+                    accuracy: 5,
+                    lastUpdated: Date.now(),
+                  });
+                }
+                setDemoMode((value) => !value);
+              }}
               aria-pressed={demoMode}
-              className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] font-bold transition ${
+              className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-bold transition ${
                 demoMode
                   ? "border-[#67e8f9] bg-[#0e7490] text-white"
                   : "border-[#67e8f9]/25 bg-[#101c22] text-[#b7c7cc]"
@@ -951,10 +968,10 @@ export default function TrackerPage() {
         </header>
 
         {/* The companion stays on screen in every state and speaks its own messages: large in the
-            middle while calm, a small strip above the camera while guiding. */}
+           middle while calm, a small strip above the camera while guiding. */}
         <section
           aria-label={`${companionName} AI туслах`}
-          className={`relative z-10 flex gap-3 ${
+          className={`relative z-10 flex gap-2 ${
             guiding
               ? "items-center"
               : "flex-1 flex-col items-center justify-center"
@@ -986,18 +1003,28 @@ export default function TrackerPage() {
             )}
           </Link>
           <div
-            className={`flex min-w-0 items-center gap-3 ${
+            className={`flex min-w-0 items-center gap-2 ${
               guiding ? "flex-1" : "w-full"
             }`}
           >
             <p
               aria-live="polite"
               aria-busy={assistantLoading}
-              className={`line-clamp-4 min-w-0 flex-1 rounded-2xl bg-[#10232b] px-4 py-3 text-[17px] font-semibold leading-6 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
-                guiding ? "rounded-tl-md" : "text-center"
+              className={`min-w-0 flex-1 rounded-2xl bg-[#10232b] font-semibold text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
+                guiding
+                  ? "rounded-tl-md px-3 py-2 text-[13px] leading-[18px]"
+                  : "px-4 py-3 text-center text-[15px] leading-[22px]"
               }`}
             >
-              {companionMessage}
+              {/* Clamp on an inner span so the border grows with the text and
+                  no half-cut line leaks into the padding. */}
+              <span
+                className={`block break-words ${
+                  guiding ? "line-clamp-3" : "line-clamp-4"
+                }`}
+              >
+                {companionMessage}
+              </span>
             </p>
             {safetyState?.riskLevel === "SAFE" && (
               <button
@@ -1018,14 +1045,16 @@ export default function TrackerPage() {
               onClick={() => void speakMessage(assistantMessage)}
               aria-label={`Дахин сонсох: ${companionName}`}
               className="grid size-12 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+              aria-label={`${companionName}-г дахин сонсох`}
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
             >
               {assistantLoading || speechStatus === "loading" ? (
                 <SafePathLoading variant="button" />
               ) : speechError ? (
-                <VolumeX size={22} aria-hidden="true" />
+                <VolumeX size={18} aria-hidden="true" />
               ) : (
                 <Volume2
-                  size={22}
+                  size={18}
                   className={speechStatus === "playing" ? "animate-pulse" : ""}
                   aria-hidden="true"
                 />
@@ -1041,7 +1070,7 @@ export default function TrackerPage() {
         {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
         <div
           className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
-            guiding ? "min-h-[360px] flex-1" : "h-[230px] shrink-0"
+            guiding ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
           }`}
         >
           {guiding && currentLocation ? (
@@ -1089,7 +1118,7 @@ export default function TrackerPage() {
           ) : (
             <div
               role="status"
-              className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-4 py-3 text-sm leading-5 text-[#d4e1e5] backdrop-blur"
+              className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-3 py-2.5 text-[13px] leading-5 text-[#d4e1e5] backdrop-blur"
             >
               {locationStatus === "loading" ? (
                 <SafePathLoading
@@ -1114,14 +1143,14 @@ export default function TrackerPage() {
         <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
           {sosConfirm && !demoMode ? (
             <div className="rounded-2xl border border-rose-400/40 bg-[#140d12] p-3">
-              <p className="text-center text-[16px] font-bold text-white">
+              <p className="text-center text-[14px] font-bold text-white">
                 Асран хамгаалагчдаа SOS илгээх үү?
               </p>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setSosConfirm(false)}
-                  className="min-h-12 rounded-xl border border-white/15 px-3 text-[15px] font-semibold text-white"
+                  className="min-h-11 rounded-xl border border-white/15 px-3 text-[14px] font-semibold text-white"
                 >
                   Болих
                 </button>
@@ -1129,7 +1158,7 @@ export default function TrackerPage() {
                   type="button"
                   onClick={() => void sendSos()}
                   disabled={sosStatus === "sending"}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[15px] font-bold text-white disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[14px] font-bold text-white disabled:opacity-50"
                 >
                   {sosStatus === "sending" && (
                     <SafePathLoading variant="button" />
@@ -1147,7 +1176,7 @@ export default function TrackerPage() {
                 setSosStatus("idle");
                 setSosMessage("");
               }}
-              className="min-h-14 w-full rounded-2xl bg-rose-600 px-4 text-[17px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+              className="min-h-12 w-full rounded-2xl bg-rose-600 px-4 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
             >
               🆘 SOS — Тусламж дуудах
             </button>
@@ -1155,7 +1184,7 @@ export default function TrackerPage() {
           {sosMessage && (
             <p
               role={sosStatus === "error" ? "alert" : "status"}
-              className={`mt-2 rounded-xl px-3 py-2 text-center text-sm leading-5 ${
+              className={`mt-2 rounded-xl px-3 py-2 text-center text-[13px] leading-5 ${
                 sosStatus === "error"
                   ? "bg-rose-500/10 text-rose-200"
                   : sosStatus === "sent"
@@ -1268,7 +1297,7 @@ function DemoPad({
       type="button"
       onClick={() => onMove(direction)}
       aria-label={label}
-      className={`grid size-9 place-items-center rounded-xl bg-white/10 text-[17px] text-white transition active:scale-90 active:bg-white/25 ${area}`}
+      className={`grid size-7 place-items-center rounded-lg bg-white/10 text-[13px] text-white transition active:scale-90 active:bg-white/25 ${area}`}
     >
       {glyph}
     </button>
@@ -1276,14 +1305,14 @@ function DemoPad({
   return (
     <div
       aria-label="Demo байршил хөдөлгөх"
-      className="absolute left-3 top-1/2 z-[410] grid -translate-y-1/2 grid-cols-3 grid-rows-3 gap-1 rounded-2xl bg-[#071116]/70 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
+      className="absolute bottom-3 left-3 z-[410] grid grid-cols-3 grid-rows-3 gap-0.5 rounded-xl bg-[#071116]/70 p-1 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
     >
       {arrow("up", "Demo: хойд зүг рүү", "↑", "col-start-2")}
       {arrow("left", "Demo: баруун зүг рүү", "←", "col-start-1 row-start-2")}
       <span
         role="status"
         aria-label={`Demo төлөв: ${riskLevel ?? "тодорхойгүй"}`}
-        className={`col-start-2 row-start-2 m-auto size-3 rounded-full ${
+        className={`col-start-2 row-start-2 m-auto size-2.5 rounded-full ${
           riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"
         }`}
       />

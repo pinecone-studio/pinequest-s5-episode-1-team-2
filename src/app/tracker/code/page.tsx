@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { ChevronLeft, LogOut, MapPin, Shield, UserX } from "lucide-react";
-import { logout, unlink } from "@/app/actions/auth";
-import { CodeGenerator } from "@/components/auth/pairing";
-import { AppShell } from "@/components/safe-path";
-import { requireRole } from "@/lib/auth/dal";
-import { listLinkedPeople } from "@/lib/auth/pairing";
+import {ChevronLeft, LogOut, MapPin, Shield, UserX} from "lucide-react";
+import {logout, unlink} from "@/app/actions/auth";
+import {CodeGenerator} from "@/components/auth/pairing";
+import {AppShell} from "@/components/safe-path";
+import {requireRole} from "@/lib/auth/dal";
+import {listLinkedPeople} from "@/lib/auth/pairing";
 
 export default async function TrackerCodePage() {
   const child = await requireRole("child");
@@ -29,7 +29,6 @@ export default async function TrackerCodePage() {
         />
 
         <div className="mx-auto w-full max-w-[420px]">
-
           <header className="relative z-10 flex h-14 w-full items-center gap-2.5">
             <Link
               href="/tracker"
@@ -39,7 +38,20 @@ export default async function TrackerCodePage() {
               <ChevronLeft size={22} aria-hidden="true" />
             </Link>
             <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
-              <MapPin size={22} fill="currentColor" strokeWidth={2.2} />
+              <svg
+                viewBox="0 0 24 24"
+                className="size-[22px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12" cy="10" r="2.5" fill="currentColor" />
+              </svg>
             </span>
             <span className="text-[18px] font-bold tracking-[-0.04em]">
               SafePath
@@ -50,14 +62,12 @@ export default async function TrackerCodePage() {
           </header>
 
           <div className="relative z-10 pt-4">
-
             <div className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-cyan-500/10 bg-cyan-500/5 py-2.5 text-center">
               <Shield size={16} className="text-[#67e8f9]" />
               <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-[#67e8f9]">
                 Аюулгүй байдлын тохиргоо
               </p>
             </div>
-
 
             <section
               aria-label="Холбох код авах"
@@ -81,7 +91,6 @@ export default async function TrackerCodePage() {
                 <CodeGenerator />
               </div>
             </section>
-
 
             <section className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.035] p-5 backdrop-blur-md">
               <div className="mb-3 flex items-center justify-between gap-3">

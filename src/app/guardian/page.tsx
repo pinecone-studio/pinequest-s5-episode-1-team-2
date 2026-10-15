@@ -658,6 +658,24 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
+        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
+          <div className="grid grid-cols-2 gap-2">
+            <a
+              href={`tel:${phone || "+97600000000"}`}
+              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-[15px] font-semibold text-emerald-400 backdrop-blur transition-transform active:scale-[0.97]"
+            >
+              <PhoneIcon />
+              Залгах
+            </a>
+            <a
+              href="#location"
+              onClick={() => setActiveTab("map")}
+              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[#22d3ee]/40 bg-(--sp-primary-soft) text-[15px] font-medium text-[#22d3ee] backdrop-blur transition-transform active:scale-[0.97]"
+            >
+              Байршил
+            </a>
+          </div>
+        </div>
       </div>
     </AppShell>
   );
