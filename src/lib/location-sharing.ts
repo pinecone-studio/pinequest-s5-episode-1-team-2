@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { zonesByChild } from "@/lib/child-zones";
 import { checkReachedCheckpoints, openCheckpointsByChild } from "@/lib/checkpoints";
+import { sendCheckpointReachedPush } from "@/lib/push/firebase";
 import { createLowBatteryAlert, LOW_BATTERY_LEVEL, updateChildGeofenceState } from "@/lib/safety-alerts";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
 import type { ChildLocation, SeenLandmark, SharingState } from "@/types/location";
@@ -95,7 +96,10 @@ export async function saveChildLocation(childId: string, { ageMs, batteryLevel =
 
   // A reached checkpoint is a reward, not a safety event: a failure here must not stop the geofence check.
   try {
-    await checkReachedCheckpoints(childId, { ...position, updatedAt });
+    const reached = await checkReachedCheckpoints(childId, { ...position, updatedAt });
+    await Promise.all(reached.map((checkpoint) =>
+      sendCheckpointReachedPush(childId, checkpoint.name).catch(() => console.error("SAFEPATH_CHECKPOINT_PUSH_FAILED")),
+    ));
   } catch (error) {
     console.error("SAFEPATH_CHECKPOINT_CHECK_FAILED", error);
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { PartyPopper, Sparkles, Star, Target } from "lucide-react";
+import { Navigation, PartyPopper, Sparkles, Star, Target, X } from "lucide-react";
 import { RewardBadge } from "@/components/reward-badge";
 import { describeReward } from "@/types/rewards";
 import type { Checkpoint } from "@/types/location";
@@ -20,8 +20,17 @@ function formatDistance(meters: number) {
   return `${(meters / 1000).toFixed(1)} км`;
 }
 
-/** The child's current goal: where to go, how far, and what they win. */
-export function CheckpointGoal({ goal, location, compact = false }: { goal: Checkpoint; location: Point | null; compact?: boolean }) {
+/**
+ * The child's current goal: where to go, how far, and what they win. `onGuide` offers to walk
+ * there with the camera; `onStop` ends that walk.
+ */
+export function CheckpointGoal({ goal, location, compact = false, onGuide, onStop }: {
+  goal: Checkpoint;
+  location: Point | null;
+  compact?: boolean;
+  onGuide?: () => void;
+  onStop?: () => void;
+}) {
   const reward = describeReward(goal.reward);
   const remaining = location ? Math.max(0, metersBetween(location, goal) - goal.radiusMeters) : null;
   return (
@@ -40,6 +49,26 @@ export function CheckpointGoal({ goal, location, compact = false }: { goal: Chec
         <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[13px] font-bold text-white">
           {remaining < 5 ? "Ирлээ!" : formatDistance(remaining)}
         </span>
+      )}
+      {onGuide && (
+        <button
+          type="button"
+          onClick={onGuide}
+          className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-white px-3 text-[13px] font-bold text-[#4c1d95] transition hover:bg-[#ede9fe] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          <Navigation size={14} aria-hidden="true" />
+          Зам заах
+        </button>
+      )}
+      {onStop && (
+        <button
+          type="button"
+          onClick={onStop}
+          aria-label="Зам заахыг зогсоох"
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-white/15 text-white transition hover:bg-white/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
       )}
     </section>
   );

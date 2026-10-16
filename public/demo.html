@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafePath Demo</title>
+<style>
+  /* Танилцуулгын үед аппыг Android утасны хүрээн дотор харуулна.
+     Нэг домэйн дээр байх ёстой (login cookie нь sameSite=lax), тиймээс public/ дотор байна.
+     ?path=/tracker гэж аль хуудсаас эхлэхийг зааж болно. R = дахин ачаалах. */
+  :root {
+    --stage: #071116;
+    --glow: rgba(56, 189, 248, 0.12);
+    --bezel: #0b0d10;
+    --bezel-edge: #2a2f36;
+    --screen-w: 412px;
+    --screen-h: 915px;
+    --status-h: 30px;
+    --scale: 1;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(ellipse at 50% 40%, var(--glow), transparent 60%), var(--stage);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .stage {
+    width: calc((var(--screen-w) + 28px) * var(--scale));
+    height: calc((var(--screen-h) + 28px) * var(--scale));
+  }
+  .phone {
+    position: relative;
+    width: calc(var(--screen-w) + 28px);
+    height: calc(var(--screen-h) + 28px);
+    padding: 14px;
+    border-radius: 56px;
+    background: var(--bezel);
+    box-shadow:
+      0 0 0 2px var(--bezel-edge),
+      0 0 0 4px #15181d,
+      0 40px 80px rgba(0, 0, 0, 0.6);
+    transform: scale(var(--scale));
+    transform-origin: top left;
+  }
+  /* Хажуугийн товчлуурууд */
+  .phone::before, .phone::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    width: 4px;
+    border-radius: 0 3px 3px 0;
+    background: var(--bezel-edge);
+  }
+  .phone::before { top: 180px; height: 70px; }
+  .phone::after { top: 290px; height: 120px; }
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 42px;
+    overflow: hidden;
+    background: var(--stage);
+    display: flex;
+    flex-direction: column;
+  }
+  .status {
+    height: var(--status-h);
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 26px;
+    color: #e6edf3;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+  }
+  .punch {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 50%;
+    background: #000;
+    box-shadow: inset 0 0 0 2px #1b1f24;
+  }
+  .icons { display: flex; gap: 6px; align-items: center; }
+  .icons svg { width: 15px; height: 15px; fill: currentColor; }
+  iframe {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: var(--stage);
+  }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="phone">
+      <div class="screen">
+        <div class="status">
+          <span id="clock">9:41</span>
+          <span class="punch"></span>
+          <span class="icons" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 21 1 8.5a16 16 0 0 1 22 0z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M2 22h20V2z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M8 3h8v2h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2z"/></svg>
+          </span>
+        </div>
+        <iframe id="app" title="SafePath" allow="camera; microphone; geolocation; autoplay; fullscreen; clipboard-write"></iframe>
+      </div>
+    </div>
+  </div>
+<script>
+  const app = document.getElementById("app");
+  const path = new URLSearchParams(location.search).get("path") || "/";
+  app.src = path.startsWith("/") ? path : "/";
+
+  // Жинхэнэ утас шиг scrollbar харагдахгүй байлгана (нэг домэйн тул iframe-д хандаж болно).
+  app.addEventListener("load", () => {
+    try {
+      const style = app.contentDocument.createElement("style");
+      style.textContent = "html{scrollbar-width:none}::-webkit-scrollbar{display:none}";
+      app.contentDocument.head.appendChild(style);
+    } catch {}
+  });
+
+  function fit() {
+    const root = document.documentElement;
+    const css = getComputedStyle(root);
+    const w = parseFloat(css.getPropertyValue("--screen-w")) + 28;
+    const h = parseFloat(css.getPropertyValue("--screen-h")) + 28;
+    const scale = Math.min((innerHeight - 48) / h, (innerWidth - 48) / w, 1.2);
+    root.style.setProperty("--scale", scale.toFixed(3));
+  }
+  addEventListener("resize", fit);
+  fit();
+
+  const clock = document.getElementById("clock");
+  function tick() {
+    const d = new Date();
+    clock.textContent = d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  tick();
+  setInterval(tick, 10000);
+
+  addEventListener("keydown", (e) => {
+    if (e.key === "r" || e.key === "R") app.contentWindow.location.reload();
+  });
+</script>
+</body>
+</html>

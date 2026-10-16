@@ -97,12 +97,12 @@ function formatRelative(ts: number | null, now: number) {
 const ROUGH_ACCURACY_METERS = 100;
 
 /** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
-/** The newest surroundings photo from a child's camera, opening full size on tap. */
+/** The newest photo from the child: from the camera opening, or a building photo sent for a walking task. Opens full size on tap. */
 function ScenePhoto({ childId, name, photo }: { childId: string; name: string; photo: { id: string; taken: string } }) {
   const src = `/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`;
   return (
     <>
-      <p className="inline-flex items-center gap-1.5 text-xs text-(--sp-muted)"><Camera size={13} aria-hidden="true" /> Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
+      <p className="inline-flex items-center gap-1.5 text-xs text-(--sp-muted)"><Camera size={13} aria-hidden="true" /> Хүүхдийн илгээсэн орчны зураг · {photo.taken}</p>
       <a
         href={src}
         target="_blank"
@@ -110,7 +110,7 @@ function ScenePhoto({ childId, name, photo }: { childId: string; name: string; p
         className="mt-2 block overflow-hidden rounded-xl border border-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-guardian image route; next/image would cache it publicly. */}
-        <img src={src} alt={`${name} камераа нээх үед харж байсан орчин`} className="max-h-64 w-full object-cover" loading="lazy" />
+        <img src={src} alt={`${name} илгээсэн орчны зураг`} className="max-h-64 w-full object-cover" loading="lazy" />
       </a>
     </>
   );

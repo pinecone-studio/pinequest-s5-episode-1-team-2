@@ -42,6 +42,9 @@ type LiveMapProps = {
   safeZones?: SafeZone[];
   currentRoute?: [number, number][];
   destination?: Pick<SafetyLocation, "latitude" | "longitude">;
+  /** Shown beside the destination dot, so the child sees where the line leads. */
+  destinationName?: string;
+  destinationColor?: string;
   familiarRoute?: [number, number][];
   variant?: "guardian" | "companion";
   routeColor?: string;
@@ -50,7 +53,7 @@ type LiveMapProps = {
   className?: string;
 };
 
-export default function LiveMap({ location, people = [], landmarks = [], checkpoints = [], onPick, hideCenterDot = false, safeZones = SAFE_ZONES, currentRoute = [], destination, familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
+export default function LiveMap({ location, people = [], landmarks = [], checkpoints = [], onPick, hideCenterDot = false, safeZones = SAFE_ZONES, currentRoute = [], destination, destinationName, destinationColor = "#2e7d4f", familiarRoute = [], variant = "guardian", routeColor = "#2e7d4f", showCredit = true, className = "" }: LiveMapProps) {
   const center: [number, number] = [location.latitude, location.longitude];
   const companion = variant === "companion";
   const [tileError, setTileError] = useState(false);
@@ -100,8 +103,10 @@ export default function LiveMap({ location, people = [], landmarks = [], checkpo
         {destination && <CircleMarker
           center={[destination.latitude, destination.longitude]}
           radius={8}
-          pathOptions={{ color: "#ffffff", fillColor: "#2e7d4f", fillOpacity: 1, weight: 3 }}
-        />}
+          pathOptions={{ color: "#ffffff", fillColor: destinationColor, fillOpacity: 1, weight: 3 }}
+        >
+          {destinationName && <Tooltip direction="top" offset={[0, -8]} permanent>{destinationName}</Tooltip>}
+        </CircleMarker>}
         {!companion && checkpoints.map((checkpoint) => (
           <Circle
             key={checkpoint.id}

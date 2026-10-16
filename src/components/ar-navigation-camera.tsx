@@ -21,6 +21,8 @@ type ArNavigationCameraProps = {
   onAutoStartAttempted?: () => void;
   voice?: "female" | "male";
   speechSpeed?: "normal" | "slow";
+  /** The child's AI companion, drawn standing on the mini-map. */
+  companion?: ReactNode;
 };
 
 type DeviceOrientationPermissionApi = typeof DeviceOrientationEvent & {
@@ -337,6 +339,7 @@ export default function ArNavigationCamera({
   onAutoStartAttempted,
   voice = "female",
   speechSpeed = "normal",
+  companion,
 }: ArNavigationCameraProps) {
   const isOnline = useNetworkStatus();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1316,6 +1319,13 @@ export default function ArNavigationCamera({
           </div>
         </div>
       </div>
+
+      {/* The companion stands on the right of the dome, above the map credit and below the quick actions. */}
+      {companion && (
+        <div className="pointer-events-none absolute right-2 z-[25]" style={{ bottom: "1.75rem" }}>
+          {companion}
+        </div>
+      )}
 
       <audio
         ref={speechAudioRef}

@@ -1,7 +1,7 @@
 import type { SafeZone, SafetyLocation } from "@/types/safety";
 
-export type SafeZoneProximity = {
-  zone: SafeZone;
+export type SafeZoneProximity<Z extends SafeZone = SafeZone> = {
+  zone: Z;
   distanceMeters: number;
   distanceToBoundaryMeters: number;
   isInside: boolean;
@@ -26,10 +26,10 @@ export function getDistanceMeters(
   return 2 * earthRadiusMeters * Math.asin(Math.sqrt(haversine));
 }
 
-export function getSafeZoneProximities(
+export function getSafeZoneProximities<Z extends SafeZone>(
   location: Pick<SafetyLocation, "latitude" | "longitude">,
-  safeZones: SafeZone[],
-): SafeZoneProximity[] {
+  safeZones: Z[],
+): SafeZoneProximity<Z>[] {
   return safeZones
     .map((zone) => {
       const distanceMeters = getDistanceMeters(
