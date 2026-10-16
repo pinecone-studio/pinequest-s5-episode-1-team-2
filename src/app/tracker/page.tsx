@@ -56,7 +56,8 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
-const CALM_MAP_CENTER_PERCENT = 64;
+const CALM_MAP_CENTER_PERCENT = 70;
+const CALM_MAP_MASK = "linear-gradient(to bottom, transparent 0%, transparent 20%, rgba(0,0,0,.5) 36%, #000 55%)";
 const ZONES_POLL_MS = 30_000;
 
 type RouteResult = {
@@ -953,6 +954,65 @@ export default function TrackerPage() {
       ? "speaking"
       : "idle";
 
+  const sosSection = (
+    <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
+      {sosConfirm && !demoMode ? (
+        <div className="rounded-2xl border border-rose-400/40 bg-[#140d12] p-3">
+          <p className="text-center text-[14px] font-bold text-white">
+            Асран хамгаалагчдаа SOS илгээх үү?
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSosConfirm(false)}
+              className="min-h-11 rounded-xl border border-white/15 px-3 text-[14px] font-semibold text-white"
+            >
+              Болих
+            </button>
+            <button
+              type="button"
+              onClick={() => void sendSos()}
+              disabled={sosStatus === "sending"}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[14px] font-bold text-white disabled:opacity-50"
+            >
+              {sosStatus === "sending" && (
+                <SafePathLoading variant="button" />
+              )}
+              {sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={demoMode || sosStatus === "sending"}
+          onClick={() => {
+            setSosConfirm(true);
+            setSosStatus("idle");
+            setSosMessage("");
+          }}
+          className="min-h-12 w-full rounded-2xl bg-rose-600 px-4 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
+        >
+          <Siren size={18} aria-hidden="true" /> SOS — Тусламж дуудах
+        </button>
+      )}
+      {sosMessage && (
+        <p
+          role={sosStatus === "error" ? "alert" : "status"}
+          className={`mt-2 rounded-xl px-3 py-2 text-center text-[13px] leading-5 ${
+            sosStatus === "error"
+              ? "bg-rose-500/10 text-rose-200"
+              : sosStatus === "sent"
+              ? "bg-emerald-500/10 text-emerald-200"
+              : "text-[#d4e1e5]"
+          }`}
+        >
+          {sosMessage}
+        </p>
+      )}
+    </section>
+  );
+
   return (
     <AppShell>
       <main className="relative isolate flex min-h-dvh flex-col overflow-hidden bg-linear-to-b from-[#071116] via-[#0b151b] to-[#050a0e] px-4 pb-[calc(16px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
@@ -1044,66 +1104,91 @@ export default function TrackerPage() {
           </div>
         </header>
 
-        <section
-          aria-label={`${companionName} AI туслах`}
-          className={`relative z-10 flex gap-2 ${
-            navigating
-              ? "items-center"
-              : "flex-1 flex-col items-center justify-center"
-          }`}
-        >
-          {/* Tapping the companion opens the screen where the child dresses and renames it. */}
-          <Link
-            href="/tracker/companion"
-            aria-label={`AI найзаа өөрчлөх: ${companionName}`}
-            className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#67e8f9]"
+        {!navigating && goal && (
+          <CheckpointGoal
+            goal={goal}
+            location={currentLocation ?? null}
+            onGuide={
+              targetZone?.id === goal.id && !arrivedAtCheckpoint
+                ? () => setFollowGoal(true)
+                : undefined
+            }
+          />
+        )}
+
+        {/* The companion stands on the slanted map, which melts into the page at its top edge. */}
+        {!navigating && (
+          <section
+            aria-label={`${companionName} AI туслах`}
+            className="relative z-10 -mx-4 mt-2 flex min-h-105 flex-1 flex-col"
           >
-            <CompanionMark
-              state={companionState}
-              avatar={shownAvatar}
-              accessory={shownAccessory}
-              custom={settings.custom}
-              name={companionName}
-              className={`companion-avatar--compact shrink-0 ${
-                navigating ? "companion-avatar--mini" : ""
-              }`}
-            />
-            {!navigating && (
-              <span
-                aria-hidden="true"
-                className="absolute bottom-1 right-1 z-3 grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
+            {/* Masked rather than painted over, so the far side fades into the page itself. */}
+            <div
+              className="absolute inset-0 overflow-hidden"
+              style={{maskImage: CALM_MAP_MASK, WebkitMaskImage: CALM_MAP_MASK}}
+            >
+              {currentLocation && (
+                <>
+                  <TiltedPlane
+                    tilt={45}
+                    centerPercent={CALM_MAP_CENTER_PERCENT}
+                    heading={calmHeading}
+                    fadeColor="#0a1419"
+                  >
+                    <CompanionMap
+                      location={currentLocation}
+                      destination={targetZone ?? undefined}
+                      destinationName={targetZone?.name}
+                      destinationColor={targetIsCheckpoint ? "#7c3aed" : undefined}
+                      currentRoute={route?.route ?? []}
+                      variant="companion"
+                      showCredit={false}
+                    />
+                  </TiltedPlane>
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 z-403 -translate-x-1/2 -translate-y-1/2"
+                    style={{top: `${CALM_MAP_CENTER_PERCENT}%`}}
+                  >
+                    {calmHeading === null ? (
+                      <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
+                    ) : (
+                      <HeadingArrow />
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div className="relative z-405 flex flex-col items-center gap-1 px-4">
+              {/* Tapping the companion opens the screen where the child dresses and renames it. */}
+              <Link
+                href="/tracker/companion"
+                aria-label={`AI найзаа өөрчлөх: ${companionName}`}
+                className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#67e8f9]"
               >
-                <Pencil size={15} aria-hidden="true" />
-              </span>
-            )}
-          </Link>
-          <div
-            className={`flex min-w-0 items-center gap-2 ${
-              navigating ? "flex-1" : "w-full"
-            }`}
-          >
+                <CompanionMark
+                  state={companionState}
+                  avatar={shownAvatar}
+                  accessory={shownAccessory}
+                  custom={settings.custom}
+                  name={companionName}
+                  className="companion-avatar--floating"
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute bottom-3 right-3 z-3 grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                </span>
+              </Link>
+              <div className="flex w-full min-w-0 items-center gap-2">
             <p
               aria-live="polite"
               aria-busy={assistantLoading}
-              className={`min-w-0 flex-1 rounded-2xl bg-[#10232b] font-semibold text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
-                navigating
-                  ? "rounded-tl-md px-3 py-2 text-[13px] leading-[18px]"
-                  : "px-4 py-3 text-center text-[15px] leading-[22px]"
-              }`}
+              className="min-w-0 flex-1 rounded-2xl bg-[#10232b]/85 px-4 py-3 text-center text-[15px] font-semibold leading-5.5 text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 backdrop-blur-md"
             >
-              <span
-                className={`block break-words ${
-                  navigating ? "line-clamp-3" : "line-clamp-4"
-                guiding
-                  ? "rounded-tl-md px-3 py-2 text-[13px] leading-4.5"
-                  : "px-4 py-3 text-center text-[15px] leading-5.5"
-              }`}
-            >
-              <span
-                className={`block wrap-break-word ${
-                  guiding ? "line-clamp-3" : "line-clamp-4"
-                }`}
-              >
+              <span className="block line-clamp-4 wrap-break-word">
                 {companionMessage}
               </span>
             </p>
@@ -1139,162 +1224,89 @@ export default function TrackerPage() {
                 />
               )}
             </button>
-          </div>
-        </section>
+              </div>
+            </div>
 
-        {goal && (
-          <CheckpointGoal
-            goal={goal}
-            location={currentLocation ?? null}
-            compact={navigating}
-            onGuide={
-              !navigating && targetZone?.id === goal.id && !arrivedAtCheckpoint
-                ? () => setFollowGoal(true)
-                : undefined
-            }
-            onStop={
-              followGoal && navigating && !guiding
-                ? () => setFollowGoal(false)
-                : undefined
-            }
-          />
+            {!currentLocation && (
+              <div
+                role="status"
+                className="absolute inset-x-5 bottom-5 z-405 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-3 py-2.5 text-[13px] leading-5 text-[#d4e1e5] backdrop-blur"
+              >
+                {locationStatus === "loading" ? (
+                  <SafePathLoading
+                    className="flex-col gap-1"
+                    label="Байршил тогтоож байна…"
+                  />
+                ) : (
+                  locationError || "Байршлын зөвшөөрлөө шалгана уу."
+                )}
+              </div>
+            )}
+            {demoMode && (
+              <DemoPad
+                riskLevel={safetyState?.riskLevel ?? null}
+                onMove={moveDemoLocation}
+              />
+            )}
+          </section>
         )}
 
-        {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
-        <div
-          className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
-            navigating ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
-            guiding ? "min-h-80 flex-1" : "h-55 shrink-0"
-          }`}
-        >
-          {navigating && currentLocation ? (
-            <ArNavigationCamera
-              location={currentLocation}
-              route={route?.route ?? []}
-              instruction={
-                arrivedAtCheckpoint && targetZone
-                  ? `Ирлээ! ${targetZone.name} дээр түр зогсоорой, шагнал чинь удахгүй ирнэ.`
-                  : navigationInstruction ??
-                    route?.nextInstruction ??
-                    (targetIsCheckpoint
-                      ? "Зам тооцоолж байна…"
-                      : "Аюулгүй бүс рүү буцах зам тооцоолж байна…")
-              }
-              destinationName={targetZone?.name ?? "Аюулгүй бүс"}
-              distanceMeters={arrivedAtCheckpoint ? 0 : route?.distanceMeters ?? null}
-              autoStart
-              voice={profile.voice}
-              speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
-            />
-          ) : currentLocation ? (
-            <>
-              <TiltedPlane
-                centerPercent={CALM_MAP_CENTER_PERCENT}
-                heading={calmHeading}
-              >
-                <CompanionMap
-                  location={currentLocation}
-                  destination={targetZone ?? undefined}
-                  destinationName={targetZone?.name}
-                  destinationColor={targetIsCheckpoint ? "#7c3aed" : undefined}
-                  currentRoute={route?.route ?? []}
-                  variant="companion"
-                  showCredit={false}
+        {/* Camera guidance fills the screen; only SOS stays below it. */}
+        {navigating && currentLocation && (
+          <div className="fixed inset-0 z-900 mx-auto flex w-full max-w-[430px] flex-col bg-[#050a0e] pb-[calc(8px+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] text-white">
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <ArNavigationCamera
+                location={currentLocation}
+                route={route?.route ?? []}
+                instruction={
+                  arrivedAtCheckpoint && targetZone
+                    ? `Ирлээ! ${targetZone.name} дээр түр зогсоорой, шагнал чинь удахгүй ирнэ.`
+                    : navigationInstruction ??
+                      route?.nextInstruction ??
+                      (targetIsCheckpoint
+                        ? "Зам тооцоолж байна…"
+                        : "Аюулгүй бүс рүү буцах зам тооцоолж байна…")
+                }
+                destinationName={targetZone?.name ?? "Аюулгүй бүс"}
+                distanceMeters={arrivedAtCheckpoint ? 0 : route?.distanceMeters ?? null}
+                autoStart
+                voice={profile.voice}
+                speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
+                companion={
+                  <CompanionMark
+                    state={companionState}
+                    avatar={shownAvatar}
+                    accessory={shownAccessory}
+                    custom={settings.custom}
+                    name={companionName}
+                    className="companion-avatar--floating companion-avatar--mini"
+                  />
+                }
+              />
+              {demoMode && (
+                <DemoPad
+                  riskLevel={safetyState?.riskLevel ?? null}
+                  onMove={moveDemoLocation}
                 />
-              </TiltedPlane>
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 z-403 -translate-x-1/2 -translate-y-1/2"
-                style={{top: `${CALM_MAP_CENTER_PERCENT}%`}}
-              >
-                {calmHeading === null ? (
-                  <span className="block size-5 rounded-full border-[3px] border-white bg-[#0e7490] shadow-[0_0_0_8px_rgba(14,116,144,.25)]" />
-                ) : (
-                  <HeadingArrow />
-                )}
-              </span>
-            </>
-          ) : (
-            <div
-              role="status"
-              className="absolute inset-x-5 bottom-5 rounded-2xl border border-[#67e8f9]/15 bg-[#071116]/85 px-3 py-2.5 text-[13px] leading-5 text-[#d4e1e5] backdrop-blur"
-            >
-              {locationStatus === "loading" ? (
-                <SafePathLoading
-                  className="flex-col gap-1"
-                  label="Байршил тогтоож байна…"
-                />
-              ) : (
-                locationError || "Байршлын зөвшөөрлөө шалгана уу."
               )}
             </div>
-          )}
-          {demoMode && (
-            <DemoPad
-              riskLevel={safetyState?.riskLevel ?? null}
-              onMove={moveDemoLocation}
-            />
-          )}
-        </div>
+            <div className="px-3">
+              {followGoal && !guiding && goal && (
+                <CheckpointGoal
+                  goal={goal}
+                  location={currentLocation}
+                  compact
+                  onStop={() => setFollowGoal(false)}
+                />
+              )}
+              {sosSection}
+            </div>
+          </div>
+        )}
 
         <LocationSharingStatus outsideSafeZone={guiding} />
 
-        <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
-          {sosConfirm && !demoMode ? (
-            <div className="rounded-2xl border border-rose-400/40 bg-[#140d12] p-3">
-              <p className="text-center text-[14px] font-bold text-white">
-                Асран хамгаалагчдаа SOS илгээх үү?
-              </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSosConfirm(false)}
-                  className="min-h-11 rounded-xl border border-white/15 px-3 text-[14px] font-semibold text-white"
-                >
-                  Болих
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void sendSos()}
-                  disabled={sosStatus === "sending"}
-                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 text-[14px] font-bold text-white disabled:opacity-50"
-                >
-                  {sosStatus === "sending" && (
-                    <SafePathLoading variant="button" />
-                  )}
-                  {sosStatus === "sending" ? "Илгээж байна…" : "Тийм, илгээх"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={demoMode || sosStatus === "sending"}
-              onClick={() => {
-                setSosConfirm(true);
-                setSosStatus("idle");
-                setSosMessage("");
-              }}
-              className="min-h-12 w-full rounded-2xl bg-rose-600 px-4 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
-            >
-              <Siren size={18} aria-hidden="true" /> SOS — Тусламж дуудах
-            </button>
-          )}
-          {sosMessage && (
-            <p
-              role={sosStatus === "error" ? "alert" : "status"}
-              className={`mt-2 rounded-xl px-3 py-2 text-center text-[13px] leading-5 ${
-                sosStatus === "error"
-                  ? "bg-rose-500/10 text-rose-200"
-                  : sosStatus === "sent"
-                  ? "bg-emerald-500/10 text-emerald-200"
-                  : "text-[#d4e1e5]"
-              }`}
-            >
-              {sosMessage}
-            </p>
-          )}
-        </section>
+        {!navigating && sosSection}
 
         {celebrating && (
           <RewardCelebration
