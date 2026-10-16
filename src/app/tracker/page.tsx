@@ -57,6 +57,7 @@ type SpeechStatus = "idle" | "loading" | "playing" | "error";
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
 const CALM_MAP_CENTER_PERCENT = 64;
+const ZONES_POLL_MS = 30_000;
 
 type RouteResult = {
   destination: {
@@ -93,9 +94,11 @@ export default function TrackerPage() {
   >("idle");
   const [sosMessage, setSosMessage] = useState("");
 
+  // Polled, so a zone the guardian adds or removes reaches the child without reopening the page.
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    let timer: number | undefined;
 
     async function loadSavedZones() {
       try {
@@ -132,7 +135,10 @@ export default function TrackerPage() {
           }
         }
       } finally {
-        if (active) setZonesLoaded(true);
+        if (active) {
+          setZonesLoaded(true);
+          timer = window.setTimeout(loadSavedZones, ZONES_POLL_MS);
+        }
       }
     }
 
@@ -140,6 +146,7 @@ export default function TrackerPage() {
     return () => {
       active = false;
       controller.abort();
+      window.clearTimeout(timer);
     };
   }, []);
 
@@ -188,7 +195,19 @@ export default function TrackerPage() {
 
   const currentLocation = demoMode ? demoLocation : location;
   const {checkpoints, rewards} = useCheckpoints();
-  const goal = checkpoints.find((checkpoint) => !checkpoint.reachedAt) ?? null;
+  const openCheckpoints = useMemo(
+    () => checkpoints.filter((checkpoint) => !checkpoint.reachedAt),
+    [checkpoints]
+  );
+  // The goal card shows the nearest reward place, not just the newest one.
+  const goal = useMemo(() => {
+    if (!currentLocation) return openCheckpoints[0] ?? null;
+    return (
+      getSafeZoneProximities(currentLocation, openCheckpoints)[0]?.zone ?? null
+    );
+  }, [currentLocation, openCheckpoints]);
+  // The child asked to be walked to the goal with the camera, even from inside a safe zone.
+  const [followGoal, setFollowGoal] = useState(false);
   // Reward companions and accessories only show once earned.
   const shownAvatar = effectiveAvatar(settings.avatar, rewards);
   const shownAccessory =
@@ -201,6 +220,7 @@ export default function TrackerPage() {
       (checkpoint) => checkpoint.reachedAt && !celebrated.includes(checkpoint.id)
     ) ?? null;
   const finishCelebration = (id: string) => {
+    setFollowGoal(false);
     const next = [...celebrated, id].slice(-50);
     setCelebrated(next);
     try {
@@ -213,12 +233,30 @@ export default function TrackerPage() {
   const currentLongitude = currentLocation?.longitude;
   const demoZones = savedZones.length > 0 ? savedZones : SAFE_ZONES;
   const activeZones = demoMode ? demoZones : savedZones;
-  const targetZone = useMemo(() => {
+  // Where the route points. Outside every safe zone: the nearest place the guardian set, a safe
+  // zone or a checkpoint still to be reached. Inside one the child is already safe, so it shows
+  // the way to the nearest checkpoint instead, or nothing when there is none.
+  const destinations = useMemo<SafeZone[]>(
+    () => [...activeZones, ...openCheckpoints],
+    [activeZones, openCheckpoints]
+  );
+  const target = useMemo(() => {
     if (!currentLocation || activeZones.length === 0) return null;
+    const inSafeZone = getSafeZoneProximities(currentLocation, activeZones)[0]
+      ?.isInside;
     return (
-      getSafeZoneProximities(currentLocation, activeZones)[0]?.zone ?? null
+      getSafeZoneProximities(
+        currentLocation,
+        inSafeZone ? openCheckpoints : destinations
+      )[0] ?? null
     );
-  }, [activeZones, currentLocation]);
+  }, [activeZones, currentLocation, destinations, openCheckpoints]);
+  const targetZone = target?.zone ?? null;
+  const targetIsCheckpoint = Boolean(
+    target && !activeZones.includes(target.zone)
+  );
+  // Standing in the checkpoint: no route to follow, just wait there until it counts as reached.
+  const arrivedAtCheckpoint = Boolean(targetIsCheckpoint && target?.isInside);
 
   const sendSos = useCallback(async () => {
     if (demoMode || sosStatus === "sending") return;
@@ -319,6 +357,9 @@ export default function TrackerPage() {
     );
     return () => window.clearTimeout(timer);
   }, [guiding, isOutsideSafeZone]);
+  // The camera screen: by itself once outside every safe zone, or when the child chose to be
+  // walked to a checkpoint. It closes by itself once that checkpoint is reached.
+  const navigating = guiding || (followGoal && targetIsCheckpoint);
 
   useEffect(() => {
     if (currentLatitude === undefined || currentLongitude === undefined) {
@@ -334,7 +375,7 @@ export default function TrackerPage() {
       return;
     }
 
-    if (safetyState?.isInsideSafeZone) {
+    if (arrivedAtCheckpoint) {
       routeController.current?.abort();
       lastRouteAt.current = 0;
       setRoute(null);
@@ -513,10 +554,10 @@ export default function TrackerPage() {
         guideWithoutInternet();
       });
   }, [
+    arrivedAtCheckpoint,
     currentLatitude,
     currentLongitude,
     demoMode,
-    safetyState?.isInsideSafeZone,
     targetZone?.id,
     targetZone?.latitude,
     targetZone?.longitude,
@@ -768,10 +809,11 @@ export default function TrackerPage() {
       : null;
 
   useEffect(() => {
-    if (!safetyState || !targetZone) return;
+    if (!safetyState) return;
 
     if (safetyState.isInsideSafeZone) {
-      const safeKey = `inside:${targetZone.id}`;
+      const safeZone = safetyState.nearestSafeZone;
+      const safeKey = `inside:${safeZone.id}`;
       if (lastAutomaticRequest.current === safeKey) return;
       lastAutomaticRequest.current = safeKey;
       requestSequence.current += 1;
@@ -784,12 +826,14 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
       setAssistantMessage(
-        `${profile.userName}, чи ${targetZone.name} аюулгүй бүсэд байна. Ёстой гоё!`
+        `${profile.userName}, чи ${safeZone.name} аюулгүй бүсэд байна. Ёстой гоё!`
       );
       return;
     }
 
-    if (!safetyState.isInsideSafeZone && routeStatus === "error") {
+    if (!targetZone) return;
+
+    if (routeStatus === "error") {
       const routeErrorKey = `route-error:${targetZone.id}:${safetyState.riskLevel}`;
       if (lastAutomaticRequest.current !== routeErrorKey) {
         lastAutomaticRequest.current = routeErrorKey;
@@ -993,7 +1037,7 @@ export default function TrackerPage() {
         <section
           aria-label={`${companionName} AI туслах`}
           className={`relative z-10 flex gap-2 ${
-            guiding
+            navigating
               ? "items-center"
               : "flex-1 flex-col items-center justify-center"
           }`}
@@ -1011,10 +1055,10 @@ export default function TrackerPage() {
               custom={settings.custom}
               name={companionName}
               className={`companion-avatar--compact shrink-0 ${
-                guiding ? "companion-avatar--mini" : ""
+                navigating ? "companion-avatar--mini" : ""
               }`}
             />
-            {!guiding && (
+            {!navigating && (
               <span
                 aria-hidden="true"
                 className="absolute bottom-1 right-1 z-[3] grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
@@ -1025,21 +1069,21 @@ export default function TrackerPage() {
           </Link>
           <div
             className={`flex min-w-0 items-center gap-2 ${
-              guiding ? "flex-1" : "w-full"
+              navigating ? "flex-1" : "w-full"
             }`}
           >
             <p
               aria-live="polite"
               aria-busy={assistantLoading}
               className={`min-w-0 flex-1 rounded-2xl bg-[#10232b] font-semibold text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
-                guiding
+                navigating
                   ? "rounded-tl-md px-3 py-2 text-[13px] leading-[18px]"
                   : "px-4 py-3 text-center text-[15px] leading-[22px]"
               }`}
             >
               <span
                 className={`block break-words ${
-                  guiding ? "line-clamp-3" : "line-clamp-4"
+                  navigating ? "line-clamp-3" : "line-clamp-4"
                 }`}
               >
                 {companionMessage}
@@ -1081,26 +1125,44 @@ export default function TrackerPage() {
         </section>
 
         {goal && (
-          <CheckpointGoal goal={goal} location={currentLocation ?? null} compact={guiding} />
+          <CheckpointGoal
+            goal={goal}
+            location={currentLocation ?? null}
+            compact={navigating}
+            onGuide={
+              !navigating && targetZone?.id === goal.id && !arrivedAtCheckpoint
+                ? () => setFollowGoal(true)
+                : undefined
+            }
+            onStop={
+              followGoal && navigating && !guiding
+                ? () => setFollowGoal(false)
+                : undefined
+            }
+          />
         )}
 
         {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
         <div
           className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
-            guiding ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
+            navigating ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
           }`}
         >
-          {guiding && currentLocation ? (
+          {navigating && currentLocation ? (
             <ArNavigationCamera
               location={currentLocation}
               route={route?.route ?? []}
               instruction={
-                navigationInstruction ??
-                route?.nextInstruction ??
-                "Аюулгүй бүс рүү буцах зам тооцоолж байна…"
+                arrivedAtCheckpoint && targetZone
+                  ? `Ирлээ! ${targetZone.name} дээр түр зогсоорой, шагнал чинь удахгүй ирнэ.`
+                  : navigationInstruction ??
+                    route?.nextInstruction ??
+                    (targetIsCheckpoint
+                      ? "Зам тооцоолж байна…"
+                      : "Аюулгүй бүс рүү буцах зам тооцоолж байна…")
               }
               destinationName={targetZone?.name ?? "Аюулгүй бүс"}
-              distanceMeters={route?.distanceMeters ?? null}
+              distanceMeters={arrivedAtCheckpoint ? 0 : route?.distanceMeters ?? null}
               autoStart
               voice={profile.voice}
               speechSpeed={settings.speechSpeed === "Удаан" ? "slow" : "normal"}
@@ -1114,6 +1176,8 @@ export default function TrackerPage() {
                 <CompanionMap
                   location={currentLocation}
                   destination={targetZone ?? undefined}
+                  destinationName={targetZone?.name}
+                  destinationColor={targetIsCheckpoint ? "#7c3aed" : undefined}
                   currentRoute={route?.route ?? []}
                   variant="companion"
                   showCredit={false}
