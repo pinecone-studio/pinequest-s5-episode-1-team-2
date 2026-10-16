@@ -1,14 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { getSessionUserId } from "@/lib/auth/dal";
 import { allowAttempt } from "@/lib/auth/rate-limit";
-import {
-  createSafetyPrompt,
-  createWalkingGamePrompt,
-  SAFETY_ASSISTANT_SYSTEM_PROMPT,
-  WALKING_GAME_KINDS,
-  WALKING_GAME_SYSTEM_PROMPT,
-} from "@/lib/ai/safety-prompt";
-import { getGameFallback, getSafetyFallback } from "@/lib/ai/fallback-messages";
+import { createSafetyPrompt, SAFETY_ASSISTANT_SYSTEM_PROMPT } from "@/lib/ai/safety-prompt";
+import { getSafetyFallback } from "@/lib/ai/fallback-messages";
 import { tidyMongolianText } from "@/lib/ai/mongolian-text";
 import type { SafetyAssistantRequest, SafetyStatus } from "@/types/safety";
 
@@ -29,9 +23,8 @@ const allowedKeys = new Set([
   "instructionLength",
   "navigationInstruction",
   "nearbyLandmarks",
-  "mode",
 ]);
-const requiredKeys = [...allowedKeys].filter((key) => key !== "navigationInstruction" && key !== "mode");
+const requiredKeys = [...allowedKeys].filter((key) => key !== "navigationInstruction");
 
 export async function POST(request: Request) {
   const userId = await getSessionUserId();
@@ -52,9 +45,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid assistant request." }, { status: 400 });
   }
 
-  // Games are only for calm moments: a warning or risk always gets safety guidance instead.
-  const game = input.mode === "game" && input.riskLevel === "SAFE";
-  const fallback = game ? getGameFallback(input.userName) : getSafetyFallback(input.riskLevel, input.userName);
+  const fallback = getSafetyFallback(input.riskLevel, input.userName);
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return Response.json({ message: fallback, fallback: true });
@@ -62,15 +53,14 @@ export async function POST(request: Request) {
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const gameKind = WALKING_GAME_KINDS[Math.floor(Math.random() * WALKING_GAME_KINDS.length)];
     const response = await ai.models.generateContent({
       model: process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite",
-      contents: game ? createWalkingGamePrompt(input, gameKind) : createSafetyPrompt(input),
+      contents: createSafetyPrompt(input),
       config: {
-        systemInstruction: game ? WALKING_GAME_SYSTEM_PROMPT : SAFETY_ASSISTANT_SYSTEM_PROMPT,
+        systemInstruction: SAFETY_ASSISTANT_SYSTEM_PROMPT,
         // Some variety keeps a calm walk from sounding scripted; risk guidance stays steady.
-        temperature: game ? 0.9 : input.riskLevel === "SAFE" ? 0.5 : 0.3,
-        maxOutputTokens: game ? 120 : input.instructionLength === "short" ? 80 : 120,
+        temperature: input.riskLevel === "SAFE" ? 0.5 : 0.3,
+        maxOutputTokens: input.instructionLength === "short" ? 80 : 120,
       },
     });
 
@@ -107,7 +97,6 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     (value.tone !== "calm" && value.tone !== "friendly") ||
     (value.instructionLength !== "short" && value.instructionLength !== "normal") ||
     !isOptionalText(value.navigationInstruction, 160) ||
-    (value.mode !== undefined && value.mode !== "guide" && value.mode !== "game") ||
     !isNearbyLandmarks(value.nearbyLandmarks)
   ) {
     return null;
@@ -130,7 +119,6 @@ function validateRequest(value: unknown): SafetyAssistantRequest | null {
     ...(typeof value.navigationInstruction === "string" && value.navigationInstruction.trim()
       ? { navigationInstruction: value.navigationInstruction.trim() }
       : {}),
-    ...(value.mode === "game" ? { mode: "game" as const } : {}),
     ...(Array.isArray(value.nearbyLandmarks)
   ? { nearbyLandmarks: value.nearbyLandmarks }
   : {}),

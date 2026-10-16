@@ -69,8 +69,6 @@ export type SafetyAssistantRequest = CompanionProfile & {
   distanceFromSafeZone: number;
   destination: string | null;
   navigationInstruction?: string;
-  /** "game" asks for a short walking game instead of guidance; only honoured while SAFE. */
-  mode?: "guide" | "game";
   nearbyLandmarks?: {
     name: string;
     type: string;

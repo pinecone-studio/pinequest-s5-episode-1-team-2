@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
   ChevronLeft,
-  Gamepad2,
+  Footprints,
   Pencil,
   Siren,
   Settings,
@@ -18,6 +18,11 @@ import ArNavigationCamera from "@/components/ar-navigation-camera";
 import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
 import {AppShell, CompanionMark} from "@/components/safe-path";
 import {CheckpointGoal, RewardCelebration} from "@/components/checkpoint-goal";
+import {
+  WalkingTaskCard,
+  walkingTaskMessage,
+  type WalkingTask,
+} from "@/components/walking-task";
 import {useCheckpoints} from "@/hooks/use-checkpoints";
 import {
   buildOfflineRoute,
@@ -32,7 +37,7 @@ import {useCompassHeading} from "@/hooks/use-compass-heading";
 import {useGeolocation} from "@/hooks/use-geolocation";
 import {useNetworkStatus} from "@/hooks/use-network-status";
 import {toCompanionProfile} from "@/lib/assistant-settings";
-import {getGameFallback, getSafetyFallback} from "@/lib/ai/fallback-messages";
+import {getSafetyFallback} from "@/lib/ai/fallback-messages";
 import {calculateSafetyState} from "@/lib/risk-engine";
 import {getSafeZoneProximities} from "@/lib/geofence";
 import {SAFE_ZONES} from "@/lib/safe-zones";
@@ -690,10 +695,8 @@ export default function TrackerPage() {
   );
 
   const requestAssistantMessage = useCallback(
-    async (state: SafetyState, mode: "guide" | "game" = "guide") => {
+    async (state: SafetyState) => {
       const sequence = ++requestSequence.current;
-      // The server answers a game request with guidance anyway unless the child is safe.
-      const game = mode === "game" && state.riskLevel === "SAFE";
 
       requestController.current?.abort();
 
@@ -703,9 +706,8 @@ export default function TrackerPage() {
 
       // Outside the zone the guidance screen is open, so even the offline message should
       // point the way home rather than say that everything is fine.
-      const fallbackMessage = game
-        ? getGameFallback(profile.userName)
-        : !state.isInsideSafeZone && targetZone
+      const fallbackMessage =
+        !state.isInsideSafeZone && targetZone
           ? getGuidanceFallback(targetZone.name, profile.userName)
           : getSafetyFallback(state.riskLevel, profile.userName);
 
@@ -724,8 +726,7 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
 
-      // A game keeps the current words on screen until its own question arrives.
-      if (!game) setAssistantMessage(fallbackMessage);
+      setAssistantMessage(fallbackMessage);
 
       setAssistantLoading(true);
 
@@ -747,8 +748,6 @@ export default function TrackerPage() {
         destination: targetZone?.name ?? state.nearestSafeZone.name,
 
         nearbyLandmarks: [],
-
-        ...(game ? { mode: "game" as const } : {}),
 
         ...(navigationInstruction
           ? {
@@ -870,40 +869,70 @@ export default function TrackerPage() {
     targetZone,
   ]);
 
-  // While the camera guides a safe walk, the companion starts a little game by itself now and
-  // then. It waits for a quiet moment, so a turn instruction always comes first.
-  const lastGameAt = useRef(0);
+  // Instead of games, small tasks on the way to the place the child is heading: count the steps
+  // there, or photograph a building for their guardian. They take turns.
+  const [task, setTask] = useState<WalkingTask | null>(null);
+  const nextTaskKind = useRef<WalkingTask["kind"]>("steps");
+  const remainingMeters = target
+    ? Math.round(target.distanceToBoundaryMeters)
+    : null;
+  // A task belongs to one place; once the child is guided elsewhere it is over.
+  const activeTask = task && task.targetId === targetZone?.id ? task : null;
+  const canStartTask = Boolean(
+    targetZone && !arrivedAtCheckpoint && safetyState?.riskLevel === "SAFE"
+  );
+  const startTask = useCallback(() => {
+    if (!targetZone || remainingMeters === null) return;
+    const kind = nextTaskKind.current;
+    nextTaskKind.current = kind === "steps" ? "photo" : "steps";
+    const next: WalkingTask = {
+      kind,
+      targetId: targetZone.id,
+      targetName: targetZone.name,
+    };
+    // The task replaces whatever the companion was about to say.
+    requestSequence.current += 1;
+    requestController.current?.abort();
+    setAssistantLoading(false);
+    const message = walkingTaskMessage(next, profile.userName, remainingMeters);
+    setTask(next);
+    setAssistantMessage(message);
+    void speakMessage(message);
+  }, [profile.userName, remainingMeters, speakMessage, targetZone]);
+
+  // While the camera guides a safe walk, the companion hands out a task by itself now and then.
+  // It waits for a quiet moment, so a turn instruction always comes first.
+  const lastTaskAt = useRef(0);
   const guidingSince = useRef<number | null>(null);
-  const autoGameInputs = useRef({
-    safetyState,
+  const autoTaskInputs = useRef({
+    ready: false,
     busy: false,
-    requestAssistantMessage,
+    startTask,
   });
   useEffect(() => {
-    autoGameInputs.current = {
-      safetyState,
+    autoTaskInputs.current = {
+      ready: canStartTask && !activeTask,
       busy:
         assistantLoading ||
         speechStatus === "loading" ||
         speechStatus === "playing",
-      requestAssistantMessage,
+      startTask,
     };
   });
   useEffect(() => {
     if (!guiding) return;
     guidingSince.current = Date.now();
     const interval = window.setInterval(() => {
-      const {safetyState: state, busy, requestAssistantMessage: request} =
-        autoGameInputs.current;
-      if (!state || state.riskLevel !== "SAFE" || busy) return;
+      const {ready, busy, startTask: start} = autoTaskInputs.current;
+      if (!ready || busy) return;
       if (document.visibilityState !== "visible") return;
       const now = Date.now();
-      if (now - (guidingSince.current ?? now) < AUTO_GAME_FIRST_DELAY_MS) return;
-      if (now - lastGameAt.current < AUTO_GAME_INTERVAL_MS) return;
-      if (now - lastSpeechAt.current < AUTO_GAME_QUIET_MS) return;
-      lastGameAt.current = now;
-      void request(state, "game");
-    }, AUTO_GAME_CHECK_MS);
+      if (now - (guidingSince.current ?? now) < AUTO_TASK_FIRST_DELAY_MS) return;
+      if (now - lastTaskAt.current < AUTO_TASK_INTERVAL_MS) return;
+      if (now - lastSpeechAt.current < AUTO_TASK_QUIET_MS) return;
+      lastTaskAt.current = now;
+      start();
+    }, AUTO_TASK_CHECK_MS);
     return () => window.clearInterval(interval);
   }, [guiding]);
 
@@ -1115,6 +1144,15 @@ export default function TrackerPage() {
             }
           />
         )}
+        {!navigating && activeTask && (
+          <WalkingTaskCard
+            key={`${activeTask.kind}:${activeTask.targetId}`}
+            task={activeTask}
+            remainingMeters={remainingMeters}
+            location={currentLocation ?? null}
+            onClose={() => setTask(null)}
+          />
+        )}
 
         {/* The companion stands on the slanted map, which melts into the page at its top edge. */}
         {!navigating && (
@@ -1192,15 +1230,14 @@ export default function TrackerPage() {
                 {companionMessage}
               </span>
             </p>
-            {safetyState?.riskLevel === "SAFE" && (
+            {canStartTask && (
               <button
                 type="button"
-                disabled={assistantLoading}
-                onClick={() => void requestAssistantMessage(safetyState, "game")}
-                aria-label="Хамт тоглоом тоглох"
-                className="grid size-10 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-white shadow-[0_8px_20px_rgba(124,58,237,.3)] transition hover:bg-[#6d28d9] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+                onClick={startTask}
+                aria-label="Замын даалгавар авах"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-white shadow-[0_8px_20px_rgba(124,58,237,.3)] transition hover:bg-[#6d28d9] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
               >
-                <Gamepad2 size={18} aria-hidden="true" />
+                <Footprints size={18} aria-hidden="true" />
               </button>
             )}
             <button
@@ -1299,6 +1336,15 @@ export default function TrackerPage() {
                   onStop={() => setFollowGoal(false)}
                 />
               )}
+              {activeTask && (
+                <WalkingTaskCard
+                  key={`${activeTask.kind}:${activeTask.targetId}`}
+                  task={activeTask}
+                  remainingMeters={remainingMeters}
+                  location={currentLocation ?? null}
+                  onClose={() => setTask(null)}
+                />
+              )}
               {sosSection}
             </div>
           </div>
@@ -1359,12 +1405,12 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
   );
 }
 
-// Automatic walking games: the first a little after guidance starts, then every few minutes,
+// Automatic walking tasks: the first a little after guidance starts, then every few minutes,
 // and only after the companion has been quiet for a while.
-const AUTO_GAME_FIRST_DELAY_MS = 40_000;
-const AUTO_GAME_INTERVAL_MS = 3 * 60_000;
-const AUTO_GAME_QUIET_MS = 25_000;
-const AUTO_GAME_CHECK_MS = 5_000;
+const AUTO_TASK_FIRST_DELAY_MS = 40_000;
+const AUTO_TASK_INTERVAL_MS = 3 * 60_000;
+const AUTO_TASK_QUIET_MS = 25_000;
+const AUTO_TASK_CHECK_MS = 5_000;
 
 const CELEBRATED_KEY = "safepath:celebrated-checkpoints";
 
