@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronLeft, Check, Lock, Palette, Target, Trophy } from "lucide-react";
+import { motion } from "framer-motion";
 import { AccessoryIcon } from "@/components/app-icons";
 import { AppShell, CompanionMark } from "@/components/safe-path";
 import { useAssistantSettings } from "@/hooks/use-assistant-settings";
@@ -72,58 +73,73 @@ export default function CompanionPage() {
             <p className="mt-2 text-[13px] text-[#c9bff0]">Нэр дээр дарж найзаа нэрлэж болно</p>
           </section>
 
-          {/* Pick a ready-made friend, or build one part by part. */}
+          {/* Зөвхөн сонгогдсон Option дээр гулсах (sliding tab indicator) анимэйшн */}
           <div className="mt-7 grid grid-cols-2 gap-1 rounded-2xl bg-white/5 p-1" role="tablist" aria-label="Найз хийх арга">
             {[
               { id: false, label: "Бэлэн найз" },
               { id: true, label: "Өөрөө зохиох" },
-            ].map((tab) => (
-              <button
-                key={tab.label}
-                type="button"
-                role="tab"
-                aria-selected={building === tab.id}
-                onClick={() => update("avatar", tab.id ? CUSTOM_AVATAR : "Мило")}
-                className={`min-h-11 rounded-xl text-[15px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${building === tab.id ? "bg-[#a78bfa] text-[#1e1035]" : "text-[#d4cdf0] hover:bg-white/10"}`}
-              >
-                {tab.id && <Palette size={15} className="mr-1.5 inline align-[-2px]" aria-hidden="true" />}{tab.label}
-              </button>
-            ))}
+            ].map((tab) => {
+              const active = building === tab.id;
+              return (
+                <button
+                  key={tab.label}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => update("avatar", tab.id ? CUSTOM_AVATAR : "Мило")}
+                  className={`relative min-h-11 rounded-xl text-[15px] font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${
+                    active ? "text-[#1e1035]" : "text-[#d4cdf0] hover:bg-white/10"
+                  }`}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="tab-indicator"
+                      className="absolute inset-0 rounded-xl bg-[#a78bfa]"
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex items-center justify-center">
+                    {tab.id && <Palette size={15} className="mr-1.5 inline align-[-2px]" aria-hidden="true" />}
+                    {tab.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {building ? (
             <CompanionBuilder parts={settings.custom} onChange={(next) => update("custom", next)} />
           ) : (
-          <section aria-labelledby="pick-friend" className="mt-5">
-            <h2 id="pick-friend" className="mb-3 text-[16px] font-bold">Найзаа сонго</h2>
-            <div className="grid grid-cols-4 gap-2.5" role="radiogroup" aria-labelledby="pick-friend">
-              {COMPANIONS.map((companion) => {
-                const isLocked = locked(companion);
-                const selected = avatar === companion;
-                return (
-                  <button
-                    key={companion}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={isLocked}
-                    aria-label={isLocked ? `${companion}: шалгах цэгт хүрч нээнэ` : companion}
-                    onClick={() => update("avatar", companion)}
-                    className={`relative flex flex-col items-center gap-1.5 rounded-2xl p-2 transition disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${selected ? "bg-white/12 ring-2 ring-[#c4b5fd]" : "bg-white/5 enabled:hover:bg-white/10"}`}
-                  >
-                    <span className={`companion-picker__art companion-picker__art--${companion.toLowerCase()} ${isLocked ? "opacity-30 grayscale" : ""}`} aria-hidden="true" />
-                    {isLocked && <span className="absolute top-7 grid size-7 place-items-center rounded-full bg-black/60 text-white" aria-hidden="true"><Lock size={14} /></span>}
-                    {selected && (
-                      <span className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-[#c4b5fd] text-[#1e1035]" aria-hidden="true">
-                        <Check size={13} strokeWidth={3} />
-                      </span>
-                    )}
-                    <span className={`text-[12px] ${selected ? "font-bold text-white" : "text-[#d4cdf0]"}`}>{companion}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+            <section aria-labelledby="pick-friend" className="mt-5">
+              <h2 id="pick-friend" className="mb-3 text-[16px] font-bold">Найзаа сонго</h2>
+              <div className="grid grid-cols-4 gap-2.5" role="radiogroup" aria-labelledby="pick-friend">
+                {COMPANIONS.map((companion) => {
+                  const isLocked = locked(companion);
+                  const selected = avatar === companion;
+                  return (
+                    <button
+                      key={companion}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={isLocked}
+                      aria-label={isLocked ? `${companion}: шалгах цэгт хүрч нээнэ` : companion}
+                      onClick={() => update("avatar", companion)}
+                      className={`relative flex flex-col items-center gap-1.5 rounded-2xl p-2 transition disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd] ${selected ? "bg-white/12 ring-2 ring-[#c4b5fd]" : "bg-white/5 enabled:hover:bg-white/10"}`}
+                    >
+                      <span className={`companion-picker__art companion-picker__art--${companion.toLowerCase()} ${isLocked ? "opacity-30 grayscale" : ""}`} aria-hidden="true" />
+                      {isLocked && <span className="absolute top-7 grid size-7 place-items-center rounded-full bg-black/60 text-white" aria-hidden="true"><Lock size={14} /></span>}
+                      {selected && (
+                        <span className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-[#c4b5fd] text-[#1e1035]" aria-hidden="true">
+                          <Check size={13} strokeWidth={3} />
+                        </span>
+                      )}
+                      <span className={`text-[12px] ${selected ? "font-bold text-white" : "text-[#d4cdf0]"}`}>{companion}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           <section aria-labelledby="pick-accessory" className="mt-7">
