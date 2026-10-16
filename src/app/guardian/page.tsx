@@ -1488,22 +1488,3 @@ function DemoPad({
  {glyph}
  </button>
  );
- return (
- <div
- aria-label="Demo байршил хөдөлгөх"
- className="absolute bottom-3 left-3 z-410 grid grid-cols-3 grid-rows-3 gap-0.5 rounded-xl bg-[#071116]/70 p-1 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
- >
- {arrow("up", "Demo: хойд зүг рүү", "↑", "col-start-2")}
- {arrow("left", "Demo: баруун зүг рүү", "←", "col-start-1 row-start-2")}
- <span
- role="status"
- aria-label={`Demo төлөв: ${riskLevel ?? "тодорхойгүй"}`}
- className={`col-start-2 row-start-2 m-auto size-2.5 rounded-full ${
- riskLevel ? DEMO_STATUS_COLORS[riskLevel] : "bg-[#60747b]"
- }`}
- />
- {arrow("right", "Demo: зүүн зүг рүү", "→", "col-start-3 row-start-2")}
- {arrow("down", "Demo: урд зүг рүү", "↓", "col-start-2 row-start-3")}
- </div>
- );
-}
