@@ -649,9 +649,6 @@ export default function TrackerPage() {
 
       requestController.current = controller;
 
-      const fallbackMessage =
-        !state.isInsideSafeZone && targetZone
-          ? getGuidanceFallback(targetZone.name)
       // Outside the zone the guidance screen is open, so even the offline message should
       // point the way home rather than say that everything is fine.
       const fallbackMessage = game

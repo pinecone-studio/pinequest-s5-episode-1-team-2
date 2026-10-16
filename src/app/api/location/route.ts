@@ -36,6 +36,6 @@ export async function POST(request: Request) {
   const parsed = LocationReportSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: "Invalid location." }, { status: 400 });
 
-  const shared = await saveChildLocation(user.id, parsed.data);
-  return Response.json({ shared });
+  // Flat, so the phone can read `shared`, `paused` and `watchers` straight off the body.
+  return Response.json(await saveChildLocation(user.id, parsed.data));
 }
