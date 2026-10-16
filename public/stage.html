@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafePath Stage</title>
+<style>
+  /* Танилцуулгын үед зүүн талд эцэг эхийн дэлгэц, баруун талд хүүхдийн жинхэнэ Android утасны дэлгэцийг харуулна.
+     Утасны дэлгэцийг scrcpy-аар laptop дээр гаргаад, тэр цонхыг энэ хуудас getDisplayMedia-аар барьж авна.
+     Эцэг эхийн iframe нэг домэйн дээр байх ёстой (login cookie нь sameSite=lax), тиймээс public/ дотор байна.
+     ?parent=/guardian гэж эцэг эхийн хуудсыг заана. R = эцэг эхийн хуудсыг дахин ачаалах, S = утсыг дахин холбох. */
+  :root {
+    --stage: #071116;
+    --glow: rgba(56, 189, 248, 0.12);
+    --bezel: #0b0d10;
+    --bezel-edge: #2a2f36;
+    --text: #e6edf3;
+    --muted: #8b98a5;
+    --accent: #38bdf8;
+    --screen-w: 412px;
+    --screen-h: 915px;
+    --status-h: 30px;
+    --label-h: 44px;
+    --gap: 72px;
+    --scale: 1;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(ellipse at 50% 40%, var(--glow), transparent 60%), var(--stage);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .stage { display: flex; gap: var(--gap); }
+  .slot {
+    width: calc((var(--screen-w) + 28px) * var(--scale));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .label {
+    height: var(--label-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .label small { color: var(--muted); font-weight: 500; font-size: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2); }
+  .frame {
+    width: calc((var(--screen-w) + 28px) * var(--scale));
+    height: calc((var(--screen-h) + 28px) * var(--scale));
+  }
+  .phone {
+    position: relative;
+    width: calc(var(--screen-w) + 28px);
+    height: calc(var(--screen-h) + 28px);
+    padding: 14px;
+    border-radius: 56px;
+    background: var(--bezel);
+    box-shadow:
+      0 0 0 2px var(--bezel-edge),
+      0 0 0 4px #15181d,
+      0 40px 80px rgba(0, 0, 0, 0.6);
+    transform: scale(var(--scale));
+    transform-origin: top left;
+  }
+  .phone::before, .phone::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    width: 4px;
+    border-radius: 0 3px 3px 0;
+    background: var(--bezel-edge);
+  }
+  .phone::before { top: 180px; height: 70px; }
+  .phone::after { top: 290px; height: 120px; }
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 42px;
+    overflow: hidden;
+    background: var(--stage);
+    display: flex;
+    flex-direction: column;
+  }
+  .status {
+    height: var(--status-h);
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 26px;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    position: relative;
+  }
+  .punch {
+    position: absolute;
+    left: 50%;
+    top: 8px;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    border-radius: 50%;
+    background: #000;
+    box-shadow: inset 0 0 0 2px #1b1f24;
+  }
+  .icons { display: flex; gap: 6px; align-items: center; }
+  .icons svg { width: 15px; height: 15px; fill: currentColor; }
+  iframe {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: var(--stage);
+  }
+  /* Жинхэнэ утас өөрийн status bar-тай тул энд хуурамч status bar байхгүй. */
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+    display: none;
+  }
+  .connect {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px;
+    text-align: center;
+  }
+  .connect p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .connect code { color: var(--text); font-size: 14px; }
+  .connect button {
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    color: #04131b;
+    background: var(--accent);
+    border: 0;
+    border-radius: 14px;
+    padding: 14px 26px;
+    cursor: pointer;
+  }
+  .live .connect { display: none; }
+  .live video { display: block; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="slot">
+      <div class="label">Эцэг эх <small>laptop</small></div>
+      <div class="frame">
+        <div class="phone">
+          <div class="screen">
+            <div class="status">
+              <span id="clock">9:41</span>
+              <span class="punch"></span>
+              <span class="icons" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 21 1 8.5a16 16 0 0 1 22 0z"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M2 22h20V2z"/></svg>
+                <svg viewBox="0 0 24 24"><path d="M8 3h8v2h2a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2z"/></svg>
+              </span>
+            </div>
+            <iframe id="parent" title="SafePath — эцэг эх" allow="camera; microphone; geolocation; autoplay; fullscreen; clipboard-write"></iframe>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="slot">
+      <div class="label"><span class="dot" id="dot"></span>Хүүхэд <small>жинхэнэ утас</small></div>
+      <div class="frame">
+        <div class="phone">
+          <div class="screen" id="child">
+            <video id="mirror" autoplay muted playsinline></video>
+            <div class="connect">
+              <p>Утсаа <code>scrcpy</code>-аар laptop дээр гаргаад,<br>тэр цонхыг сонгоно уу.</p>
+              <button id="share" type="button">Утсыг холбох</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<script>
+  const parent = document.getElementById("parent");
+  const path = new URLSearchParams(location.search).get("parent") || "/guardian";
+  parent.src = path.startsWith("/") ? path : "/guardian";
+
+  // Жинхэнэ утас шиг scrollbar харагдахгүй байлгана (нэг домэйн тул iframe-д хандаж болно).
+  parent.addEventListener("load", () => {
+    try {
+      const style = parent.contentDocument.createElement("style");
+      style.textContent = "html{scrollbar-width:none}::-webkit-scrollbar{display:none}";
+      parent.contentDocument.head.appendChild(style);
+    } catch {}
+  });
+
+  const child = document.getElementById("child");
+  const mirror = document.getElementById("mirror");
+  const dot = document.getElementById("dot");
+  let stream = null;
+
+  function setLive(live) {
+    child.classList.toggle("live", live);
+    dot.classList.toggle("live", live);
+  }
+
+  async function connect() {
+    try {
+      const next = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "window", frameRate: 30 },
+        audio: false,
+        selfBrowserSurface: "exclude",
+      });
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      stream = next;
+      mirror.srcObject = stream;
+      setLive(true);
+      // scrcpy цонхыг хаах эсвэл "Stop sharing" дарвал товчийг буцааж харуулна.
+      stream.getVideoTracks()[0].addEventListener("ended", () => {
+        if (mirror.srcObject === next) setLive(false);
+      });
+    } catch {}
+  }
+  document.getElementById("share").addEventListener("click", connect);
+
+  function fit() {
+    const root = document.documentElement;
+    const css = getComputedStyle(root);
+    const w = parseFloat(css.getPropertyValue("--screen-w")) + 28;
+    const h = parseFloat(css.getPropertyValue("--screen-h")) + 28;
+    const gap = parseFloat(css.getPropertyValue("--gap"));
+    const label = parseFloat(css.getPropertyValue("--label-h"));
+    const scale = Math.min((innerHeight - label - 48) / h, (innerWidth - gap - 48) / (2 * w), 1.2);
+    root.style.setProperty("--scale", scale.toFixed(3));
+  }
+  addEventListener("resize", fit);
+  fit();
+
+  const clock = document.getElementById("clock");
+  function tick() {
+    const d = new Date();
+    clock.textContent = d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+  tick();
+  setInterval(tick, 10000);
+
+  addEventListener("keydown", (e) => {
+    if (e.key === "r" || e.key === "R") parent.contentWindow.location.reload();
+    if (e.key === "s" || e.key === "S") connect();
+  });
+</script>
+</body>
+</html>
