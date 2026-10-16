@@ -4,70 +4,61 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Family SafePath | Presentation</title>
-    <link rel="stylesheet" href="index.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="index.css" />
   </head>
   <body>
     <div class="bg-glow"></div>
     <div class="bg-grid"></div>
 
-    <!-- Байнгын харагдах Дээд лого -->
-    <a href="#" id="main-logo" class="centered">
-      <div class="logo-icon-container">
-        <div class="pulse-container">
-          <div class="pulse-ring"></div>
-          <div class="pulse-ring"></div>
+    <!-- 1920×1080 тайз: ямар ч дэлгэцэнд тааруулж томруулна -->
+    <div class="stage is-loading">
+      <!-- Байнгын харагдах Дээд лого -->
+      <div id="main-logo" class="centered">
+        <div class="logo-icon-container">
+          <div class="pulse-container">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring"></div>
+          </div>
+          <svg
+            class="map-pin"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--primary)"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
         </div>
-        <svg
-          class="map-pin"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--primary)"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3"></circle>
-        </svg>
+        <span class="logo-text">SafePath</span>
       </div>
-      <span class="logo-text">SafePath</span>
-    </a>
 
-    <!-- Дээд цэс -->
-    <nav id="nav-actions">
-      <a href="#" class="nav-link">Нэвтрэх</a>
-      <a href="#" class="btn-primary">Бүртгүүлэх</a>
-    </nav>
-
-    <!-- ПРЕЗЕНТАЦИЙН 11 СЛАЙД -->
-    <main class="presentation-container">
-      <!-- СЛАЙД 1: Лого + Хотын зураг -->
-      <section class="slide active" id="slide-1">
-        <div class="hero-content">
+      <!-- ПРЕЗЕНТАЦИЙН 14 СЛАЙД -->
+      <main class="presentation-container">
+        <!-- СЛАЙД 1: Лого + Хотын зураг -->
+        <section class="slide active" id="slide-1" data-logo="centered">
           <div class="city-skyline-bg">
             <img
               src="Art-UB.png"
               alt="Ulaanbaatar Skyline"
-              class="skyline-image green-theme"
+              class="skyline-image"
             />
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 2: Family SafePath Гарчиг + Хотын зураг -->
-      <section class="slide" id="slide-2">
-        <div class="city-skyline-bg slide2-skyline">
-          <img
-            src="Art-UB.png"
-            alt="Ulaanbaatar Skyline"
-            class="skyline-image green-theme"
-          />
-        </div>
-        <div class="hero-content centered-title-slide">
+        <!-- СЛАЙД 2: Family SafePath Гарчиг + Хотын зураг -->
+        <section class="slide" id="slide-2">
+          <div class="city-skyline-bg">
+            <img src="Art-UB.png" alt="" class="skyline-image" />
+          </div>
           <div class="hero-text-block">
             <div class="tag">Хиймэл оюун ухаанд суурилсан</div>
             <h1 class="hero-title">
@@ -75,226 +66,406 @@
               Гэр бүлийн аюулгүй байдал
             </h1>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 3: Манай баг -->
-      <section class="slide" id="slide-3">
-        <div class="container centered-team-container">
-          <div class="section-header center">
+        <!-- СЛАЙД 3: Манай баг -->
+        <section class="slide" id="slide-3">
+          <div class="slide-header center">
             <div class="tag red-dot-tag">Манай баг</div>
           </div>
-          <div class="team-grid">
-            <div id="team-members-container" class="team-grid-inner"></div>
-          </div>
-        </div>
-      </section>
+          <div id="team-members-container" class="team-grid"></div>
+        </section>
 
-      <!-- СЛАЙД 4: Асуудал -->
-      <section class="slide" id="slide-4">
-        <div class="container problem-layout">
-          <div class="q-marks-column">
-            <div class="q-mark q1">?</div>
-            <div class="q-mark q2">?</div>
-            <div class="q-mark q3">?</div>
-            <div class="q-mark q4">?</div>
-            <div class="q-mark q5">?</div>
-          </div>
+        <!-- СЛАЙД 4: Асуудал -->
+        <section class="slide" id="slide-4">
+          <div class="problem-layout">
+            <div class="q-marks-column" aria-hidden="true">
+              <div class="q-mark q1">?</div>
+              <div class="q-mark q2">?</div>
+              <div class="q-mark q3">?</div>
+              <div class="q-mark q4">?</div>
+              <div class="q-mark q5">?</div>
+            </div>
 
-          <div class="problems-column">
-            <div class="tag red-dot-tag">АСУУДАЛ</div>
-
-            <div class="glass-panel problem-list-container">
-              <div class="problem-item" data-step="0">
-                <div class="icon-box warning animated-icon">⏰</div>
-                <div class="p-text">
-                  Алга болсон хүнийг гэр бүл нь хэт оройтож олж мэддэг.
+            <div class="problems-column">
+              <div class="tag red-dot-tag">АСУУДАЛ</div>
+              <div class="item-list">
+                <div class="item" data-step="0">
+                  <div class="icon-box warning">
+                    <i data-lucide="alarm-clock"></i>
+                  </div>
+                  <div class="item-text">
+                    Алга болсон хүнийг гэр бүл нь хэт оройтож олж мэддэг.
+                  </div>
                 </div>
-              </div>
-              <div class="problem-item" data-step="1">
-                <div class="icon-box warning animated-icon">🧭</div>
-                <div class="p-text">Хаанаас хайхаа мэддэггүй.</div>
-              </div>
-              <div class="problem-item" data-step="2">
-                <div class="icon-box warning animated-icon">🚔</div>
-                <div class="p-text">Хайхад хугацаа их шаардагддаг.</div>
-              </div>
-              <div class="problem-item" data-step="3">
-                <div class="icon-box warning animated-icon">⚠️</div>
-                <div class="p-text">
-                  Гэнэтийн бэртэл, гэмтлээс урьдчилан сэргийлж чаддаггүй.
+                <div class="item" data-step="1">
+                  <div class="icon-box warning">
+                    <i data-lucide="compass"></i>
+                  </div>
+                  <div class="item-text">Хаанаас хайхаа мэддэггүй.</div>
+                </div>
+                <div class="item" data-step="2">
+                  <div class="icon-box warning">
+                    <i data-lucide="hourglass"></i>
+                  </div>
+                  <div class="item-text">Хайхад хугацаа их шаардагддаг.</div>
+                </div>
+                <div class="item" data-step="3">
+                  <div class="icon-box warning">
+                    <i data-lucide="triangle-alert"></i>
+                  </div>
+                  <div class="item-text">
+                    Гэнэтийн бэртэл, гэмтлээс урьдчилан сэргийлж чаддаггүй.
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 5: ТООН БАРИМТ -->
-      <section class="slide" id="slide-5">
-        <div class="container stats-layout">
-          <div class="section-header center">
+        <!-- СЛАЙД 5: ТООН БАРИМТ -->
+        <section class="slide" id="slide-5">
+          <div class="slide-header center">
             <div class="tag red-dot-tag">ТООН БАРИМТ</div>
-            <h2 class="section-title">Сүүлийн оны ҮСХ судалгаагаар</h2>
+            <h2 class="section-title">Сүүлийн оны албан ёсны статистик</h2>
           </div>
-          <div class="glass-panel stats-list-container">
-            <div class="stat-item" data-step="0">
-              <div class="icon-box primary animated-icon">👶</div>
-              <div class="p-text">Аутизмтай хүүхэд: <strong>2,300</strong></div>
-            </div>
-            <div class="stat-item" data-step="1">
-              <div class="icon-box warning animated-icon">🔍</div>
-              <div class="p-text">
-                Алга болсон хүүхэд: <strong>1,380</strong>
+          <div class="stats-layout">
+            <!-- График: index.js-ийн elderlyData-аас зурна -->
+            <figure class="chart-card">
+              <div class="chart-head">
+                <div>
+                  <h3 class="chart-title">65+ насны хүн ам</h3>
+                  <p class="chart-subtitle">2015–2025 он, мянган хүн</p>
+                </div>
+                <div class="chart-delta">
+                  <i data-lucide="trending-up"></i>
+                  <span><strong>+78%</strong> 10 жилд</span>
+                </div>
               </div>
-            </div>
-            <div class="stat-item" data-step="2">
-              <div class="icon-box primary animated-icon">🧓</div>
-              <div class="p-text">
-                Өндөр настан (65+): <strong>200,000</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+              <svg
+                id="elderly-chart"
+                class="chart"
+                viewBox="0 0 960 400"
+                role="group"
+                aria-label="65+ насны хүн ам 2015 онд 115,065 байсан бол 2025 онд 204,790 болж өссөн"
+              ></svg>
+              <figcaption class="chart-source">
+                Эх сурвалж: Үндэсний статистикийн хороо (1212.mn)
+              </figcaption>
+            </figure>
 
-      <!-- СЛАЙД 6: Шийдэл -->
-      <section class="slide" id="slide-6">
-        <div class="container solution-layout">
-          <div class="solution-left-column centered-solution-visual">
-            <div class="tag red-dot-tag">ШИЙДЭЛ</div>
-
-            <div class="solution-visual-box-centered">
-              <div class="neon-light-container-extra-large">
-                <div class="neon-glow-effect"></div>
-                <svg
-                  class="neon-bulb-icon-extra-large"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path
-                    d="M9 18h6M10 22h4M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"
-                  ></path>
-                  <path
-                    d="M12 6a3 3 0 0 0-3 3M12 6a3 3 0 0 1 3 3M12 9v3"
-                    stroke-linecap="round"
-                  ></path>
-                </svg>
-                <div class="sparkle s1"></div>
-                <div class="sparkle s2"></div>
-                <div class="sparkle s3"></div>
+            <div class="stat-stack">
+              <div class="stat-card" data-step="0">
+                <div class="icon-box"><i data-lucide="baby"></i></div>
+                <div>
+                  <div class="stat-value">2,395</div>
+                  <div class="stat-label">Аутизмтай хүүхэд (0–18 нас)</div>
+                  <div class="stat-source">ГБХНХЯ, 2024</div>
+                </div>
+              </div>
+              <div class="stat-card" data-step="1">
+                <div class="icon-box warning"><i data-lucide="search"></i></div>
+                <div>
+                  <div class="stat-value">1,380</div>
+                  <div class="stat-label">Алга болсон хүүхэд</div>
+                </div>
+              </div>
+              <div class="stat-card" data-step="2">
+                <div class="icon-box">
+                  <i data-lucide="heart-handshake"></i>
+                </div>
+                <div>
+                  <div class="stat-value">200,000</div>
+                  <div class="stat-label">Өндөр настан (65+)</div>
+                  <div class="stat-source">ҮСХ, 2025</div>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          <div class="solutions-column">
-            <div class="glass-panel solution-list-container">
-              <div class="solution-item" data-step="0">
-                <div class="icon-box primary animated-icon">🚨</div>
-                <div class="p-text">Хүрээнээс гарсан даруй мэдэгдэх.</div>
-              </div>
-              <div class="solution-item" data-step="1">
-                <div class="icon-box primary animated-icon">📢</div>
-                <div class="p-text">Гэр бүлийн бүх гишүүдрүү мэдээ өгөх.</div>
-              </div>
-              <div class="solution-item" data-step="2">
-                <div class="icon-box primary animated-icon">⚡</div>
-                <div class="p-text">Хурдан очих замыг тооцоолно.</div>
-              </div>
-              <div class="solution-item" data-step="3">
-                <div class="icon-box primary animated-icon">🔋</div>
-                <div class="p-text">Утас сүлжээгүй үед таамгийг гаргана.</div>
-              </div>
-              <div class="solution-item" data-step="4">
-                <div class="icon-box primary animated-icon">🎙️</div>
-                <div class="p-text">Дуу хоолойгоор чиглүүлэг өгнө.</div>
+        <!-- СЛАЙД 6: Шийдэл -->
+        <section class="slide" id="slide-6">
+          <div class="split-layout">
+            <div class="phone-fan">
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-child.webp"
+                  alt="Хүүхдийн нүүр дэлгэц"
+                />
+              </figure>
+              <figure class="phone-shot raised">
+                <img
+                  class="phone"
+                  src="phones/phone-role.webp"
+                  alt="Горим сонгох дэлгэц"
+                />
+              </figure>
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-guardian.webp"
+                  alt="Асран хамгаалагчийн дэлгэц"
+                />
+              </figure>
+            </div>
+
+            <div class="solutions-column">
+              <div class="tag red-dot-tag">ШИЙДЭЛ</div>
+              <div class="item-list">
+                <div class="item" data-step="0">
+                  <div class="icon-box"><i data-lucide="bell-ring"></i></div>
+                  <div class="item-text">Хүрээнээс гарсан даруй мэдэгдэх.</div>
+                </div>
+                <div class="item" data-step="1">
+                  <div class="icon-box"><i data-lucide="users"></i></div>
+                  <div class="item-text">
+                    Гэр бүлийн бүх гишүүдрүү мэдээ өгөх.
+                  </div>
+                </div>
+                <div class="item" data-step="2">
+                  <div class="icon-box"><i data-lucide="route"></i></div>
+                  <div class="item-text">Хурдан очих замыг тооцоолно.</div>
+                </div>
+                <div class="item" data-step="3">
+                  <div class="icon-box"><i data-lucide="wifi-off"></i></div>
+                  <div class="item-text">
+                    Утас сүлжээгүй үед таамгийг гаргана.
+                  </div>
+                </div>
+                <div class="item" data-step="4">
+                  <div class="icon-box"><i data-lucide="mic"></i></div>
+                  <div class="item-text">Дуу хоолойгоор чиглүүлэг өгнө.</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 7: ЗОРИЛТ -->
-      <section class="slide" id="slide-7">
-        <div class="container goals-layout">
-          <div class="section-header center">
-            <div class="tag red-dot-tag">ЗОРИЛТ</div>
-            <h2 class="section-title">Цаашдын хөгжүүлэлт ба Боломжууд</h2>
-          </div>
-          <div class="glass-panel goals-list-container">
-            <div class="goal-item" data-step="0">
-              <div class="icon-box primary animated-icon">⌚</div>
-              <div class="p-text">Ухаалаг цагтай холбох.</div>
-            </div>
-            <div class="goal-item" data-step="1">
-              <div class="icon-box warning animated-icon">📲</div>
-              <div class="p-text">
-                Интернетгүй үед SMS-ээр аюулын дохио илгээх.
+        <!-- СЛАЙД 7: АПП — Хүүхдийн дэлгэц -->
+        <section class="slide" id="slide-7">
+          <div class="app-layout">
+            <div class="app-copy">
+              <div class="tag red-dot-tag">Хүүхдийн дэлгэц</div>
+              <h2 class="section-title">AI найз дагалдан хамгаална</h2>
+              <p class="lead">
+                Хүүхэд AI найзтайгаа хамт явж, байршлаа асран хамгаалагчтайгаа
+                автоматаар хуваалцана.
+              </p>
+              <div class="feature-list">
+                <div class="feature" data-step="0">
+                  <div class="icon-box small"><i data-lucide="mic"></i></div>
+                  AI найз монгол хэлээр ярьж, дуут заавар өгнө
+                </div>
+                <div class="feature" data-step="1">
+                  <div class="icon-box small"><i data-lucide="users"></i></div>
+                  Байршлаа хэдэн хүнтэй хуваалцаж буйг харуулна
+                </div>
+                <div class="feature" data-step="2">
+                  <div class="icon-box small danger">
+                    <i data-lucide="siren"></i>
+                  </div>
+                  SOS — нэг товшоод тусламж дуудна
+                </div>
+                <div class="feature" data-step="3">
+                  <div class="icon-box small">
+                    <i data-lucide="sparkles"></i>
+                  </div>
+                  8 бэлэн дүр + өөрөө зохиох горим
+                </div>
               </div>
             </div>
-            <div class="goal-item" data-step="2">
-              <div class="icon-box primary animated-icon">🎨</div>
-              <div class="p-text">Анимшион ашиглан гэрлүү нь чиглүүлэх.</div>
-            </div>
-            <div class="goal-item" data-step="3">
-              <div class="icon-box warning animated-icon">🔊</div>
-              <div class="p-text">Дуут заавар.</div>
+
+            <div class="phone-row">
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-child.webp"
+                  alt="Хүүхдийн нүүр дэлгэц"
+                />
+                <figcaption>Нүүр дэлгэц</figcaption>
+              </figure>
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-friend.webp"
+                  alt="AI найз сонгох дэлгэц"
+                />
+                <figcaption>Миний AI найз</figcaption>
+              </figure>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 8: БҮТЭЦ -->
-      <section class="slide" id="slide-8">
-        <div class="container arch-layout-new">
-          <div class="section-header-left">
+        <!-- СЛАЙД 8: АПП — Асран хамгаалагчийн дэлгэц -->
+        <section class="slide" id="slide-8">
+          <div class="app-layout">
+            <div class="app-copy">
+              <div class="tag red-dot-tag">Асран хамгаалагчийн дэлгэц</div>
+              <h2 class="section-title">Шууд байршил,<br />эрсдэлийн төлөв</h2>
+              <p class="lead">
+                Хүүхэд аюулгүй бүсэд байгаа эсэх, хэзээ шинэчлэгдсэнийг газрын
+                зураг дээр шууд харна.
+              </p>
+              <div class="feature-list">
+                <div class="feature" data-step="0">
+                  <div class="icon-box small">
+                    <i data-lucide="refresh-cw"></i>
+                  </div>
+                  5 секунд тутам шинэчлэгдэнэ
+                </div>
+                <div class="feature" data-step="1">
+                  <div class="icon-box small">
+                    <i data-lucide="shield-check"></i>
+                  </div>
+                  Аюулгүй / Анхаарах / Өндөр эрсдэл төлөв
+                </div>
+                <div class="feature" data-step="2">
+                  <div class="icon-box small"><i data-lucide="map"></i></div>
+                  Харсан газар, танил зам газрын зураг дээр
+                </div>
+              </div>
+            </div>
+
+            <div class="phone-row">
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-role.webp"
+                  alt="Горим сонгох дэлгэц"
+                />
+                <figcaption>Горим сонгох</figcaption>
+              </figure>
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-guardian.webp"
+                  alt="Асран хамгаалагчийн дэлгэц"
+                />
+                <figcaption>Асран хамгаалагч</figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+
+        <!-- СЛАЙД 9: АПП — AR чиглүүлэг -->
+        <section class="slide" id="slide-9">
+          <div class="app-layout">
+            <div class="app-copy">
+              <div class="tag red-dot-tag">AR чиглүүлэг</div>
+              <h2 class="section-title">Сумаа л дагаарай</h2>
+              <p class="lead">
+                AI найз юу хийхийг хэлж, сум хаашаа явахыг харуулна. Хүүхэд
+                газрын зураг уншиж мэдэхгүй ч болно.
+              </p>
+            </div>
+
+            <div class="phone-row">
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-ar-straight.webp"
+                  alt="AR чиглүүлэг: шулуун чигээрээ"
+                />
+                <figcaption>Шулуун чигээрээ</figcaption>
+              </figure>
+              <figure class="phone-shot">
+                <img
+                  class="phone"
+                  src="phones/phone-ar-right.webp"
+                  alt="AR чиглүүлэг: баруун тийш эргэх"
+                />
+                <figcaption>Баруун тийш эргэх</figcaption>
+              </figure>
+            </div>
+          </div>
+          <p class="photo-credit">
+            Гудамжны зургууд: Jonashtand; Chinneeb — CC BY-SA 4.0, Wikimedia
+            Commons
+          </p>
+        </section>
+
+        <!-- СЛАЙД 10: ЗОРИЛТ -->
+        <section class="slide" id="slide-10">
+          <div class="list-layout">
+            <div class="slide-header center">
+              <div class="tag red-dot-tag">ЗОРИЛТ</div>
+              <h2 class="section-title">Цаашдын хөгжүүлэлт ба Боломжууд</h2>
+            </div>
+            <div class="item-list">
+              <div class="item" data-step="0">
+                <div class="icon-box"><i data-lucide="watch"></i></div>
+                <div class="item-text">Ухаалаг цагтай холбох.</div>
+              </div>
+              <div class="item" data-step="1">
+                <div class="icon-box">
+                  <i data-lucide="message-square-warning"></i>
+                </div>
+                <div class="item-text">
+                  Интернетгүй үед SMS-ээр аюулын дохио илгээх.
+                </div>
+              </div>
+              <div class="item" data-step="2">
+                <div class="icon-box"><i data-lucide="navigation"></i></div>
+                <div class="item-text">
+                  Анимшион ашиглан гэрлүү нь чиглүүлэх.
+                </div>
+              </div>
+              <div class="item" data-step="3">
+                <div class="icon-box"><i data-lucide="volume-2"></i></div>
+                <div class="item-text">Дуут заавар.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- СЛАЙД 11: БҮТЭЦ -->
+        <section class="slide" id="slide-11">
+          <div class="slide-header">
             <div class="tag red-dot-tag">БҮТЭЦ</div>
           </div>
 
           <div class="arch-flow-row">
             <div class="arch-flow-box">
-              <span class="arch-icon animated-icon">💻</span> Next.js / React
+              <i data-lucide="monitor"></i> Next.js / React
             </div>
-            <div class="arch-arrow">→</div>
+            <i class="arch-arrow" data-lucide="arrow-right"></i>
             <div class="arch-flow-box">
-              <span class="arch-icon animated-icon">⚙️</span> Next.js API &
-              MongoDB
+              <i data-lucide="server"></i> Next.js API &amp; MongoDB
             </div>
-            <div class="arch-arrow">→</div>
+            <i class="arch-arrow" data-lucide="arrow-right"></i>
             <div class="arch-flow-box">
-              <span class="arch-icon animated-icon">📱</span> Capacitor
-              (Android)
+              <i data-lucide="smartphone"></i> Capacitor (Android)
             </div>
           </div>
 
           <div class="arch-cards-grid">
-            <div class="arch-card-new" data-step="0">
-              <div class="icon-box primary animated-icon">⚛️</div>
-              <div class="arch-card-content">
-                <h4>Frontend & UI</h4>
+            <div class="arch-card" data-step="0">
+              <div class="icon-box"><i data-lucide="code"></i></div>
+              <div>
+                <h4>Frontend &amp; UI</h4>
                 <p>Next.js 16.4, React 19.3, TypeScript 5, Tailwind CSS 4</p>
               </div>
             </div>
-            <div class="arch-card-new" data-step="1">
-              <div class="icon-box primary animated-icon">🗄️</div>
-              <div class="arch-card-content">
-                <h4>Backend & DB</h4>
-                <p>Next.js Server API & MongoDB</p>
+            <div class="arch-card" data-step="1">
+              <div class="icon-box"><i data-lucide="database"></i></div>
+              <div>
+                <h4>Backend &amp; DB</h4>
+                <p>Next.js Server API &amp; MongoDB</p>
               </div>
             </div>
-            <div class="arch-card-new" data-step="2">
-              <div class="icon-box primary animated-icon">🗺️</div>
-              <div class="arch-card-content">
-                <h4>Safe Zone & Map</h4>
-                <p>Leaflet & React Leaflet</p>
+            <div class="arch-card" data-step="2">
+              <div class="icon-box"><i data-lucide="map"></i></div>
+              <div>
+                <h4>Safe Zone &amp; Map</h4>
+                <p>Leaflet &amp; React Leaflet</p>
               </div>
             </div>
-            <div class="arch-card-new" data-step="3">
-              <div class="icon-box primary animated-icon">🤖</div>
-              <div class="arch-card-content">
-                <h4>AI & Voice / Mobile</h4>
+            <div class="arch-card" data-step="3">
+              <div class="icon-box"><i data-lucide="bot"></i></div>
+              <div>
+                <h4>AI &amp; Voice / Mobile</h4>
                 <p>
                   Google Gemini SDK, ElevenLabs SDK, Capacitor Local
                   Notifications
@@ -302,195 +473,164 @@
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 9: АШИГЛАЛТ -->
-      <section class="slide" id="slide-9">
-        <div class="container usage-layout">
-          <div class="section-header">
-            <div class="tag red-dot-tag">АШИГЛАЛТ</div>
+        <!-- СЛАЙД 12: ӨРТГИЙН СУДАЛГАА (тооцоог index.js-ийн costModel хийнэ) -->
+        <section class="slide" id="slide-12">
+          <div class="slide-header">
+            <div class="tag red-dot-tag">Өртгийн судалгаа</div>
           </div>
-          <div class="usage-grid">
-            <div class="usage-column">
-              <h3 class="usage-section-title">
-                🔒 Хувийн нууц, аюулгүй байдал
-              </h3>
-              <div class="usage-cards">
-                <div class="usage-card" data-step="0">
-                  <div class="icon-box primary animated-icon">👁️</div>
-                  <div class="usage-card-body">
-                    <h4>Ил тод</h4>
-                    <p>
-                      Хоёр талын зөвшөөрөл шаардлагатай (мэдэгдэл үргэлж
-                      харагдана).
-                    </p>
-                  </div>
-                </div>
-                <div class="usage-card" data-step="1">
-                  <div class="icon-box primary animated-icon">🛡️</div>
-                  <div class="usage-card-body">
-                    <h4>Аюулгүй</h4>
-                    <p>Мэдээлэл нууцласан (encrypt) байна.</p>
-                  </div>
-                </div>
-                <div class="usage-card" data-step="2">
-                  <div class="icon-box warning animated-icon">🗑️</div>
-                  <div class="usage-card-body">
-                    <h4>Түүх</h4>
-                    <p>
-                      Байршлын түүхийг 30 хоногийн дараа автоматаар устгана.
-                    </p>
-                  </div>
+
+          <div class="cost-grid">
+            <div class="cost-card" data-step="0">
+              <div class="cost-card-head">
+                <div class="icon-box small"><i data-lucide="users"></i></div>
+                <div>
+                  <h3>Хэдэн хүн авах боломжтой?</h3>
+                  <p>ҮСХ, 2025</p>
                 </div>
               </div>
+              <dl class="cost-rows">
+                <div>
+                  <dt>Хүүхэд (0–14), өндөр настан (65+)</dt>
+                  <dd>1.3 сая</dd>
+                </div>
+                <div>
+                  <dt>Үүнээс Улаанбаатарт</dt>
+                  <dd>634 мянга</dd>
+                </div>
+                <div>
+                  <dt>Улаанбаатар дахь өрх</dt>
+                  <dd>490,501</dd>
+                </div>
+                <div class="cost-total">
+                  <dt>Эхний жилийн зорилт (1%)</dt>
+                  <dd data-cost="families"></dd>
+                </div>
+              </dl>
             </div>
 
-            <div class="usage-column">
-              <h3 class="usage-section-title">⚡ Батарей, оффлайн</h3>
-              <div class="usage-cards">
-                <div class="usage-card" data-step="3">
-                  <div class="icon-box warning animated-icon">🧭</div>
-                  <div class="usage-card-body">
-                    <h4>Дасан зохичих GPS</h4>
-                    <p>
-                      Хөдөлгөөнгүй үед 2–5 минут, хөдөлсөн үед 15–30 секунд.
-                    </p>
-                  </div>
-                </div>
-                <div class="usage-card" data-step="4">
-                  <div class="icon-box warning animated-icon">📶</div>
-                  <div class="usage-card-body">
-                    <h4>Оффлайн</h4>
-                    <p>Оффлайн үед төхөөрөмжийн сан дотор хадгална.</p>
-                  </div>
+            <div class="cost-card" data-step="1">
+              <div class="cost-card-head">
+                <div class="icon-box small"><i data-lucide="cpu"></i></div>
+                <div>
+                  <h3>API зардал</h3>
+                  <p data-cost="rateNote"></p>
                 </div>
               </div>
+              <dl class="cost-rows">
+                <div>
+                  <dt>Gemini 3.1 Flash-Lite (AI найз)</dt>
+                  <dd data-cost="gemini"></dd>
+                </div>
+                <div>
+                  <dt>ElevenLabs v3 (монгол дуу)</dt>
+                  <dd data-cost="voice"></dd>
+                </div>
+                <div>
+                  <dt>Сервер, өгөгдлийн сан</dt>
+                  <dd data-cost="infra"></dd>
+                </div>
+                <div class="cost-total">
+                  <dt>Нийт</dt>
+                  <dd data-cost="costPerFamily"></dd>
+                </div>
+              </dl>
+            </div>
+
+            <div class="cost-card" data-step="2">
+              <div class="cost-card-head">
+                <div class="icon-box small"><i data-lucide="wallet"></i></div>
+                <div>
+                  <h3>Боломжит орлого</h3>
+                  <p data-cost="revenueNote"></p>
+                </div>
+              </div>
+              <dl class="cost-rows">
+                <div>
+                  <dt>Үнэ <span data-cost="wageShare"></span></dt>
+                  <dd data-cost="price"></dd>
+                </div>
+                <div>
+                  <dt>Орлого</dt>
+                  <dd data-cost="revenue"></dd>
+                </div>
+                <div>
+                  <dt>Зардал</dt>
+                  <dd data-cost="totalCost"></dd>
+                </div>
+                <div class="cost-total">
+                  <dt>Ашиг</dt>
+                  <dd data-cost="profit"></dd>
+                </div>
+              </dl>
             </div>
           </div>
-        </div>
-      </section>
 
-      <!-- СЛАЙД 10: ТУРШИЛТ -->
-      <section class="slide" id="slide-10">
-        <div class="container demo-layout">
-          <div class="section-header center">
+          <figure class="cost-bar-card" data-step="3">
+            <div class="cost-bar-head">
+              <h3 data-cost="barTitle"></h3>
+              <p data-cost="yearNote"></p>
+            </div>
+            <div id="cost-bar" class="cost-bar"></div>
+            <div id="cost-legend" class="cost-legend"></div>
+          </figure>
+
+          <p class="cost-note">
+            Таамаглал: 1 өрхөд 1 хүүхэд эсвэл өндөр настан; өдөрт 20 AI
+            харилцаа; сард 10,000 тэмдэгт дуу (давтагдах заавар хадгалагдана);
+            сервер ≈ $100/сар. Үнэ: Google, ElevenLabs, Vercel, MongoDB
+            (2026.10), Монголбанкны ханш. Ашигт цалин, татвар ороогүй.
+          </p>
+        </section>
+
+        <!-- СЛАЙД 13: ТУРШИЛТ (видео: videos/turshilt.mp4, слайд руу ороход тоглоно) -->
+        <section class="slide" id="slide-13">
+          <div class="slide-header center">
             <div class="tag red-dot-tag">ТУРШИЛТ</div>
           </div>
-          <div class="glass-panel demo-list-container">
-            <div class="demo-item" data-step="0">
-              <div class="icon-box primary animated-icon">🧪</div>
-              <div class="p-text">
-                <strong>Модель туршилт:</strong> SisFall/MobiAct + 50 хэвийн бус
-                аяллын симуляци
-              </div>
-            </div>
-            <div class="demo-item" data-step="1">
-              <div class="icon-box warning animated-icon">📱</div>
-              <div class="p-text">
-                <strong>Симуляци:</strong> Android/iOS эмулятор дээр GPS зам
-                турших
-              </div>
-            </div>
-            <div class="demo-item" data-step="2">
-              <div class="icon-box primary animated-icon">🔍</div>
-              <div class="p-text">
-                <strong>Талбарын туршилт:</strong> Багийнхан 1 долоо хоног бодит
-                байдалд турших
-              </div>
-            </div>
+          <div class="video-frame">
+            <video
+              class="slide-video"
+              src="videos/turshilt.mp4"
+              controls
+              playsinline
+              preload="metadata"
+            ></video>
+            <p class="video-missing">
+              <i data-lucide="video"></i>
+              <span
+                >Видео файлаа <code>videos/turshilt.mp4</code> нэрээр хадгална
+                уу</span
+              >
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- СЛАЙД 11: ТӨГСГӨЛ -->
-      <section class="slide" id="slide-11">
-        <div class="container centered-closing-container">
-          <div class="closing-content-box">
-            <div class="closing-icons-cluster">
-              <div class="closing-icon-wrapper animated-icon">
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-              <div
-                class="closing-icon-wrapper animated-icon"
-                style="animation-delay: 0.2s"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-              <div
-                class="closing-icon-wrapper animated-icon large-center-icon"
-                style="animation-delay: 0.4s"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-              <div
-                class="closing-icon-wrapper animated-icon"
-                style="animation-delay: 0.6s"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-              <div
-                class="closing-icon-wrapper animated-icon"
-                style="animation-delay: 0.8s"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </div>
-            </div>
+        <!-- СЛАЙД 14: ТӨГСГӨЛ (лого дахин голдоо ирнэ) -->
+        <section class="slide" id="slide-14" data-logo="closing">
+          <div class="closing-content">
             <div class="closing-divider"></div>
             <h2 class="closing-title">Анхаарал тавьсанд баярлалаа</h2>
-            <div class="demo-button-wrapper">
-              <a
-                href="https://safepath-6tazoyjmo-libguuteis-projects.vercel.app/tracker"
-                target="_blank"
-                class="demo-action-btn"
-                >Демо</a
-              >
-            </div>
+            <a
+              href="https://safepath-indol.vercel.app/"
+              target="_blank"
+              rel="noopener"
+              class="demo-action-btn"
+              >Демо <i data-lucide="external-link"></i
+            ></a>
           </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
 
+      <div id="slide-counter" class="slide-counter"></div>
+    </div>
+
+    <div class="progress">
+      <div id="progress-bar" class="progress-bar"></div>
+    </div>
+
+    <script src="vendor/lucide.min.js"></script>
     <script src="index.js"></script>
   </body>
 </html>
