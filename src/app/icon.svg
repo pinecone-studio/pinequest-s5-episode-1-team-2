@@ -1,34 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <!-- Background Gradient -->
-    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#07151b" />
-      <stop offset="100%" stop-color="#03080c" />
-    </linearGradient>
-
     <!-- MapPin Gradient -->
     <linearGradient id="pin-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#67e8f9" />
       <stop offset="100%" stop-color="#0891b2" />
     </linearGradient>
 
-    <!-- Glow Effect Filter -->
+    <!-- Subtle Glow Shadow -->
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="16" result="blur" />
-      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#0891b2" flood-opacity="0.4" />
     </filter>
   </defs>
 
-  <!-- Background Card / Circle -->
-  <rect width="512" height="512" rx="128" fill="url(#bg-grad)" />
-
-  <!-- Map Pin Symbol with Glow -->
+  <!-- Transparent Background Map Pin Symbol -->
   <g filter="url(#glow)">
     <path 
-      d="M256 96 C176.47 96 112 160.47 112 240 C112 340 256 416 256 416 C256 416 400 340 400 240 C400 160.47 335.53 96 256 96 Z" 
+      d="M256 64 C160 64 80 144 80 240 C80 360 256 448 256 448 C256 448 432 360 432 240 C432 144 352 64 256 64 Z" 
       fill="url(#pin-grad)" 
     />
     <!-- Inner Dot -->
-    <circle cx="256" cy="224" r="52" fill="#06212a" />
+    <circle cx="256" cy="220" r="60" fill="#06212a" />
   </g>
 </svg>
