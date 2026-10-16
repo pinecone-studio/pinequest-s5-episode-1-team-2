@@ -290,10 +290,12 @@ export async function applySchema(db: Db) {
   const existing = new Set((await db.listCollections({}, { nameOnly: true }).toArray()).map(({ name }) => name));
 
   for (const [name, { validator, indexes }] of Object.entries(SCHEMA)) {
+    // "moderate": documents saved under an older schema (e.g. users that still carry `role`) can
+    // still be updated; "strict" would reject every update to them, such as resuming location sharing.
     if (existing.has(name)) {
-      await db.command({ collMod: name, validator });
+      await db.command({ collMod: name, validator, validationLevel: "moderate" });
     } else {
-      await db.createCollection(name, { validator });
+      await db.createCollection(name, { validator, validationLevel: "moderate" });
     }
     // MongoDB rejects an empty index list; collections keyed only by _id have none to add.
     if (indexes.length) await db.collection(name).createIndexes(indexes);
