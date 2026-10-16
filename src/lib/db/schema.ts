@@ -1,5 +1,7 @@
 import type { Db, Document, IndexDescription } from "mongodb";
 import { NAME_MAX_LENGTH, PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH } from "@/lib/auth/schemas";
+import { SCENE_LANDMARK_KINDS } from "@/types/vision";
+import { REWARD_IDS } from "@/types/rewards";
 
 type CollectionSchema = {
   validator: Document;
@@ -81,12 +83,102 @@ export const SCHEMA: Record<string, CollectionSchema> = {
           latitude: { bsonType: "number", minimum: -90, maximum: 90 },
           longitude: { bsonType: "number", minimum: -180, maximum: 180 },
           accuracy: { bsonType: "number", minimum: 0 },
+          batteryLevel: { bsonType: ["number", "null"], minimum: 0, maximum: 1 },
+          charging: { bsonType: ["bool", "null"] },
           updatedAt: { bsonType: "date" },
         },
       },
     },
     // A position nobody refreshed for a day is deleted, so a child's whereabouts are not kept forever.
     indexes: [{ key: { updatedAt: 1 }, name: "updatedAt_ttl", expireAfterSeconds: 24 * 60 * 60 }],
+  },
+  checkpoints: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "name", "latitude", "longitude", "radiusMeters", "reward", "insideSince", "reachedAt", "createdBy", "createdAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          name: { bsonType: "string", minLength: 1, maxLength: 40 },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          radiusMeters: { bsonType: "number", minimum: 30, maximum: 300 },
+          reward: { bsonType: "string", enum: [...REWARD_IDS] },
+          insideSince: { bsonType: ["date", "null"] },
+          reachedAt: { bsonType: ["date", "null"] },
+          createdBy: { bsonType: "string" },
+          createdAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { childId: 1, createdAt: -1 }, name: "childId_createdAt_desc" },
+      // Reached checkpoints stay for a month as a record of the child's trips, then go.
+      { key: { reachedAt: 1 }, name: "reachedAt_ttl_30_days", expireAfterSeconds: 30 * 24 * 60 * 60 },
+    ],
+  },
+  scenePhotos: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "image", "latitude", "longitude", "takenAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          image: { bsonType: "binData" },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          takenAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { childId: 1, takenAt: -1 }, name: "childId_takenAt_desc" },
+      // Photos of where a child is are as sensitive as positions: kept for a day at most.
+      { key: { takenAt: 1 }, name: "takenAt_ttl", expireAfterSeconds: 24 * 60 * 60 },
+    ],
+  },
+  childRewards: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["items", "updatedAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          items: { bsonType: "array", items: { bsonType: "string", enum: [...REWARD_IDS] } },
+          updatedAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [],
+  },
+  seenLandmarks: {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["childId", "label", "detail", "kind", "latitude", "longitude", "seenAt"],
+        additionalProperties: false,
+        properties: {
+          _id: { bsonType: "string" },
+          childId: { bsonType: "string" },
+          label: { bsonType: "string", minLength: 1, maxLength: 48 },
+          detail: { bsonType: "string", maxLength: 80 },
+          kind: { bsonType: "string", enum: [...SCENE_LANDMARK_KINDS] },
+          latitude: { bsonType: "number", minimum: -90, maximum: 90 },
+          longitude: { bsonType: "number", minimum: -180, maximum: 180 },
+          seenAt: { bsonType: "date" },
+        },
+      },
+    },
+    indexes: [
+      { key: { childId: 1, seenAt: -1 }, name: "childId_seenAt_desc" },
+      // Like positions, the places a child passed are only kept for a day.
+      { key: { seenAt: 1 }, name: "seenAt_ttl", expireAfterSeconds: 24 * 60 * 60 },
+    ],
   },
   safeZones: {
     validator: {
@@ -175,7 +267,7 @@ export const SCHEMA: Record<string, CollectionSchema> = {
         properties: {
           _id: { bsonType: "string" },
           childId: { bsonType: "string" },
-          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS"] },
+          type: { bsonType: "string", enum: ["OUTSIDE_SAFE_ZONES", "ZONE_EXIT", "ZONE_ENTER", "SOS", "LOW_BATTERY"] },
           transitionKey: { bsonType: "string", minLength: 1, maxLength: 200 },
           zoneName: { bsonType: "string", maxLength: 40 },
           message: { bsonType: "string", minLength: 1, maxLength: 200 },
@@ -203,6 +295,7 @@ export async function applySchema(db: Db) {
     } else {
       await db.createCollection(name, { validator });
     }
-    await db.collection(name).createIndexes(indexes);
+    // MongoDB rejects an empty index list; collections keyed only by _id have none to add.
+    if (indexes.length) await db.collection(name).createIndexes(indexes);
   }
 }

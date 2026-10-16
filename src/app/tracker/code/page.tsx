@@ -1,5 +1,5 @@
 import Link from "next/link";
-import {ChevronLeft, LogOut, MapPin, Shield, UserX} from "lucide-react";
+import {ChevronLeft, LogOut, MapPin, Shield, Sparkles, UserX} from "lucide-react";
 import {logout, unlink} from "@/app/actions/auth";
 import {CodeGenerator} from "@/components/auth/pairing";
 import {AppShell} from "@/components/safe-path";
@@ -13,7 +13,7 @@ export default async function TrackerCodePage() {
   return (
     <AppShell>
       <main
-        className="relative isolate min-h-dvh w-full overflow-x-hidden px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1] sm:px-6"
+        className="relative isolate min-h-dvh w-full overflow-x-clip px-4 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] text-[#f0f6f1] sm:px-6"
         style={{
           background:
             "linear-gradient(155deg, #05090d 0%, #07151b 52%, #03080c 100%)",
@@ -145,6 +145,19 @@ export default async function TrackerCodePage() {
                 </ul>
               )}
             </section>
+
+
+            <Link
+              href="/tracker/companion"
+              className="mt-5 flex min-h-[64px] items-center gap-3 rounded-2xl border border-[#c4b5fd]/30 bg-[#7c3aed]/15 px-4 text-left transition hover:bg-[#7c3aed]/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+            >
+              <span className="grid size-10 place-items-center rounded-xl bg-[#7c3aed]/30 text-[#c4b5fd]" aria-hidden="true"><Sparkles size={19} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-white">Миний AI найз</span>
+                <span className="block text-[13px] text-[#c9bff0]">Дүр, чимэглэл, нэрээ солих</span>
+              </span>
+              <ChevronLeft size={18} className="rotate-180 text-[#c9bff0]" aria-hidden="true" />
+            </Link>
 
             <form action={logout} className="mt-5">
               <button

@@ -9,10 +9,31 @@ export type SharingStatus = "waiting" | "sharing" | "no-guardian" | "no-location
 /** At most one report this often, however fast new readings arrive. */
 const MIN_GAP_MS = 10_000;
 
+type BatteryManagerLike = { level: number; charging: boolean };
+
+/** The phone's charge, where the browser shares it (Chrome and Android WebView do; Safari does not). */
+async function readBattery(): Promise<{ batteryLevel: number; charging: boolean } | null> {
+  try {
+    const getBattery = (navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }).getBattery;
+    if (typeof getBattery !== "function") return null;
+    const battery = await getBattery.call(navigator);
+    return Number.isFinite(battery.level) ? { batteryLevel: battery.level, charging: battery.charging } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function send(reading: Reading, signal: AbortSignal): Promise<{ status: SharingStatus; state?: SharingState }> {
   try {
+    const battery = await readBattery();
     const { status, data } = await postLocation(
-      { latitude: reading.latitude, longitude: reading.longitude, accuracy: reading.accuracy, ageMs: Math.max(0, Date.now() - reading.timestamp) },
+      {
+        latitude: reading.latitude,
+        longitude: reading.longitude,
+        accuracy: reading.accuracy,
+        ageMs: Math.max(0, Date.now() - reading.timestamp),
+        ...(battery ?? {}),
+      },
       signal,
     );
     if (status === 401 || status === 403) return { status: "stopped" };

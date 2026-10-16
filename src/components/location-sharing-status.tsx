@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useLocationSharing, type SharingStatus } from "@/hooks/use-location-sharing";
 
 const statusText: Record<SharingStatus, string> = {
@@ -11,10 +12,28 @@ const statusText: Record<SharingStatus, string> = {
   stopped: "Байршил хуваалцахгүй байна",
 };
 
-/** Sends the child's position while shown, says who can see it, and lets the child pause sharing. */
-export function LocationSharingStatus() {
+/**
+ * Sends the child's position while shown, says who can see it, and lets the child pause sharing.
+ * Once the child is outside every safe zone, a pause is lifted by itself so guardians can follow
+ * the way home without the child having to press anything.
+ */
+export function LocationSharingStatus({ outsideSafeZone = false }: { outsideSafeZone?: boolean }) {
   const { status, sharing, saving, saveFailed, setPaused } = useLocationSharing();
   const paused = sharing?.paused === true;
+  const [autoResumed, setAutoResumed] = useState(false);
+  // Resume only once per trip outside, so a child who pauses again on purpose is not overruled.
+  const resumedThisTrip = useRef(false);
+
+  useEffect(() => {
+    if (!outsideSafeZone) {
+      resumedThisTrip.current = false;
+      return;
+    }
+    if (!paused || !sharing || sharing.watchers === 0 || saving || resumedThisTrip.current) return;
+    resumedThisTrip.current = true;
+    void setPaused(false).then(() => setAutoResumed(true));
+  }, [outsideSafeZone, paused, saving, setPaused, sharing]);
+
   const text = paused
     ? "Байршил хуваалцахыг түр зогсоосон"
     : status === "sharing" && sharing
@@ -39,6 +58,9 @@ export function LocationSharingStatus() {
         </button>
       )}
       {canToggle && !paused && <p className="text-[12px] text-[#84979d]">Түр зогсоовол асран хамгаалагч тань үүнийг харах болно.</p>}
+      {autoResumed && outsideSafeZone && !paused && (
+        <p className="text-[12px] text-[#67e8a5]">Аюулгүй бүсээс гарсан тул байршил автоматаар хуваалцагдаж эхэллээ.</p>
+      )}
       {saveFailed && <p role="alert" className="text-[12px] text-[#fda4af]">Хадгалж чадсангүй. Дахин оролдоно уу.</p>}
     </div>
   );
