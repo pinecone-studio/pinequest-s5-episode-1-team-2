@@ -54,11 +54,8 @@ const CompanionMap = dynamic(() => import("@/components/live-map"), {
 
 type SpeechStatus = "idle" | "loading" | "playing" | "error";
 
-// Guidance starts by itself once the person has clearly left the Safe Zone, and ends once they
-// are clearly back. The short waits stop GPS jitter at the boundary from flicking the camera.
 const GUIDANCE_START_DELAY_MS = 5_000;
 const GUIDANCE_STOP_DELAY_MS = 15_000;
-// Where the person sits on the slanted calm map, as a share of its height.
 const CALM_MAP_CENTER_PERCENT = 64;
 
 type RouteResult = {
@@ -86,7 +83,6 @@ export default function TrackerPage() {
 
   const [demoMode, setDemoMode] = useState(false);
   const [guiding, setGuiding] = useState(false);
-  // The calm map turns with the compass; while guiding, the camera view reads its own.
   const {heading: calmHeading} = useCompassHeading(!guiding);
   const [savedZones, setSavedZones] = useState<SafeZone[]>([]);
   const [zonesLoaded, setZonesLoaded] = useState(false);
@@ -215,8 +211,6 @@ export default function TrackerPage() {
   };
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
-  // Demo uses the guardian's own saved zones (e.g. "Гэр"); the sample list is only a fallback
-  // for when nothing has been saved yet.
   const demoZones = savedZones.length > 0 ? savedZones : SAFE_ZONES;
   const activeZones = demoMode ? demoZones : savedZones;
   const targetZone = useMemo(() => {
@@ -314,8 +308,6 @@ export default function TrackerPage() {
       ? route?.nextInstruction
       : undefined;
 
-  // Outside a configured Safe Zone, the screen turns into camera guidance with the companion on
-  // top; back inside, it returns to the calm map. Both switches wait a moment to ride out GPS jitter.
   const isOutsideSafeZone = Boolean(
     safetyState && targetZone && !safetyState.isInsideSafeZone
   );
@@ -657,6 +649,9 @@ export default function TrackerPage() {
 
       requestController.current = controller;
 
+      const fallbackMessage =
+        !state.isInsideSafeZone && targetZone
+          ? getGuidanceFallback(targetZone.name)
       // Outside the zone the guidance screen is open, so even the offline message should
       // point the way home rather than say that everything is fine.
       const fallbackMessage = game
@@ -998,8 +993,6 @@ export default function TrackerPage() {
           </div>
         </header>
 
-        {/* The companion stays on screen in every state and speaks its own messages: large in the
-           middle while calm, a small strip above the camera while guiding. */}
         <section
           aria-label={`${companionName} AI туслах`}
           className={`relative z-10 flex gap-2 ${
@@ -1047,8 +1040,6 @@ export default function TrackerPage() {
                   : "px-4 py-3 text-center text-[15px] leading-[22px]"
               }`}
             >
-              {/* Clamp on an inner span so the border grows with the text and
-                  no half-cut line leaks into the padding. */}
               <span
                 className={`block break-words ${
                   guiding ? "line-clamp-3" : "line-clamp-4"
@@ -1119,7 +1110,6 @@ export default function TrackerPage() {
             />
           ) : currentLocation ? (
             <>
-              {/* Turns with the compass so the way the person faces is always up. */}
               <TiltedPlane
                 centerPercent={CALM_MAP_CENTER_PERCENT}
                 heading={calmHeading}
@@ -1308,7 +1298,6 @@ const DEMO_STATUS_COLORS: Record<SafetyState["riskLevel"], string> = {
   HIGH_RISK: "bg-[#f43f5e]",
 };
 
-/** Small glass D-pad laid over the map that walks the demo location ~110 m per tap. */
 function DemoPad({
   riskLevel,
   onMove,
