@@ -1,6 +1,6 @@
 import { MongoClient, type Db } from "mongodb";
 import type { GuardianLink, PairingCode, RateLimit, UserRecord } from "@/types/auth";
-import type { LocationRecord, SafeZoneRecord } from "@/types/location";
+import type { CheckpointRecord, ChildRewardsRecord, LocationRecord, SafeZoneRecord, ScenePhotoRecord, SeenLandmarkRecord } from "@/types/location";
 import type { GeofenceStateRecord, SafetyAlertRecord } from "@/types/alerts";
 import type { PushTokenRecord } from "@/types/push";
 
@@ -38,6 +38,10 @@ export async function getCollections() {
     geofenceStates: db.collection<GeofenceStateRecord>("geofenceStates"),
     safetyAlerts: db.collection<SafetyAlertRecord>("safetyAlerts"),
     pushTokens: db.collection<PushTokenRecord>("pushTokens"),
+    seenLandmarks: db.collection<SeenLandmarkRecord>("seenLandmarks"),
+    checkpoints: db.collection<CheckpointRecord>("checkpoints"),
+    childRewards: db.collection<ChildRewardsRecord>("childRewards"),
+    scenePhotos: db.collection<ScenePhotoRecord>("scenePhotos"),
   };
 }
 

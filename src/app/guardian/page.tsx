@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { Battery, BatteryLow, Camera, ChevronLeft, MapPin, Navigation, PhoneOff, PlugZap, Shield, Siren, Target, X } from "lucide-react";
+import { LandmarkIcon } from "@/components/app-icons";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell, PhoneIcon, StatusIndicator } from "@/components/safe-path";
 import { BackButton } from "@/components/back-button";
@@ -10,10 +11,14 @@ import { useAssistantSettings } from "@/hooks/use-assistant-settings";
 import { useGeolocation } from "@/hooks/use-geolocation";
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { useChildLocations } from "@/hooks/use-child-locations";
+import { useChildAddress } from "@/hooks/use-child-address";
 import { useSafetyAlerts } from "@/hooks/use-safety-alerts";
 import { DemoNotificationButton } from "@/components/demo-notification-button";
 import { SafePathLoading } from "@/components/safepath-loading";
+import { GUARDIAN_THEME } from "@/components/guardian-screen";
 import type { MapPerson } from "@/components/live-map";
+import type { PlaceDescription } from "@/lib/reverse-geocode";
+import type { SeenLandmark } from "@/types/location";
 import type { GuardianSafetyAlert } from "@/types/alerts";
 import { calculateSafetyState } from "@/lib/risk-engine";
 import { SAFE_ZONES } from "@/lib/safe-zones";
@@ -23,25 +28,7 @@ const LiveMap = dynamic(() => import("@/components/live-map"), {
   loading: () => <SafePathLoading className="h-full min-h-80" label="Газрын зураг ачаалж байна…" />,
 });
 
-const TOKENS = {
-  "--sp-primary": "#4F8FA8",
-  "--sp-primary-deep": "#3D7891",
-  "--sp-primary-soft": "rgba(79,143,168,0.18)",
-  "--sp-secondary": "#72B8B0",
-  "--sp-bg": "#000000",
-  "--sp-bg-top": "#081619",
-  "--sp-bg-bottom": "#000000",
-  "--sp-ink": "#E6F1F3",
-  "--sp-muted": "#87A0A8",
-  "--sp-line": "#1B2C32",
-  "--sp-surface": "#0C171B",
-  "--sp-safe": "#72B8B0",
-  "--sp-safe-bg": "rgba(114,184,176,0.12)",
-  "--sp-caution": "#E0A84A",
-  "--sp-caution-bg": "rgba(224,168,74,0.12)",
-  "--sp-risk": "#E57C66",
-  "--sp-risk-bg": "rgba(229,124,102,0.13)",
-} as React.CSSProperties;
+const TOKENS = GUARDIAN_THEME;
 
 type Tone = "safe" | "caution" | "risk";
 
@@ -104,6 +91,132 @@ function formatRelative(ts: number | null, now: number) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Above this, the phone is guessing from Wi-Fi or cell towers rather than GPS.
+const ROUGH_ACCURACY_METERS = 100;
+
+/** Where the child is in plain words, how sure the phone is, and a one-tap route to them. */
+/** The newest surroundings photo from a child's camera, opening full size on tap. */
+function ScenePhoto({ childId, name, photo }: { childId: string; name: string; photo: { id: string; taken: string } }) {
+  const src = `/api/scene-photo?childId=${encodeURIComponent(childId)}&id=${encodeURIComponent(photo.id)}`;
+  return (
+    <>
+      <p className="inline-flex items-center gap-1.5 text-xs text-(--sp-muted)"><Camera size={13} aria-hidden="true" /> Камер нээгдэх үеийн орчны зураг · {photo.taken}</p>
+      <a
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block overflow-hidden rounded-xl border border-(--sp-line) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-guardian image route; next/image would cache it publicly. */}
+        <img src={src} alt={`${name} камераа нээх үед харж байсан орчин`} className="max-h-64 w-full object-cover" loading="lazy" />
+      </a>
+    </>
+  );
+}
+
+// The child's phone reports every ~10 s while sharing; this long without one means it may be off or offline.
+const SILENT_MINUTES = 10;
+
+function ChildWhereabouts({ childId, name, latitude, longitude, accuracy, updated, silentMinutes, batteryLevel, charging, photo, landmarks, address, addressFailed }: {
+  childId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  updated: string;
+  /** Minutes since the last report. */
+  silentMinutes: number;
+  batteryLevel: number | null;
+  charging: boolean | null;
+  /** The newest surroundings photo from the child's camera, with how long ago it was taken. */
+  photo: { id: string; takenAt: string; taken: string } | null;
+  /** The newest notable places the child's camera saw, with how long ago. */
+  landmarks: (SeenLandmark & { seen: string })[];
+  address: PlaceDescription | null;
+  addressFailed: boolean;
+}) {
+  const headline = address?.place
+    ? `${address.place} орчим`
+    : address?.street ?? (addressFailed ? "Хаягийг тодорхойлж чадсангүй" : address ? "Нэргүй газар" : "Хаягийг тодорхойлж байна…");
+  const details = [address?.place ? address.street : null, address?.area].filter(Boolean).join(", ");
+  const rough = accuracy > ROUGH_ACCURACY_METERS;
+  const silent = silentMinutes >= SILENT_MINUTES;
+  const batteryPercent = batteryLevel === null ? null : Math.round(batteryLevel * 100);
+  const batteryLow = batteryPercent !== null && batteryPercent <= 15 && charging !== true;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${latitude.toFixed(6)},${longitude.toFixed(6)}&travelmode=walking`;
+
+  return (
+    <section className="mt-3 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label={`${name} одоо хаана байна`} aria-live="polite">
+      <div className="flex items-start gap-3">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#2a7fff]/15 text-[#2a7fff]" aria-hidden="true">
+          <MapPin size={20} />
+        </span>
+        <div className="min-w-0">
+          <p className={`text-xs ${silent ? "font-semibold text-(--sp-caution)" : "text-(--sp-muted)"}`}>
+            {silent ? <span className="inline-flex items-center gap-1.5"><PhoneOff size={13} aria-hidden="true" /> Утастай холбоо тасарсан · сүүлийн мэдээлэл {updated}</span> : `${name} одоо энд байна`}
+          </p>
+          <p className="mt-0.5 text-[17px] font-semibold leading-6">{headline}</p>
+          {details && <p className="mt-0.5 text-sm leading-5 text-(--sp-muted)">{details}</p>}
+          <p className={`mt-1.5 text-xs ${rough ? "text-(--sp-caution)" : "text-(--sp-muted)"}`}>
+            ±{Math.round(accuracy)} м нарийвчлалтай · {updated}
+            {batteryPercent !== null && (
+              <span className={batteryLow ? "font-semibold text-(--sp-risk)" : ""}>
+                {" "}· {charging ? <PlugZap size={12} className="inline align-[-1px]" aria-hidden="true" /> : batteryLow ? <BatteryLow size={13} className="inline align-[-2px]" aria-hidden="true" /> : <Battery size={13} className="inline align-[-2px]" aria-hidden="true" />} {batteryPercent}%
+              </span>
+            )}
+          </p>
+          {silent && (
+            <p className="mt-1 text-xs leading-5 text-(--sp-caution)">
+              Утас унтарсан эсвэл сүлжээгүй байж магадгүй. Доорх нь хамгийн сүүлд илгээсэн байршил{batteryPercent !== null ? `, тэр үед цэнэг ${batteryPercent}% байсан` : ""}.
+            </p>
+          )}
+          {rough && (
+            <p className="mt-1 text-xs leading-5 text-(--sp-caution)">
+              Байршил тойм байна. Хүүхдийн утсанд GPS асаалттай, гадаа байгаа эсэхийг шалгаарай.
+            </p>
+          )}
+        </div>
+      </div>
+      {photo && (
+        <div className="mt-3 border-t border-(--sp-line) pt-3">
+          <ScenePhoto childId={childId} name={name} photo={photo} />
+        </div>
+      )}
+      {landmarks.length > 0 && (
+        <div className="mt-3 border-t border-(--sp-line) pt-3">
+          <p className="text-xs text-(--sp-muted)">Замдаа харсан тод газрууд</p>
+          <ul className="mt-2 space-y-2">
+            {landmarks.map((landmark) => (
+              <li key={landmark.id} className="flex items-start gap-2.5">
+                <span className="grid size-6 shrink-0 place-items-center text-(--sp-muted)"><LandmarkIcon kind={landmark.kind} size={16} /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold leading-6">{landmark.label}</p>
+                  {landmark.detail && <p className="text-xs leading-5 text-(--sp-muted)">{landmark.detail}</p>}
+                </div>
+                <span className="shrink-0 text-xs leading-6 text-(--sp-muted)">{landmark.seen}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <a
+        href={directionsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#2a7fff] px-4 text-sm font-semibold text-white transition hover:bg-[#1c6fee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2a7fff]"
+      >
+        <Navigation size={16} aria-hidden="true" /> {name} хүртэл чиглэл авах
+      </a>
+      <Link
+        href={`/guardian/checkpoints?child=${childId}`}
+        className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#7c3aed]/50 px-4 text-sm font-semibold text-[#c4b5fd] transition hover:bg-[#7c3aed]/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7c3aed]"
+      >
+        <Target size={16} aria-hidden="true" /> Шалгах цэг, шагнал өгөх
+      </Link>
+    </section>
+  );
 }
 
 function useNow(intervalMs = 10_000) {
@@ -169,6 +282,33 @@ export default function GuardianPage() {
     : SAFE_ZONES;
   
   const displayLocation = monitoredLocation;
+  // The child new zones and checkpoints are for: the one picked in the list, else the one on the map.
+  const editChild = linkedChildren?.find((child) => child.childId === selectedChildId)
+    ?? monitoredChild
+    ?? linkedChildren?.[0]
+    ?? null;
+  // With no position yet, the map still opens: on the child's zones, the guardian, or central Ulaanbaatar.
+  const mapZones = displayLocation ? monitoredZones : editChild?.zones ?? [];
+  const mapLocation = displayLocation ?? (mapZones[0]
+    ? { latitude: mapZones[0].latitude, longitude: mapZones[0].longitude, accuracy: 0, lastUpdated: 0 }
+    : location
+      ? { latitude: location.latitude, longitude: location.longitude, accuracy: 0, lastUpdated: 0 }
+      : { latitude: 47.9186, longitude: 106.9176, accuracy: 0, lastUpdated: 0 });
+  const [picked, setPicked] = useState<{ latitude: number; longitude: number } | null>(null);
+  const addHref = (page: "zones" | "checkpoints", point?: { latitude: number; longitude: number } | null) => {
+    const params = new URLSearchParams();
+    if (editChild) params.set("child", editChild.childId);
+    if (point) {
+      params.set("lat", point.latitude.toFixed(6));
+      params.set("lng", point.longitude.toFixed(6));
+    }
+    return `/guardian/${page}?${params.toString()}`;
+  };
+  // The child whose photo to show when no linked child has shared a position yet.
+  const photoOnlyChild = linkedChildren?.find((child) => child.childId === selectedChildId && child.photo)
+    ?? linkedChildren?.find((child) => child.photo)
+    ?? null;
+  const { address: childAddress, failed: childAddressFailed } = useChildAddress(monitoredChild?.childId ?? null, monitoredLocation);
   const mapPeople: MapPerson[] = (linkedChildren ?? []).flatMap((child) =>
     child.position && !child.paused
       ? [{
@@ -178,6 +318,7 @@ export default function GuardianPage() {
           longitude: child.position.longitude,
           fresh: now - new Date(child.position.updatedAt).getTime() < 120_000,
           selected: child.childId === monitoredChild?.childId,
+          accuracy: child.position.accuracy,
         }]
       : [],
   );
@@ -237,7 +378,7 @@ export default function GuardianPage() {
           aria-hidden="true"
           className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-107.5 bg-[radial-gradient(60%_80%_at_80%_0%,rgba(79,143,168,0.22),transparent_70%)]"
         />
-        <main className="relative min-h-dvh pb-[calc(150px+env(safe-area-inset-bottom))]">
+        <main className="relative min-h-dvh pb-[calc(84px+env(safe-area-inset-bottom))]">
           {!isOnline && (
             <div role="status" aria-live="polite" className="mx-4 mt-3 rounded-xl border border-amber-300/35 bg-amber-950/70 px-3 py-2 text-sm leading-5 text-amber-100">
               Интернет тасарсан байна. Хүүхдийн сүүлийн мэдээлэл харагдаж болох ч шинэ байршил, Safe Zone дохио серверээс шинэчлэгдэхгүй байж болно.
@@ -260,33 +401,51 @@ export default function GuardianPage() {
                 </p>
               </div>
             </div>
-            <StatusIndicator status={safetyState?.riskLevel ?? "SAFE"} />
+            <div className="flex shrink-0 items-center gap-1">
+              {safetyState ? (
+                <StatusIndicator status={safetyState.riskLevel} />
+              ) : (
+                <span className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium tracking-[0.02em] text-(--sp-muted)">
+                  <span className="size-2 rounded-full bg-current" aria-hidden="true" />
+                  ТОДОРХОЙГҮЙ
+                </span>
+              )}
+              {phone && (
+                <a
+                  href={`tel:${phone}`}
+                  aria-label="Яаралтай дугаар руу залгах"
+                  className="grid size-11 place-items-center rounded-full text-emerald-400 transition hover:bg-emerald-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                >
+                  <PhoneIcon />
+                </a>
+              )}
+            </div>
           </header>
 
           <section
             role={tone === "risk" ? "alert" : "status"}
             aria-live="polite"
-            className={`mx-4 mb-3 rounded-2xl px-4 py-3 ${TONE[tone].bg} ${activeTab === "alerts" ? "hidden" : ""}`}
+            className={`mx-4 mb-3 mt-3 rounded-2xl px-4 py-3 ${safetyState ? TONE[tone].bg : "bg-(--sp-surface)"} ${activeTab === "alerts" ? "hidden" : ""}`}
           >
             <div className="flex items-center gap-2">
               <span
-                className={`size-2.5 shrink-0 rounded-full ${TONE[tone].bar} ${
+                className={`size-2.5 shrink-0 rounded-full ${safetyState ? TONE[tone].bar : "bg-(--sp-muted)"} ${
                   tone === "risk" ? "animate-pulse" : ""
                 }`}
               />
-              <p className={`text-[17px] font-semibold ${TONE[tone].text}`}>
+              <p className={`text-[17px] font-semibold ${safetyState ? TONE[tone].text : "text-(--sp-ink)"}`}>
                 {headline}
               </p>
             </div>
             <p className="mt-1 pl-4.5 text-sm text-(--sp-muted)">
-              {subline} · {formatRelative(lastUpdate, now)}
+              {lastUpdate ? `${subline} · ${formatRelative(lastUpdate, now)}` : subline}
             </p>
           </section>
 
           {activeTab !== "alerts" && urgentSos && (
             <section role="alert" aria-live="assertive" className="mx-4 mb-5 overflow-hidden rounded-[24px] border-2 border-rose-500 bg-[linear-gradient(145deg,rgba(127,29,29,0.62),rgba(30,8,12,0.96))] p-5 shadow-[0_12px_36px_rgba(244,63,94,0.22)] sm:p-6">
               <div className="flex items-center gap-3">
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-500/20 text-2xl" aria-hidden="true">🆘</span>
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-rose-500/20 text-2xl" aria-hidden="true"><Siren size={24} className="text-rose-200" aria-hidden="true" /></span>
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-200">Яаралтай мэдэгдэл</p>
                   <h2 className="mt-0.5 text-xl font-extrabold leading-tight text-rose-100 sm:text-2xl">Хүүхэд тусламж хүссэн</h2>
@@ -361,19 +520,47 @@ export default function GuardianPage() {
 
           <div id="location" className={`px-4 ${activeTab === "alerts" ? "hidden" : ""}`}>
             <div className="relative h-[46vh] min-h-80 max-h-125 overflow-hidden rounded-[22px] border border-(--sp-line) bg-(--sp-surface)">
-              {displayLocation ? (
+              {linkedChildren && linkedChildren.length > 0 ? (
                 <>
                   <LiveMap
                     key={mapKey}
-                    location={displayLocation}
+                    location={mapLocation}
                     people={mapPeople}
-                    safeZones={monitoredZones}
+                    landmarks={monitoredChild?.landmarks ?? []}
+                    checkpoints={editChild?.checkpoints ?? []}
+                    safeZones={mapZones}
                     currentRoute={currentRoute}
                     familiarRoute={familiarRoute}
+                    hideCenterDot={!displayLocation}
+                    onPick={(latitude, longitude) => setPicked({ latitude, longitude })}
                     className="h-full rounded-none border-0"
                   />
 
-                  {typeof displayLocation.accuracy === "number" && (
+                  {!displayLocation && !picked && (
+                    <p className="absolute left-3 right-16 top-3 z-400 rounded-xl border border-(--sp-line) bg-black/80 px-3 py-2 text-[12px] leading-5 text-(--sp-muted) shadow-sm backdrop-blur">
+                      Хүүхдийн байршил хараахан ирээгүй байна. Газрын зураг дээр дарж аюулгүй бүс, шалгах цэг нэмж болно.
+                    </p>
+                  )}
+
+                  {/* A tapped point: choose what to add there. */}
+                  {picked && (
+                    <div role="dialog" aria-label="Энд юу нэмэх вэ" className="absolute inset-x-3 bottom-3 z-500 rounded-2xl border border-(--sp-line) bg-black/90 p-3 shadow-lg backdrop-blur">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="inline-flex items-center gap-1.5 text-sm font-semibold"><MapPin size={15} aria-hidden="true" /> Энд юу нэмэх вэ?</p>
+                        <button type="button" onClick={() => setPicked(null)} aria-label="Хаах" className="grid size-9 place-items-center rounded-full text-(--sp-muted) hover:bg-white/10"><X size={16} aria-hidden="true" /></button>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <Link href={addHref("zones", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-(--sp-safe-bg) text-sm font-semibold text-(--sp-safe) ring-1 ring-(--sp-safe)/40">
+                          <Shield size={15} aria-hidden="true" /> Аюулгүй бүс
+                        </Link>
+                        <Link href={addHref("checkpoints", picked)} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-[#7c3aed]/20 text-sm font-semibold text-[#c4b5fd] ring-1 ring-[#7c3aed]/50">
+                          <Target size={15} aria-hidden="true" /> Шалгах цэг
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {displayLocation && typeof displayLocation.accuracy === "number" && (
                     <span className="absolute left-3 top-3 z-400 rounded-full border border-(--sp-line) bg-black/75 px-2.5 py-1 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur">
                       ±{Math.round(displayLocation.accuracy)} м
                     </span>
@@ -397,28 +584,71 @@ export default function GuardianPage() {
                     </svg>
                   </button>
 
-                  <div
+                  {!picked && <div
                     aria-label="Газрын зургийн тэмдэглэгээ"
                     className="absolute bottom-3 left-3 z-400 flex flex-wrap gap-x-3 gap-y-1 rounded-xl border border-(--sp-line) bg-black/75 px-3 py-2 text-[11px] text-(--sp-muted) shadow-sm backdrop-blur"
                   >
                     <Legend dot="bg-[#2a7fff]" label="Хүүхэд" />
+                    <Legend dot="bg-[#f59e0b]" label="Харсан газар" />
+                    {(editChild?.checkpoints.length ?? 0) > 0 && <Legend dot="bg-[#a78bfa]" label="Шалгах цэг" />}
                     <Legend dot="bg-(--sp-secondary)" label="Одоогийн зам" />
                     <span className="inline-flex items-center gap-1.5">
                       <i className="h-0 w-4 border-t border-dashed border-(--sp-muted)" />
                       Танил зам
                     </span>
-                  </div>
+                  </div>}
                 </>
               ) : (
                 <div className="grid h-full place-items-center px-8 text-center text-sm leading-6 text-(--sp-muted)">
                   {linkedChildren === null
                     ? <SafePathLoading className="flex-col gap-1" label="Хүүхдийн байршлыг ачаалж байна…" />
-                    : linkedChildren.length === 0
-                      ? "Хүүхэд холбогдоогүй байна. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана."
-                      : "Хүүхдийн байршил хараахан ирээгүй байна. Хүүхдийн утсан дээр SafePath нээлттэй, байршлын зөвшөөрөл өгсөн эсэхийг шалгаарай."}
+                    : "Хүүхэд холбогдоогүй байна. Хүүхдийн бүртгэлийг холбосны дараа байршил энд харагдана."}
                 </div>
               )}
             </div>
+
+            {editChild && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link href={addHref("zones")} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-(--sp-line) bg-(--sp-surface) text-sm font-semibold text-(--sp-safe)">
+                  + Аюулгүй бүс
+                </Link>
+                <Link href={addHref("checkpoints")} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-(--sp-line) bg-(--sp-surface) text-sm font-semibold text-[#c4b5fd]">
+                  + Шалгах цэг
+                </Link>
+              </div>
+            )}
+
+            {/* Without a position yet, a photo from the camera is still worth showing on its own. */}
+            {!displayLocation && photoOnlyChild?.photo && (
+              <section className="mt-3 rounded-2xl border border-(--sp-line) bg-(--sp-surface) p-4" aria-label={`Орчны зураг · ${photoOnlyChild.name}`}>
+                <ScenePhoto
+                  childId={photoOnlyChild.childId}
+                  name={photoOnlyChild.name}
+                  photo={{ id: photoOnlyChild.photo.id, taken: formatRelative(new Date(photoOnlyChild.photo.takenAt).getTime(), now) }}
+                />
+              </section>
+            )}
+
+            {monitoredChild && displayLocation && (
+              <ChildWhereabouts
+                childId={monitoredChild.childId}
+                name={monitoredChild.name}
+                latitude={displayLocation.latitude}
+                longitude={displayLocation.longitude}
+                accuracy={displayLocation.accuracy}
+                updated={formatRelative(displayLocation.lastUpdated, now)}
+                silentMinutes={Math.max(0, Math.floor((now - displayLocation.lastUpdated) / 60_000))}
+                batteryLevel={monitoredChild.position?.batteryLevel ?? null}
+                photo={monitoredChild.photo ? { ...monitoredChild.photo, taken: formatRelative(new Date(monitoredChild.photo.takenAt).getTime(), now) } : null}
+                charging={monitoredChild.position?.charging ?? null}
+                landmarks={(monitoredChild.landmarks ?? []).slice(0, 3).map((landmark) => ({
+                  ...landmark,
+                  seen: formatRelative(new Date(landmark.seenAt).getTime(), now),
+                }))}
+                address={childAddress}
+                addressFailed={childAddressFailed}
+              />
+            )}
           </div>
 
           <section className={`px-5 pt-4 ${activeTab === "alerts" ? "hidden" : ""}`} aria-label="Одоогийн мэдээлэл">
@@ -430,7 +660,7 @@ export default function GuardianPage() {
                     ? "Тодорхойгүй"
                     : inside
                       ? zone.name
-                      : `${zone.name}-с ${
+                      : `${zone.name} хүртэл ${
                           distance !== null ? formatDistance(distance) : "—"
                         }`
                 }
@@ -502,7 +732,9 @@ export default function GuardianPage() {
                   const alertTime = new Date(alert.createdAt).getTime();
                   const isUrgent = alert.type !== "ZONE_ENTER";
                   const label = alert.type === "SOS"
-                    ? "🆘 ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
+                    ? "ЯАРАЛТАЙ ТУСЛАМЖ — SOS"
+                    : alert.type === "LOW_BATTERY"
+                      ? "Утасны цэнэг дуусах гэж байна"
                     : alert.type === "ZONE_EXIT"
                       ? "Аюулгүй бүсээс гарсан"
                       : alert.type === "ZONE_ENTER"
@@ -537,24 +769,6 @@ export default function GuardianPage() {
           unreadCount={unreadAlertCount}
         />
 
-        <div className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-(--sp-line) bg-black px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3">
-          <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`tel:${phone || "+97600000000"}`}
-              className="inline-flex min-h-12.5 items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 text-[15px] font-semibold text-emerald-400 backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              <PhoneIcon />
-              Залгах
-            </a>
-            <a
-              href="#location"
-              onClick={() => setActiveTab("map")}
-              className="inline-flex min-h-12.5 items-center justify-center rounded-2xl border border-[#22d3ee]/40 bg-(--sp-primary-soft) text-[15px] font-medium text-[#22d3ee] backdrop-blur transition-transform active:scale-[0.97]"
-            >
-              Байршил
-            </a>
-          </div>
-        </div>
       </div>
     </AppShell>
   );
@@ -606,7 +820,7 @@ function TabBar({
   return (
     <nav
       aria-label="Асран хамгаалагчийн цэс"
-      className="fixed inset-x-0 bottom-[calc(74px+env(safe-area-inset-bottom))] z-20 mx-auto w-full max-w-107.5 border-t border-[rgba(79,143,168,0.15)] bg-black/85 backdrop-blur-xl"
+      className="fixed inset-x-0 bottom-0 z-20 mx-auto w-full max-w-107.5 border-t border-[rgba(79,143,168,0.15)] bg-black/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
     >
       <ul className="grid grid-cols-4">
         {TABS.map((tab) => {

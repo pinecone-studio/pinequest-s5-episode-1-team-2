@@ -1,10 +1,13 @@
 import * as z from "zod";
 import { zonesByChild } from "@/lib/child-zones";
-import { updateChildGeofenceState } from "@/lib/safety-alerts";
+import { checkReachedCheckpoints, openCheckpointsByChild } from "@/lib/checkpoints";
+import { createLowBatteryAlert, LOW_BATTERY_LEVEL, updateChildGeofenceState } from "@/lib/safety-alerts";
 import { getCollections, isDuplicateKey } from "@/lib/db/mongo";
-import type { ChildLocation, SharingState } from "@/types/location";
+import type { ChildLocation, SeenLandmark, SharingState } from "@/types/location";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** How many seen places a guardian's map shows per child. */
+const SHOWN_LANDMARKS = 20;
 
 /** What the child's phone sends. Any other fields in the request are dropped. */
 export const LocationReportSchema = z.object({
@@ -14,6 +17,9 @@ export const LocationReportSchema = z.object({
   accuracy: z.number().min(0).max(100_000),
   /** How long ago the phone measured this position. An age, not a time, so a wrong phone clock does not matter. */
   ageMs: z.number().min(0).max(DAY_MS),
+  /** Battery charge 0–1, when the phone's browser shares it. */
+  batteryLevel: z.number().min(0).max(1).nullable().optional(),
+  charging: z.boolean().nullable().optional(),
 });
 
 export type LocationReport = z.infer<typeof LocationReportSchema>;
@@ -35,7 +41,8 @@ export async function getSharingState(childId: string): Promise<SharingState> {
  * Keeps the child's latest position, unless nobody may see it: while sharing is paused or no
  * guardian is linked, nothing is stored and any old position is removed.
  */
-export async function saveChildLocation(childId: string, { ageMs, ...position }: LocationReport) {
+export async function saveChildLocation(childId: string, { ageMs, batteryLevel = null, charging = null, ...coordinates }: LocationReport) {
+  const position = { ...coordinates, batteryLevel, charging };
   const { locations, geofenceStates, safetyAlerts } = await getCollections();
   const state = await getSharingState(childId);
   if (state.paused || state.watchers === 0) {
@@ -77,6 +84,22 @@ export async function saveChildLocation(childId: string, { ageMs, ...position }:
     return { ...state, shared: true, geofenceCheck: "skipped-stale-reading" as const, alertsCreated: 0 };
   }
 
+  // Warn guardians while the phone can still report; its last position stays after it switches off.
+  if (batteryLevel !== null && batteryLevel <= LOW_BATTERY_LEVEL && charging !== true) {
+    try {
+      await createLowBatteryAlert(childId, batteryLevel);
+    } catch (error) {
+      console.error("SAFEPATH_LOW_BATTERY_ALERT_FAILED", error);
+    }
+  }
+
+  // A reached checkpoint is a reward, not a safety event: a failure here must not stop the geofence check.
+  try {
+    await checkReachedCheckpoints(childId, { ...position, updatedAt });
+  } catch (error) {
+    console.error("SAFEPATH_CHECKPOINT_CHECK_FAILED", error);
+  }
+
   try {
     const alertsCreated = await updateChildGeofenceState(childId, { ...position, updatedAt });
     return { ...state, shared: true, geofenceCheck: "ok" as const, alertsCreated };
@@ -88,11 +111,13 @@ export async function saveChildLocation(childId: string, { ageMs, ...position }:
 
 /** Pausing also deletes the stored position at once, so guardians stop seeing it immediately. */
 export async function setSharingPaused(childId: string, paused: boolean): Promise<SharingState> {
-  const { users, locations, geofenceStates } = await getCollections();
+  const { users, locations, geofenceStates, seenLandmarks, scenePhotos } = await getCollections();
   await users.updateOne({ _id: childId }, { $set: { locationPaused: paused } });
   if (paused) {
     await Promise.all([
       locations.deleteOne({ _id: childId }),
+      seenLandmarks.deleteMany({ childId }),
+      scenePhotos.deleteMany({ childId }),
       // Resume starts from a fresh baseline so no movement during a pause is inferred.
       geofenceStates.deleteOne({ _id: childId }),
     ]);
@@ -102,11 +127,15 @@ export async function setSharingPaused(childId: string, paused: boolean): Promis
 
 /** After a link is removed: a child nobody is linked to any more keeps no stored position or safe zones. */
 export async function forgetUnwatchedChild(childId: string) {
-  const { guardianLinks, locations, safeZones, geofenceStates, safetyAlerts } = await getCollections();
+  const { guardianLinks, locations, safeZones, geofenceStates, safetyAlerts, seenLandmarks, checkpoints, scenePhotos } = await getCollections();
   const watched = await guardianLinks.countDocuments({ childId }, { limit: 1 });
   if (!watched) {
     await Promise.all([
       locations.deleteOne({ _id: childId }),
+      seenLandmarks.deleteMany({ childId }),
+      scenePhotos.deleteMany({ childId }),
+      // Goals set by a guardian who is no longer linked go too; rewards the child already earned stay.
+      checkpoints.deleteMany({ childId }),
       safeZones.deleteMany({ childId }),
       geofenceStates.deleteOne({ _id: childId }),
       safetyAlerts.deleteMany({ childId }),
@@ -119,10 +148,13 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
   const { guardianLinks, users, locations } = await getCollections();
   const links = await guardianLinks.find({ guardianId }).sort({ createdAt: 1 }).toArray();
   const childIds = links.map((link) => link.childId);
-  const [children, positions, zones] = await Promise.all([
+  const [children, positions, zones, landmarks, photos, goals] = await Promise.all([
     users.find({ _id: { $in: childIds } }, { projection: { childName: 1, locationPaused: 1 } }).toArray(),
     locations.find({ _id: { $in: childIds } }).toArray(),
     zonesByChild(childIds),
+    seenLandmarksByChild(childIds),
+    latestPhotoByChild(childIds),
+    openCheckpointsByChild(childIds),
   ]);
   const byId = new Map(children.map((child) => [child._id, child]));
   const latest = new Map(positions.map((position) => [position._id, position]));
@@ -136,10 +168,61 @@ export async function listChildLocations(guardianId: string): Promise<ChildLocat
       childId,
       name: child?.childName ?? "Хүүхэд",
       zones: zones.get(childId) ?? [],
+      landmarks: paused ? [] : landmarks.get(childId) ?? [],
+      photo: paused ? null : photos.get(childId) ?? null,
+      checkpoints: goals.get(childId) ?? [],
       paused,
       position: position
-        ? { latitude: position.latitude, longitude: position.longitude, accuracy: position.accuracy, updatedAt: position.updatedAt.toISOString() }
+        ? {
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy,
+            updatedAt: position.updatedAt.toISOString(),
+            batteryLevel: position.batteryLevel ?? null,
+            charging: position.charging ?? null,
+          }
         : null,
     };
   });
+}
+
+/** The newest notable places each child's camera saw in the last day. */
+async function seenLandmarksByChild(childIds: string[]): Promise<Map<string, SeenLandmark[]>> {
+  const result = new Map<string, SeenLandmark[]>();
+  if (!childIds.length) return result;
+  const { seenLandmarks } = await getCollections();
+  const records = await seenLandmarks
+    .find({ childId: { $in: childIds }, seenAt: { $gte: new Date(Date.now() - DAY_MS) } })
+    .sort({ seenAt: -1 })
+    .toArray();
+  for (const record of records) {
+    const list = result.get(record.childId) ?? [];
+    if (list.length >= SHOWN_LANDMARKS) continue;
+    list.push({
+      id: record._id,
+      label: record.label,
+      detail: record.detail,
+      kind: record.kind,
+      latitude: record.latitude,
+      longitude: record.longitude,
+      seenAt: record.seenAt.toISOString(),
+    });
+    result.set(record.childId, list);
+  }
+  return result;
+}
+
+/** The newest surroundings photo per child (id and time only; the image is fetched on its own). */
+async function latestPhotoByChild(childIds: string[]): Promise<Map<string, { id: string; takenAt: string }>> {
+  const result = new Map<string, { id: string; takenAt: string }>();
+  if (!childIds.length) return result;
+  const { scenePhotos } = await getCollections();
+  const records = await scenePhotos
+    .find({ childId: { $in: childIds }, takenAt: { $gte: new Date(Date.now() - DAY_MS) } }, { projection: { image: 0 } })
+    .sort({ takenAt: -1 })
+    .toArray();
+  for (const record of records) {
+    if (!result.has(record.childId)) result.set(record.childId, { id: record._id, takenAt: record.takenAt.toISOString() });
+  }
+  return result;
 }

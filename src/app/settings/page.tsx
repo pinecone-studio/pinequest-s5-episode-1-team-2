@@ -2,11 +2,14 @@
 
 import {useRouter} from "next/navigation";
 import {useEffect, useState} from "react";
-import {ChevronLeft, LogOut, MapPin, UserRound, Sparkles} from "lucide-react";
+import {Ban, ChevronLeft, Lock, LogOut, MapPin, UserRound, Sparkles} from "lucide-react";
 import {logout} from "@/app/actions/auth";
 import {AppShell} from "@/components/safe-path";
 import {ProfileForm} from "@/components/auth/profile-form";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
+import {useCheckpoints} from "@/hooks/use-checkpoints";
+import {ACCESSORIES, isRewardLocked, type AccessoryId} from "@/types/rewards";
+import {AccessoryIcon} from "@/components/app-icons";
 import type {AssistantSettings} from "@/types/safety";
 
 const avatars: AssistantSettings["avatar"][] = [
@@ -23,6 +26,9 @@ const avatars: AssistantSettings["avatar"][] = [
 export default function SettingsPage() {
   const router = useRouter();
   const {settings, update} = useAssistantSettings();
+  // Children earn the reward companions and accessories; other accounts see everything open.
+  const {rewards, isChild} = useCheckpoints({poll: false});
+  const isLocked = (id: string) => isRewardLocked(id, rewards, isChild);
   const [pushToken, setPushToken] = useState("");
   const [section, setSection] = useState<"menu" | "parent" | "assistant">(
     "menu"
@@ -190,23 +196,34 @@ export default function SettingsPage() {
                     aria-label="Туслахын дүр"
                   >
                     {avatars.map((avatar) => {
-                      const selected = settings.avatar === avatar;
+                      const locked = isLocked(avatar);
+                      const selected = settings.avatar === avatar && !locked;
                       return (
                         <button
                           key={avatar}
                           type="button"
                           aria-pressed={selected}
+                          disabled={locked}
+                          aria-label={locked ? `${avatar}: шалгах цэгт хүрч нээнэ` : avatar}
                           onClick={() => update("avatar", avatar)}
-                          className="group flex flex-col items-center justify-center min-w-0 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
+                          className="group relative flex flex-col items-center justify-center min-w-0 text-center disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
                         >
                           <span
                             className={`companion-picker__art companion-picker__art--${avatar.toLowerCase()} ${
                               selected
                                 ? "ring-2 ring-[#67e8f9] ring-offset-2 ring-offset-[#07151b]"
                                 : ""
-                            }`}
+                            } ${locked ? "opacity-35 grayscale" : ""}`}
                             aria-hidden="true"
                           />
+                          {locked && (
+                            <span
+                              className="absolute top-4 text-lg"
+                              aria-hidden="true"
+                            >
+                              <Lock size={18} className="text-white" />
+                            </span>
+                          )}
                           <span
                             className={`mt-2 block text-xs ${
                               selected
@@ -220,6 +237,44 @@ export default function SettingsPage() {
                       );
                     })}
                   </div>
+                </SettingsSection>
+
+                <SettingsSection title="Чимэглэл">
+                  <div
+                    className="grid grid-cols-4 gap-2"
+                    role="group"
+                    aria-label="Туслахын чимэглэл"
+                  >
+                    {[{id: null as AccessoryId | null, label: "Байхгүй"}, ...ACCESSORIES].map((accessory) => {
+                      const locked = accessory.id !== null && isLocked(accessory.id);
+                      const selected = settings.accessory === accessory.id && !locked;
+                      return (
+                        <button
+                          key={accessory.id ?? "none"}
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={locked}
+                          aria-label={locked ? `${accessory.label}: шалгах цэгт хүрч нээнэ` : accessory.label}
+                          onClick={() => update("accessory", accessory.id)}
+                          className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl text-center transition disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9] ${
+                            selected ? "bg-white/10 ring-2 ring-[#67e8f9]" : "hover:bg-white/5"
+                          }`}
+                        >
+                          <span className={`text-2xl ${locked ? "opacity-35 grayscale" : ""}`} aria-hidden="true">
+                            {locked ? <Lock size={22} /> : accessory.id ? <AccessoryIcon id={accessory.id} size={24} /> : <Ban size={22} />}
+                          </span>
+                          <span className={`text-[11px] ${selected ? "font-semibold text-white" : "text-[#c2d0d5]"}`}>
+                            {accessory.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {isChild && (
+                    <p className="mt-3 text-xs leading-5 text-[#9fb3b9]">
+                      <Lock size={12} className="inline align-[-1px]" /> тэмдэгтэйг ээж, аавын өгсөн шалгах цэгт хүрч очоод нээгээрэй!
+                    </p>
+                  )}
                 </SettingsSection>
 
                 <SettingsSection title="Дуу хоолой">

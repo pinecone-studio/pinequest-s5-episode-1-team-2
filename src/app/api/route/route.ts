@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     const route = decodePolyline6(leg.shape);
     const next = pickNextManeuver(leg.maneuvers);
-    const distanceMeters = Number.isFinite(next?.length) ? Math.max(0, Math.round(next!.length! * 1000)) : null;
+    const distanceMeters = distanceToManeuver(leg.maneuvers, next);
 
     return NextResponse.json({
       destination: { latitude: destination.lat, longitude: destination.lon },
@@ -82,6 +82,22 @@ function readCoordinates(value: unknown): Coordinates | null {
     lon > 180
   ) return null;
   return { lat, lon };
+}
+
+/**
+ * Metres until `next` must be done. A Valhalla maneuver's length is the stretch walked *after*
+ * it, so the distance to a turn is the total length of the maneuvers that come before it.
+ */
+function distanceToManeuver(maneuvers: ValhallaManeuver[], next: ValhallaManeuver | null): number | null {
+  if (!next) return null;
+  const index = maneuvers.indexOf(next);
+  if (index < 0) return null;
+  let kilometers = 0;
+  for (const maneuver of maneuvers.slice(0, index)) {
+    if (!Number.isFinite(maneuver.length)) return null;
+    kilometers += maneuver.length!;
+  }
+  return Math.max(0, Math.round(kilometers * 1000));
 }
 
 function pickNextManeuver(maneuvers: ValhallaManeuver[]) {

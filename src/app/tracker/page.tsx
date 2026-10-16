@@ -3,18 +3,36 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {ChevronLeft, Settings, Volume2, VolumeX, WifiOff} from "lucide-react";
+import {
+  ChevronLeft,
+  Gamepad2,
+  Pencil,
+  Siren,
+  Settings,
+  Volume2,
+  VolumeX,
+  WifiOff,
+} from "lucide-react";
 import {LocationSharingStatus} from "@/components/location-sharing-status";
 import ArNavigationCamera from "@/components/ar-navigation-camera";
 import {HeadingArrow, TiltedPlane} from "@/components/tilted-plane";
 import {AppShell, CompanionMark} from "@/components/safe-path";
+import {CheckpointGoal, RewardCelebration} from "@/components/checkpoint-goal";
+import {useCheckpoints} from "@/hooks/use-checkpoints";
+import {
+  buildOfflineRoute,
+  loadOfflineZones,
+  saveOfflineRoute,
+  saveOfflineZones,
+} from "@/lib/offline-guidance";
+import {describeReward, effectiveAvatar, isAccessoryId} from "@/types/rewards";
 import {SafePathLoading} from "@/components/safepath-loading";
 import {useAssistantSettings} from "@/hooks/use-assistant-settings";
 import {useCompassHeading} from "@/hooks/use-compass-heading";
 import {useGeolocation} from "@/hooks/use-geolocation";
 import {useNetworkStatus} from "@/hooks/use-network-status";
 import {toCompanionProfile} from "@/lib/assistant-settings";
-import {getSafetyFallback} from "@/lib/ai/fallback-messages";
+import {getGameFallback, getSafetyFallback} from "@/lib/ai/fallback-messages";
 import {calculateSafetyState} from "@/lib/risk-engine";
 import {getSafeZoneProximities} from "@/lib/geofence";
 import {SAFE_ZONES} from "@/lib/safe-zones";
@@ -49,6 +67,8 @@ type RouteResult = {
   distanceMeters: number | null;
   durationSeconds: number | null;
   nextInstruction: string;
+  /** True when worked out on the phone without the internet. */
+  offline?: boolean;
 };
 
 export default function TrackerPage() {
@@ -59,7 +79,7 @@ export default function TrackerPage() {
   } = useGeolocation();
   const isOnline = useNetworkStatus();
 
-  const {settings} = useAssistantSettings();
+  const {settings, update} = useAssistantSettings();
 
   const [demoMode, setDemoMode] = useState(false);
   const [guiding, setGuiding] = useState(false);
@@ -96,12 +116,20 @@ export default function TrackerPage() {
         if (active) {
           setSavedZones(payload.zones);
           setZonesLoadError("");
+          saveOfflineZones(payload.zones);
         }
       } catch {
         if (!controller.signal.aborted && active) {
-          setZonesLoadError(
-            "Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу."
-          );
+          // Without the internet, the zones saved on this phone still guide the child home.
+          const saved = loadOfflineZones();
+          if (saved) {
+            setSavedZones(saved);
+            setZonesLoadError("");
+          } else {
+            setZonesLoadError(
+              "Аюулгүй бүсүүдийг ачаалж чадсангүй. Интернэтээ шалгана уу."
+            );
+          }
         }
       } finally {
         if (active) setZonesLoaded(true);
@@ -159,6 +187,28 @@ export default function TrackerPage() {
   const profile = useMemo(() => toCompanionProfile(settings), [settings]);
 
   const currentLocation = demoMode ? demoLocation : location;
+  const {checkpoints, rewards} = useCheckpoints();
+  const goal = checkpoints.find((checkpoint) => !checkpoint.reachedAt) ?? null;
+  // Reward companions and accessories only show once earned.
+  const shownAvatar = effectiveAvatar(settings.avatar, rewards);
+  const shownAccessory =
+    settings.accessory && rewards?.includes(settings.accessory)
+      ? settings.accessory
+      : null;
+  const [celebrated, setCelebrated] = useState<string[]>(readCelebrated);
+  const celebrating =
+    checkpoints.find(
+      (checkpoint) => checkpoint.reachedAt && !celebrated.includes(checkpoint.id)
+    ) ?? null;
+  const finishCelebration = (id: string) => {
+    const next = [...celebrated, id].slice(-50);
+    setCelebrated(next);
+    try {
+      window.localStorage.setItem(CELEBRATED_KEY, JSON.stringify(next));
+    } catch {
+      // Without storage the celebration may show again next visit; that is harmless.
+    }
+  };
   const currentLatitude = currentLocation?.latitude;
   const currentLongitude = currentLocation?.longitude;
   const demoZones = savedZones.length > 0 ? savedZones : SAFE_ZONES;
@@ -431,6 +481,19 @@ export default function TrackerPage() {
       };
     };
 
+    const here = {latitude: currentLatitude, longitude: currentLongitude};
+    const zone = targetZone;
+    const guideWithoutInternet = () => {
+      setRoute(buildOfflineRoute(here, zone));
+      setRouteStatus("ready");
+    };
+
+    // No point waiting on route servers that cannot be reached.
+    if (!navigator.onLine) {
+      guideWithoutInternet();
+      return;
+    }
+
     void fetchAppRoute()
       .catch(async (error) => {
         if (controller.signal.aborted) throw error;
@@ -439,14 +502,15 @@ export default function TrackerPage() {
       })
       .then((result) => {
         if (controller.signal.aborted) return;
+        saveOfflineRoute(zone.id, result);
         setRoute(result);
         setRouteStatus("ready");
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
         console.error("ROUTE ERROR:", error);
-        setRoute(null);
-        setRouteStatus("error");
+        // Both route services failed (often no data): guide from the phone instead of giving up.
+        guideWithoutInternet();
       });
   }, [
     currentLatitude,
@@ -464,6 +528,9 @@ export default function TrackerPage() {
     };
   }, []);
 
+  // When the companion last started talking, so an automatic game never cuts into guidance.
+  const lastSpeechAt = useRef(0);
+
   const speakMessage = useCallback(
     async (message: string) => {
       const text = message.trim();
@@ -475,6 +542,8 @@ export default function TrackerPage() {
       }
 
       const sequence = ++speechSequence.current;
+
+      lastSpeechAt.current = Date.now();
 
       speechController.current?.abort();
 
@@ -569,8 +638,10 @@ export default function TrackerPage() {
   );
 
   const requestAssistantMessage = useCallback(
-    async (state: SafetyState) => {
+    async (state: SafetyState, mode: "guide" | "game" = "guide") => {
       const sequence = ++requestSequence.current;
+      // The server answers a game request with guidance anyway unless the child is safe.
+      const game = mode === "game" && state.riskLevel === "SAFE";
 
       requestController.current?.abort();
 
@@ -581,6 +652,12 @@ export default function TrackerPage() {
       const fallbackMessage =
         !state.isInsideSafeZone && targetZone
           ? getGuidanceFallback(targetZone.name)
+      // Outside the zone the guidance screen is open, so even the offline message should
+      // point the way home rather than say that everything is fine.
+      const fallbackMessage = game
+        ? getGameFallback(profile.userName)
+        : !state.isInsideSafeZone && targetZone
+          ? getGuidanceFallback(targetZone.name, profile.userName)
           : getSafetyFallback(state.riskLevel, profile.userName);
 
       speechSequence.current += 1;
@@ -598,7 +675,8 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
 
-      setAssistantMessage(fallbackMessage);
+      // A game keeps the current words on screen until its own question arrives.
+      if (!game) setAssistantMessage(fallbackMessage);
 
       setAssistantLoading(true);
 
@@ -620,6 +698,8 @@ export default function TrackerPage() {
         destination: targetZone?.name ?? state.nearestSafeZone.name,
 
         nearbyLandmarks: [],
+
+        ...(game ? { mode: "game" as const } : {}),
 
         ...(navigationInstruction
           ? {
@@ -707,7 +787,7 @@ export default function TrackerPage() {
       setSpeechStatus("idle");
       setSpeechError("");
       setAssistantMessage(
-        `Та ${targetZone.name} аюулгүй бүсэд байна. Тайван байгаарай.`
+        `${profile.userName}, чи ${targetZone.name} аюулгүй бүсэд байна. Ёстой гоё!`
       );
       return;
     }
@@ -731,11 +811,60 @@ export default function TrackerPage() {
     void requestAssistantMessage(safetyState);
   }, [
     automaticRequestKey,
+    profile.userName,
     requestAssistantMessage,
     routeStatus,
     safetyState,
     targetZone,
   ]);
+
+  // While the camera guides a safe walk, the companion starts a little game by itself now and
+  // then. It waits for a quiet moment, so a turn instruction always comes first.
+  const lastGameAt = useRef(0);
+  const guidingSince = useRef<number | null>(null);
+  const autoGameInputs = useRef({
+    safetyState,
+    busy: false,
+    requestAssistantMessage,
+  });
+  useEffect(() => {
+    autoGameInputs.current = {
+      safetyState,
+      busy:
+        assistantLoading ||
+        speechStatus === "loading" ||
+        speechStatus === "playing",
+      requestAssistantMessage,
+    };
+  });
+  useEffect(() => {
+    if (!guiding) return;
+    guidingSince.current = Date.now();
+    const interval = window.setInterval(() => {
+      const {safetyState: state, busy, requestAssistantMessage: request} =
+        autoGameInputs.current;
+      if (!state || state.riskLevel !== "SAFE" || busy) return;
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - (guidingSince.current ?? now) < AUTO_GAME_FIRST_DELAY_MS) return;
+      if (now - lastGameAt.current < AUTO_GAME_INTERVAL_MS) return;
+      if (now - lastSpeechAt.current < AUTO_GAME_QUIET_MS) return;
+      lastGameAt.current = now;
+      void request(state, "game");
+    }, AUTO_GAME_CHECK_MS);
+    return () => window.clearInterval(interval);
+  }, [guiding]);
+
+  // The companion says the good news out loud, once per reached checkpoint.
+  const announcedCheckpoint = useRef<string | null>(null);
+  useEffect(() => {
+    if (!celebrating || announcedCheckpoint.current === celebrating.id) return;
+    announcedCheckpoint.current = celebrating.id;
+    const reward = describeReward(celebrating.reward);
+    void speakMessage(
+      `Баяр хүргэе, ${profile.userName}! Чи ${celebrating.name} хүртэл алхаж очлоо. ${reward.label} одоо чинийх боллоо!`
+    );
+  }, [celebrating, profile.userName, speakMessage]);
 
   useEffect(() => {
     const audio = audioElement.current;
@@ -759,7 +888,7 @@ export default function TrackerPage() {
     assistantMessage ||
     (safetyState
       ? isOutsideSafeZone && targetZone
-        ? getGuidanceFallback(targetZone.name)
+        ? getGuidanceFallback(targetZone.name, profile.userName)
         : getSafetyFallback(safetyState.riskLevel, profile.userName)
       : zonesLoadError ||
         (zonesLoaded && !demoMode && savedZones.length === 0
@@ -872,14 +1001,31 @@ export default function TrackerPage() {
               : "flex-1 flex-col items-center justify-center"
           }`}
         >
-          <CompanionMark
-            state={companionState}
-            avatar={settings.avatar}
-            name={companionName}
-            className={`companion-avatar--compact shrink-0 ${
-              guiding ? "companion-avatar--mini" : ""
-            }`}
-          />
+          {/* Tapping the companion opens the screen where the child dresses and renames it. */}
+          <Link
+            href="/tracker/companion"
+            aria-label={`AI найзаа өөрчлөх: ${companionName}`}
+            className="relative shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#67e8f9]"
+          >
+            <CompanionMark
+              state={companionState}
+              avatar={shownAvatar}
+              accessory={shownAccessory}
+              custom={settings.custom}
+              name={companionName}
+              className={`companion-avatar--compact shrink-0 ${
+                guiding ? "companion-avatar--mini" : ""
+              }`}
+            />
+            {!guiding && (
+              <span
+                aria-hidden="true"
+                className="absolute bottom-1 right-1 z-[3] grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
+              >
+                <Pencil size={15} aria-hidden="true" />
+              </span>
+            )}
+          </Link>
           <div
             className={`flex min-w-0 items-center gap-2 ${
               guiding ? "flex-1" : "w-full"
@@ -902,13 +1048,24 @@ export default function TrackerPage() {
                 {companionMessage}
               </span>
             </p>
+            {safetyState?.riskLevel === "SAFE" && (
+              <button
+                type="button"
+                disabled={assistantLoading}
+                onClick={() => void requestAssistantMessage(safetyState, "game")}
+                aria-label="Хамт тоглоом тоглох"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-[#7c3aed] text-white shadow-[0_8px_20px_rgba(124,58,237,.3)] transition hover:bg-[#6d28d9] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c4b5fd]"
+              >
+                <Gamepad2 size={18} aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               disabled={
                 !safetyState || assistantLoading || speechStatus === "loading"
               }
               onClick={() => void speakMessage(assistantMessage)}
-              aria-label={`${companionName}-г дахин сонсох`}
+              aria-label={`Дахин сонсох: ${companionName}`}
               className="grid size-10 shrink-0 place-items-center rounded-full bg-[#0e7490] text-white shadow-[0_8px_20px_rgba(6,182,212,.25)] transition hover:bg-[#0c819d] disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#67e8f9]"
             >
               {assistantLoading || speechStatus === "loading" ? (
@@ -926,6 +1083,11 @@ export default function TrackerPage() {
           </div>
         </section>
 
+        {goal && (
+          <CheckpointGoal goal={goal} location={currentLocation ?? null} compact={guiding} />
+        )}
+
+        {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
         <div
           className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
             guiding ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
@@ -995,7 +1157,7 @@ export default function TrackerPage() {
           )}
         </div>
 
-        <LocationSharingStatus />
+        <LocationSharingStatus outsideSafeZone={guiding} />
 
         <section className="relative z-10 mt-2" aria-label="Яаралтай тусламж">
           {sosConfirm && !demoMode ? (
@@ -1035,7 +1197,7 @@ export default function TrackerPage() {
               }}
               className="min-h-12 w-full rounded-2xl bg-rose-600 px-4 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(225,29,72,.22)] transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-45 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-300"
             >
-              🆘 SOS — Тусламж дуудах
+              <Siren size={18} aria-hidden="true" /> SOS — Тусламж дуудах
             </button>
           )}
           {sosMessage && (
@@ -1053,6 +1215,19 @@ export default function TrackerPage() {
             </p>
           )}
         </section>
+
+        {celebrating && (
+          <RewardCelebration
+            checkpoint={celebrating}
+            userName={profile.userName}
+            onUse={() => {
+              if (isAccessoryId(celebrating.reward)) update("accessory", celebrating.reward);
+              else update("avatar", celebrating.reward);
+              finishCelebration(celebrating.id);
+            }}
+            onClose={() => finishCelebration(celebrating.id)}
+          />
+        )}
 
         <audio
           ref={audioElement}
@@ -1092,8 +1267,27 @@ function isSafeZoneList(value: unknown): value is SafeZone[] {
   );
 }
 
-function getGuidanceFallback(zoneName: string) {
-  return `${zoneName} руу хамт буцъя. Цэнхэр сумыг дагаад алхаарай.`;
+// Automatic walking games: the first a little after guidance starts, then every few minutes,
+// and only after the companion has been quiet for a while.
+const AUTO_GAME_FIRST_DELAY_MS = 40_000;
+const AUTO_GAME_INTERVAL_MS = 3 * 60_000;
+const AUTO_GAME_QUIET_MS = 25_000;
+const AUTO_GAME_CHECK_MS = 5_000;
+
+const CELEBRATED_KEY = "safepath:celebrated-checkpoints";
+
+/** Checkpoints whose celebration this phone already showed. */
+function readCelebrated(): string[] {
+  try {
+    const stored: unknown = JSON.parse(window.localStorage.getItem(CELEBRATED_KEY) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function getGuidanceFallback(zoneName: string, userName: string) {
+  return `${userName}, ${zoneName} хүртэл хамт алхъя. Цэнхэр сумыг дагаад алхаарай, би чамтай хамт байна.`;
 }
 
 type DemoDirection = "up" | "down" | "left" | "right";

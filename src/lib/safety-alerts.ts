@@ -172,6 +172,40 @@ export async function markGuardianSafetyAlertRead(
 }
 
 
+/** At or below this charge, and not charging, guardians are told the phone may switch off soon. */
+export const LOW_BATTERY_LEVEL = 0.1;
+
+/**
+ * Tells guardians the child's phone is about to run out, while it can still report. At most one
+ * per child per day; the last shared position stays visible after the phone switches off.
+ */
+export async function createLowBatteryAlert(childId: string, batteryLevel: number): Promise<boolean> {
+  const { safetyAlerts } = await getCollections();
+  const now = new Date();
+  const percent = Math.round(batteryLevel * 100);
+  const alert: SafetyAlertRecord = {
+    _id: crypto.randomUUID(),
+    childId,
+    type: "LOW_BATTERY",
+    transitionKey: `low-battery:${childId}:${now.toISOString().slice(0, 10)}`,
+    message: `Хүүхдийн утасны цэнэг ${percent}% боллоо. Утас унтарвал хамгийн сүүлийн байршил SafePath дээр хадгалагдсан хэвээр байна.`,
+    createdAt: now,
+    readBy: [],
+  };
+  try {
+    await safetyAlerts.insertOne(alert);
+  } catch (error) {
+    if (isDuplicateKey(error)) return false;
+    throw error;
+  }
+  try {
+    await sendSafetyAlertPush(childId, { alertId: alert._id, type: alert.type, message: alert.message });
+  } catch {
+    console.error("SAFEPATH_LOW_BATTERY_PUSH_DELIVERY_FAILED");
+  }
+  return true;
+}
+
 /** Creates an explicit SOS alert for every currently linked guardian.
  * The alert deliberately stores no coordinates; guardians can use the existing
  * authenticated live-location feed to see the most recent shared position.

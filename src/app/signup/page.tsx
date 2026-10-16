@@ -11,7 +11,7 @@ export default async function SignupPage() {
 
   return (
     <AppShell>
-      <main className="relative isolate flex min-h-dvh flex-col overflow-x-hidden bg-[linear-gradient(155deg,#05090d_0%,#07151b_52%,#03080c_100%)] px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] sm:px-5">
+      <main className="relative isolate flex min-h-dvh flex-col overflow-x-clip bg-[linear-gradient(155deg,#05090d_0%,#07151b_52%,#03080c_100%)] px-4 pb-[calc(20px+env(safe-area-inset-bottom))] pt-[calc(12px+env(safe-area-inset-top))] sm:px-5">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-24 top-[12%] size-72 rounded-full bg-[#06b6d4]/20 blur-3xl"

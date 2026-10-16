@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 
 /**
  * Lays its child (a map) down as ground seen from a low, slanted angle, like a navigation app's
@@ -19,6 +21,15 @@ export function TiltedPlane({
   heading?: number | null;
   fadeColor?: string;
 }) {
+  // Keep a running angle instead of the raw 0–360° heading, so the eased turn from 359° to 1°
+  // takes the short 2° step rather than spinning the whole map around.
+  const [turn, setTurn] = useState<{ heading: number | null; angle: number }>({ heading, angle: heading ?? 0 });
+  if (heading !== null && heading !== turn.heading) {
+    const step = turn.heading === null ? heading - turn.angle : ((heading - turn.heading + 540) % 360) - 180;
+    setTurn({ heading, angle: turn.angle + step });
+  }
+  const angle = heading === null ? 0 : turn.angle;
+
   // A square plane big enough to cover the frame out to the horizon at any rotation: half its side
   // is the larger of 2.2× the frame's height (the far reach once tilted) and its full width.
   const halfSide = "max(220cqh, 100cqw)";
@@ -34,8 +45,9 @@ export function TiltedPlane({
           height: `calc(2 * ${halfSide})`,
           left: `calc(50cqw - ${halfSide})`,
           top: `calc(${centerPercent}cqh - ${halfSide})`,
-          transform: `rotateX(${tilt}deg) rotateZ(${heading === null ? 0 : (-heading).toFixed(1)}deg)`,
+          transform: `rotateX(${tilt}deg) rotateZ(${(-angle).toFixed(1)}deg)`,
           transformOrigin: "50% 50%",
+          transition: "transform 300ms ease-out",
         }}
       >
         {children}
