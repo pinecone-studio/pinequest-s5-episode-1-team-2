@@ -11,14 +11,19 @@ type PushPlugin = typeof import("@capacitor/push-notifications").PushNotificatio
 type PushStatus = "idle" | "requesting" | "enabled" | "server-not-configured" | "denied" | "error" | "unavailable";
 
 // PushNotifications.register() kills the whole Android app (a native IllegalStateException that
-// JavaScript cannot catch) when the APK was built without google-services.json. Only register once
-// a Firebase-enabled build is out and this flag is set.
-const ANDROID_PUSH_ENABLED = process.env.NEXT_PUBLIC_ANDROID_PUSH_ENABLED === "true";
+// JavaScript cannot catch) when the APK was built without google-services.json. The plugin is only
+// built into the APK together with that file (see capacitor.config.ts), so an installed app that
+// has the plugin can register safely, and older APKs without it simply skip push.
+function pushBuiltIn() {
+  return Capacitor.isPluginAvailable("PushNotifications");
+}
 
 export default function PushNotificationSetup() {
   const [nativeAndroid, setNativeAndroid] = useState(false);
   const [pushStatus, setStatus] = useState<PushStatus>("idle");
-  const status: PushStatus = ANDROID_PUSH_ENABLED ? pushStatus : "unavailable";
+  // Markup only appears once the effect marks this as native Android, so server and client agree.
+  const [available] = useState(() => typeof window !== "undefined" && pushBuiltIn());
+  const status: PushStatus = available ? pushStatus : "unavailable";
   const handlesRef = useRef<ListenerHandle[]>([]);
   const listenersReadyRef = useRef(false);
   const mountedRef = useRef(false);
@@ -59,9 +64,8 @@ export default function PushNotificationSetup() {
 
     handlesRef.current.push(await plugin.addListener("pushNotificationActionPerformed", (action) => {
       const data = action.notification.data as Record<string, unknown> | undefined;
-      if (data?.type === "SAFETY_ALERT" && data.target === "guardian") {
-        window.location.assign("/guardian#events");
-      }
+      if (data?.target !== "guardian") return;
+      window.location.assign(data.type === "SAFETY_ALERT" ? "/guardian#events" : "/guardian");
     }));
   }, []);
 
@@ -95,7 +99,7 @@ export default function PushNotificationSetup() {
       return () => { mountedRef.current = false; };
     }
     setNativeAndroid(true);
-    if (!ANDROID_PUSH_ENABLED) {
+    if (!available) {
       return () => { mountedRef.current = false; };
     }
 
@@ -130,10 +134,10 @@ export default function PushNotificationSetup() {
       mountedRef.current = false;
       void removeListeners();
     };
-  }, [addListeners, prepareChannels, removeListeners]);
+  }, [addListeners, available, prepareChannels, removeListeners]);
 
   const enableNotifications = async () => {
-    if (!ANDROID_PUSH_ENABLED) return;
+    if (!pushBuiltIn()) return;
     setStatus("requesting");
     try {
       const plugin = pluginRef.current ?? (await import("@capacitor/push-notifications")).PushNotifications;

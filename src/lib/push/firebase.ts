@@ -92,11 +92,20 @@ function pushTitle(type: SafetyAlertType) {
   return "SafePath — Аюулгүй бүс";
 }
 
+type GuardianPush = {
+  title: string;
+  body: string;
+  /** Read by the app when the notification is tapped. Values must be strings. */
+  data: Record<string, string>;
+  channelId: string;
+  priority: "HIGH" | "NORMAL";
+};
+
 /**
  * Best-effort Android/iOS FCM delivery to guardian-role devices currently linked to a child.
- * This function never includes exact GPS coordinates in the notification payload.
+ * Callers never include exact GPS coordinates in the notification payload.
  */
-export async function sendSafetyAlertPush(childId: string, alert: SafetyPushInput) {
+async function pushToGuardians(childId: string, push: GuardianPush) {
   const config = getConfig();
   if (!config) return { status: "not-configured" as const, sent: 0, attempted: 0 };
 
@@ -127,21 +136,15 @@ export async function sendSafetyAlertPush(childId: string, alert: SafetyPushInpu
           message: {
             token: device.token,
             notification: {
-              title: pushTitle(alert.type),
-              body: alert.message.slice(0, 200),
+              title: push.title,
+              body: push.body.slice(0, 200),
             },
-            data: {
-              type: "SAFETY_ALERT",
-              alertId: alert.alertId,
-              childId,
-              alertType: alert.type,
-              target: "guardian",
-            },
+            data: { ...push.data, childId, target: "guardian" },
             android: {
-              priority: alert.type === "ZONE_ENTER" ? "NORMAL" : "HIGH",
+              priority: push.priority,
               ttl: "300s",
               notification: {
-                channel_id: alert.type === "SOS" ? SOS_NOTIFICATION_CHANNEL_ID : SAFETY_NOTIFICATION_CHANNEL_ID,
+                channel_id: push.channelId,
                 sound: "default",
               },
             },
@@ -170,4 +173,26 @@ export async function sendSafetyAlertPush(childId: string, alert: SafetyPushInpu
   }));
 
   return { status: sent === tokens.length ? "sent" as const : sent > 0 ? "partial" as const : "failed" as const, sent, attempted: tokens.length };
+}
+
+/** A safety alert (SOS, zone, battery) to the child's guardians. */
+export async function sendSafetyAlertPush(childId: string, alert: SafetyPushInput) {
+  return pushToGuardians(childId, {
+    title: pushTitle(alert.type),
+    body: alert.message,
+    data: { type: "SAFETY_ALERT", alertId: alert.alertId, alertType: alert.type },
+    channelId: alert.type === "SOS" ? SOS_NOTIFICATION_CHANNEL_ID : SAFETY_NOTIFICATION_CHANNEL_ID,
+    priority: alert.type === "ZONE_ENTER" ? "NORMAL" : "HIGH",
+  });
+}
+
+/** Good news for the guardians: the child walked to a checkpoint they set and won its reward. */
+export async function sendCheckpointReachedPush(childId: string, checkpointName: string) {
+  return pushToGuardians(childId, {
+    title: "SafePath — Шагналтай газар",
+    body: `Хүүхэд ${checkpointName} хүртэл алхаж очоод шагналаа авлаа.`,
+    data: { type: "CHECKPOINT_REACHED" },
+    channelId: SAFETY_NOTIFICATION_CHANNEL_ID,
+    priority: "NORMAL",
+  });
 }
