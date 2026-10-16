@@ -327,18 +327,26 @@ export default function TrackerPage() {
 
     if (!targetZone) {
       routeController.current?.abort();
+      routeController.current = null;
       lastRouteAt.current = 0;
       lastRouteTargetId.current = null;
-      setRoute(null);
-      setRouteStatus("idle");
+      queueMicrotask(() => {
+        if (routeController.current !== null) return;
+        setRoute(null);
+        setRouteStatus("idle");
+      });
       return;
     }
 
     if (safetyState?.isInsideSafeZone) {
       routeController.current?.abort();
+      routeController.current = null;
       lastRouteAt.current = 0;
-      setRoute(null);
-      setRouteStatus("idle");
+      queueMicrotask(() => {
+        if (routeController.current !== null) return;
+        setRoute(null);
+        setRouteStatus("idle");
+      });
       return;
     }
 
@@ -517,9 +525,7 @@ export default function TrackerPage() {
     currentLongitude,
     demoMode,
     safetyState?.isInsideSafeZone,
-    targetZone?.id,
-    targetZone?.latitude,
-    targetZone?.longitude,
+    targetZone,
   ]);
 
   useEffect(() => {
@@ -921,10 +927,10 @@ export default function TrackerPage() {
               <ChevronLeft size={24} aria-hidden="true" />
             </Link>
             <div className="inline-flex items-center gap-2 text-[15px] font-bold tracking-[-0.02em]">
-              <span className="grid size-10 place-items-center rounded-[14px] bg-gradient-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
+              <span className="grid size-10 place-items-center rounded-[14px] bg-linear-to-br from-[#67e8f9] to-[#0891b2] text-[#06212a] shadow-[0_6px_18px_rgba(6,182,212,.3)]">
                 <svg
                   viewBox="0 0 24 24"
-                  className="size-[22px]"
+                  className="size-5.5"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.2"
@@ -1017,7 +1023,7 @@ export default function TrackerPage() {
             {!guiding && (
               <span
                 aria-hidden="true"
-                className="absolute bottom-1 right-1 z-[3] grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
+                className="absolute bottom-1 right-1 z-3 grid size-8 place-items-center rounded-full bg-[#7c3aed] text-[15px] shadow-[0_4px_10px_rgba(0,0,0,.35)] ring-2 ring-[#07151b]"
               >
                 <Pencil size={15} aria-hidden="true" />
               </span>
@@ -1033,12 +1039,12 @@ export default function TrackerPage() {
               aria-busy={assistantLoading}
               className={`min-w-0 flex-1 rounded-2xl bg-[#10232b] font-semibold text-[#f1f7f8] ring-1 ring-[#67e8f9]/15 ${
                 guiding
-                  ? "rounded-tl-md px-3 py-2 text-[13px] leading-[18px]"
-                  : "px-4 py-3 text-center text-[15px] leading-[22px]"
+                  ? "rounded-tl-md px-3 py-2 text-[13px] leading-4.5"
+                  : "px-4 py-3 text-center text-[15px] leading-5.5"
               }`}
             >
               <span
-                className={`block break-words ${
+                className={`block wrap-break-word ${
                   guiding ? "line-clamp-3" : "line-clamp-4"
                 }`}
               >
@@ -1087,7 +1093,7 @@ export default function TrackerPage() {
         {/* A small slanted map inside the Safe Zone; camera guidance takes over by itself once outside. */}
         <div
           className={`relative z-10 mt-3 overflow-hidden rounded-[28px] bg-[#101c22] ring-1 ring-[#67e8f9]/20 shadow-[0_18px_45px_rgba(0,0,0,.28)] ${
-            guiding ? "min-h-[320px] flex-1" : "h-[220px] shrink-0"
+            guiding ? "min-h-80 flex-1" : "h-55 shrink-0"
           }`}
         >
           {guiding && currentLocation ? (
@@ -1121,7 +1127,7 @@ export default function TrackerPage() {
               </TiltedPlane>
               <span
                 aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 z-[403] -translate-x-1/2 -translate-y-1/2"
+                className="pointer-events-none absolute left-1/2 z-403 -translate-x-1/2 -translate-y-1/2"
                 style={{top: `${CALM_MAP_CENTER_PERCENT}%`}}
               >
                 {calmHeading === null ? (
@@ -1320,7 +1326,7 @@ function DemoPad({
   return (
     <div
       aria-label="Demo байршил хөдөлгөх"
-      className="absolute bottom-3 left-3 z-[410] grid grid-cols-3 grid-rows-3 gap-0.5 rounded-xl bg-[#071116]/70 p-1 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
+      className="absolute bottom-3 left-3 z-410 grid grid-cols-3 grid-rows-3 gap-0.5 rounded-xl bg-[#071116]/70 p-1 shadow-lg ring-1 ring-white/15 backdrop-blur-md"
     >
       {arrow("up", "Demo: хойд зүг рүү", "↑", "col-start-2")}
       {arrow("left", "Demo: баруун зүг рүү", "←", "col-start-1 row-start-2")}
