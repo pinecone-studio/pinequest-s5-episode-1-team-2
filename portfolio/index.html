@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Миний Портфолио</title>
+  <meta name="description" content="Вэб хөгжүүлэгчийн портфолио — төслүүд, ур чадвар, холбоо барих." />
+  <style>
+    :root {
+      --bg: #0b1014;
+      --surface: #121a20;
+      --surface-2: #18232b;
+      --text: #e8eef2;
+      --muted: #8a9aa6;
+      --accent: #3ddc97;
+      --accent-2: #4fb3ff;
+      --border: #22303a;
+      --radius: 16px;
+    }
+    :root[data-theme="light"] {
+      --bg: #f7f7f5;
+      --surface: #ffffff;
+      --surface-2: #f0f2f1;
+      --text: #111111;
+      --muted: #5f6b73;
+      --accent: #1f9e68;
+      --accent-2: #1d7fd1;
+      --border: #e3e6e4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      transition: background .3s, color .3s;
+    }
+    a { color: inherit; text-decoration: none; }
+    .container { width: min(1100px, 100% - 32px); margin-inline: auto; }
+
+    /* Nav */
+    nav {
+      position: sticky; top: 0; z-index: 10;
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .container { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { font-weight: 800; font-size: 1.2rem; }
+    .logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-links a { color: var(--muted); font-size: .95rem; transition: color .2s; }
+    .nav-links a:hover { color: var(--text); }
+    .icon-btn {
+      background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+      width: 38px; height: 38px; border-radius: 10px; cursor: pointer; font-size: 1rem;
+    }
+    .menu-btn { display: none; }
+
+    /* Hero */
+    .hero { padding: 100px 0 80px; }
+    .hero .tag {
+      display: inline-block; padding: 6px 14px; border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      color: var(--accent); font-size: .85rem; font-weight: 600; margin-bottom: 20px;
+    }
+    .hero h1 { font-size: clamp(2.2rem, 6vw, 4rem); line-height: 1.1; margin-bottom: 20px; }
+    .hero h1 .grad {
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .hero p { color: var(--muted); font-size: 1.15rem; max-width: 600px; margin-bottom: 32px; }
+    .btns { display: flex; gap: 12px; flex-wrap: wrap; }
+    .btn {
+      padding: 12px 24px; border-radius: 12px; font-weight: 600;
+      border: 1px solid var(--border); transition: transform .2s, opacity .2s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn.primary { background: var(--accent); color: #062015; border-color: var(--accent); }
+
+    /* Sections */
+    section { padding: 80px 0; }
+    .section-title { font-size: 2rem; margin-bottom: 8px; }
+    .section-sub { color: var(--muted); margin-bottom: 40px; }
+
+    .about-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 40px; align-items: center; }
+    .avatar {
+      aspect-ratio: 1; width: 100%; max-width: 280px; border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center; font-size: 4rem; font-weight: 800; color: #062015;
+    }
+    .about-grid p { color: var(--muted); margin-bottom: 16px; }
+    .stats { display: flex; gap: 32px; margin-top: 24px; flex-wrap: wrap; }
+    .stats strong { display: block; font-size: 1.8rem; color: var(--accent); }
+    .stats span { color: var(--muted); font-size: .9rem; }
+
+    .skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; transition: transform .2s, border-color .2s;
+    }
+    .card:hover { transform: translateY(-4px); border-color: var(--accent); }
+    .card h3 { margin-bottom: 12px; }
+    .bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin-top: 6px; }
+    .bar div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: inherit; transition: width 1.2s ease; }
+    .skill-row { margin-bottom: 14px; font-size: .92rem; }
+    .skill-row .lbl { display: flex; justify-content: space-between; color: var(--muted); }
+
+    .projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+    .project .thumb {
+      height: 160px; border-radius: 12px; margin-bottom: 18px;
+      display: grid; place-items: center; font-size: 3rem;
+    }
+    .project p { color: var(--muted); font-size: .95rem; margin-bottom: 16px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .chip { font-size: .8rem; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+    .project .links a { color: var(--accent); font-weight: 600; margin-right: 16px; font-size: .9rem; }
+
+    .contact-box { text-align: center; max-width: 640px; margin-inline: auto; }
+    .contact-box p { color: var(--muted); margin-bottom: 28px; }
+    form { display: grid; gap: 12px; text-align: left; margin-bottom: 28px; }
+    input, textarea {
+      width: 100%; padding: 14px; border-radius: 12px; font: inherit;
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    }
+    input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .socials { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+    .socials a { color: var(--muted); }
+    .socials a:hover { color: var(--accent); }
+    .form-msg { color: var(--accent); min-height: 1.5em; }
+
+    footer { border-top: 1px solid var(--border); padding: 28px 0; text-align: center; color: var(--muted); font-size: .9rem; }
+
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .7s, transform .7s; }
+    .reveal.show { opacity: 1; transform: none; }
+
+    @media (max-width: 760px) {
+      .menu-btn { display: block; }
+      .nav-links {
+        position: absolute; top: 64px; left: 0; right: 0; flex-direction: column;
+        background: var(--bg); border-bottom: 1px solid var(--border);
+        padding: 20px; gap: 16px; display: none;
+      }
+      .nav-links.open { display: flex; }
+      .about-grid { grid-template-columns: 1fr; }
+      .avatar { max-width: 200px; }
+      .hero { padding: 60px 0 40px; }
+      section { padding: 56px 0; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ✏️ Доорх "Таны Нэр", имэйл, холбоосуудыг өөрийн мэдээллээр солиорой -->
+  <nav>
+    <div class="container">
+      <a href="#" class="logo">Таны<span>.</span>Нэр</a>
+      <div class="nav-links" id="navLinks">
+        <a href="#about">Миний тухай</a>
+        <a href="#skills">Ур чадвар</a>
+        <a href="#projects">Төслүүд</a>
+        <a href="#contact">Холбоо барих</a>
+        <button class="icon-btn" id="themeBtn" aria-label="Өнгө солих">🌙</button>
+      </div>
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Цэс">☰</button>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <span class="tag">👋 Сайн байна уу!</span>
+      <h1>Би <span class="grad">Таны Нэр</span><br />— <span id="typed"></span></h1>
+      <p>Хэрэглэгчдэд хэрэгтэй, хурдан, гоё вэб болон мобайл аппликейшн бүтээх дуртай. Pinecone Academy-д суралцаж байна.</p>
+      <div class="btns">
+        <a href="#projects" class="btn primary">Төслүүд үзэх</a>
+        <a href="#contact" class="btn">Холбогдох</a>
+      </div>
+    </div>
+  </header>
+
+  <section id="about">
+    <div class="container about-grid reveal">
+      <div class="avatar">TN</div>
+      <div>
+        <h2 class="section-title">Миний тухай</h2>
+        <p>Би програмчлалд дуртай, шинэ зүйл сурах сонирхолтой хөгжүүлэгч. React, Next.js, TypeScript ашиглан хэрэглэгчийн бодит асуудлыг шийддэг бүтээгдэхүүн хийдэг.</p>
+        <p>Багаар ажиллах, дизайн болон кодын чанарт анхаарал хандуулах нь миний давуу тал.</p>
+        <div class="stats">
+          <div><strong data-count="10">0</strong><span>Төсөл</span></div>
+          <div><strong data-count="2">0</strong><span>Жилийн туршлага</span></div>
+          <div><strong data-count="8">0</strong><span>Технологи</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="skills">
+    <div class="container">
+      <h2 class="section-title reveal">Ур чадвар</h2>
+      <p class="section-sub reveal">Миний ашигладаг технологиуд</p>
+      <div class="skills">
+        <div class="card reveal">
+          <h3>🎨 Frontend</h3>
+          <div class="skill-row"><div class="lbl"><span>HTML / CSS</span><span>90%</span></div><div class="bar"><div data-w="90"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>React / Next.js</span><span>80%</span></div><div class="bar"><div data-w="80"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>Tailwind CSS</span><span>85%</span></div><div class="bar"><div data-w="85"></div></div></div>
+        </div>
+        <div class="card reveal">
+          <h3>⚙️ Backend</h3>
+          <div class="skill-row"><div class="lbl"><span>Node.js</span><span>70%</span></div><div class="bar"><div data-w="70"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>MongoDB</span><span>65%</span></div><div class="bar"><div data-w="65"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>REST API</span><span>75%</span></div><div class="bar"><div data-w="75"></div></div></div>
+        </div>
+        <div class="card reveal">
+          <h3>🛠 Хэрэгсэл</h3>
+          <div class="skill-row"><div class="lbl"><span>Git / GitHub</span><span>85%</span></div><div class="bar"><div data-w="85"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>TypeScript</span><span>75%</span></div><div class="bar"><div data-w="75"></div></div></div>
+          <div class="skill-row"><div class="lbl"><span>Figma</span><span>60%</span></div><div class="bar"><div data-w="60"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="projects">
+    <div class="container">
+      <h2 class="section-title reveal">Төслүүд</h2>
+      <p class="section-sub reveal">Миний хийсэн зарим ажлууд</p>
+      <div class="projects">
+        <article class="card project reveal">
+          <div class="thumb" style="background:linear-gradient(135deg,#0f3d2e,#1e6b8f)">🛡️</div>
+          <h3>SafePath AI</h3>
+          <p>Хүүхдийн байршлыг хянах, AR камераар аюулгүй замаар хөтлөх, дуут зааварчилгаатай аппликейшн.</p>
+          <div class="chips"><span class="chip">Next.js</span><span class="chip">Capacitor</span><span class="chip">MongoDB</span><span class="chip">Gemini AI</span></div>
+          <div class="links"><a href="https://github.com/pinecone-studio/pinequest-s5-episode-1-team-2" target="_blank" rel="noopener">GitHub →</a></div>
+        </article>
+        <article class="card project reveal">
+          <div class="thumb" style="background:linear-gradient(135deg,#4a2a6b,#c0507a)">🛒</div>
+          <h3>Төслийн нэр 2</h3>
+          <p>Энд төслийнхөө товч тайлбарыг бичнэ үү. Ямар асуудлыг шийдсэн, юу сурсан гэх мэт.</p>
+          <div class="chips"><span class="chip">React</span><span class="chip">Tailwind</span></div>
+          <div class="links"><a href="#">Демо →</a><a href="#">GitHub →</a></div>
+        </article>
+        <article class="card project reveal">
+          <div class="thumb" style="background:linear-gradient(135deg,#6b4a1a,#d19a2b)">📝</div>
+          <h3>Төслийн нэр 3</h3>
+          <p>Энд төслийнхөө товч тайлбарыг бичнэ үү. Ямар асуудлыг шийдсэн, юу сурсан гэх мэт.</p>
+          <div class="chips"><span class="chip">Node.js</span><span class="chip">Express</span></div>
+          <div class="links"><a href="#">Демо →</a><a href="#">GitHub →</a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="container contact-box reveal">
+      <h2 class="section-title">Холбоо барих</h2>
+      <p>Хамтран ажиллах санал байвал надтай холбогдоорой!</p>
+      <form id="contactForm">
+        <input name="name" placeholder="Таны нэр" required />
+        <input name="email" type="email" placeholder="Имэйл хаяг" required />
+        <textarea name="message" rows="5" placeholder="Мессеж" required></textarea>
+        <button class="btn primary" type="submit">Илгээх</button>
+        <div class="form-msg" id="formMsg"></div>
+      </form>
+      <div class="socials">
+        <a href="mailto:your@email.com">✉️ Имэйл</a>
+        <a href="https://github.com/" target="_blank" rel="noopener">💻 GitHub</a>
+        <a href="https://linkedin.com/" target="_blank" rel="noopener">💼 LinkedIn</a>
+        <a href="https://instagram.com/" target="_blank" rel="noopener">📷 Instagram</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">© <span id="year"></span> Таны Нэр. Бүх эрх хуулиар хамгаалагдсан.</div>
+  </footer>
+
+  <script>
+    // Theme toggle (remembered in this browser)
+    const root = document.documentElement;
+    const themeBtn = document.getElementById("themeBtn");
+    function setTheme(t) {
+      root.dataset.theme = t;
+      themeBtn.textContent = t === "light" ? "🌙" : "☀️";
+      try { localStorage.setItem("theme", t); } catch {}
+    }
+    let saved = "dark";
+    try { saved = localStorage.getItem("theme") || "dark"; } catch {}
+    setTheme(saved);
+    themeBtn.addEventListener("click", () => setTheme(root.dataset.theme === "light" ? "dark" : "light"));
+
+    // Mobile menu
+    const navLinks = document.getElementById("navLinks");
+    document.getElementById("menuBtn").addEventListener("click", () => navLinks.classList.toggle("open"));
+    navLinks.querySelectorAll("a").forEach(a => a.addEventListener("click", () => navLinks.classList.remove("open")));
+
+    // Typing effect
+    const words = ["Frontend хөгжүүлэгч", "Next.js дуртай", "Шинийг сурагч"];
+    const typed = document.getElementById("typed");
+    let wi = 0, ci = 0, deleting = false;
+    (function type() {
+      const w = words[wi];
+      typed.textContent = w.slice(0, ci);
+      if (!deleting && ci < w.length) ci++;
+      else if (deleting && ci > 0) ci--;
+      else { deleting = !deleting; if (!deleting) wi = (wi + 1) % words.length; }
+      setTimeout(type, deleting ? 50 : ci === w.length ? 1400 : 100);
+    })();
+
+    // Reveal on scroll + skill bars + counters
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add("show");
+        e.target.querySelectorAll("[data-w]").forEach(b => b.style.width = b.dataset.w + "%");
+        e.target.querySelectorAll("[data-count]").forEach(el => {
+          const end = +el.dataset.count; let n = 0;
+          const t = setInterval(() => { el.textContent = ++n + "+"; if (n >= end) clearInterval(t); }, 80);
+        });
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.15 });
+    document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+    // Contact form (demo only — no backend)
+    document.getElementById("contactForm").addEventListener("submit", e => {
+      e.preventDefault();
+      document.getElementById("formMsg").textContent = "Баярлалаа! Таны мессеж хүлээн авлаа ✅";
+      e.target.reset();
+    });
+
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
